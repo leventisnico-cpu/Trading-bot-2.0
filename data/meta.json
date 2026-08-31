@@ -1,0 +1,29 @@
+{
+  "fetched": "2026-08-31",
+  "source": "yahoo finance adjusted close (total-return approximation)",
+  "cad": {
+    "symbols": [
+      "XUU.TO",
+      "XEF.TO",
+      "XEC.TO",
+      "XIC.TO",
+      "ZAG.TO"
+    ],
+    "rows": 6408,
+    "start": "2001-02-22",
+    "end": "2026-08-28",
+    "common_start": "2015-02-20"
+  },
+  "us": {
+    "symbols": [
+      "SPY",
+      "EFA",
+      "EEM",
+      "AGG"
+    ],
+    "rows": 6956,
+    "start": "1999-01-04",
+    "end": "2026-08-28",
+    "common_start": "2003-09-29"
+  }
+}
