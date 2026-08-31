@@ -1,0 +1,56 @@
+# Engine configuration. EVERY risk limit lives here (§7) and tests read
+# these values instead of hardcoding them (§8).
+#
+# Calibration notes:
+# - max_drawdown_pct 0.35: equities dual momentum has seen ~30% strategy
+#   drawdowns historically; a 20% stop would fire on noise and train the
+#   operator to ignore it (§7). 35% is "something is genuinely wrong".
+# - fee model: IBKR Canada fixed pricing, CAD-listed ETFs. VERIFY the live
+#   schedule before funding (fixed CAD 0.01/share, min CAD 1.00/order as of
+#   research date; see docs/PHASE_0-2_REPORT.md).
+
+[meta]
+base_currency = "CAD"
+
+[universe]
+# TSX-listed, CAD-denominated ETFs (dual-momentum menu). Config, not code.
+symbols = ["XUU.TO", "XEF.TO", "XEC.TO", "XIC.TO", "ZAG.TO"]
+
+[costs]
+fee_model = "fixed_per_order"      # §3.5: proportional only if venue verified proportional
+fixed_min_fee = 1.00               # CAD per order (IBKR Canada fixed, min)
+per_share_fee = 0.01               # CAD per share (IBKR Canada fixed)
+proportional_rate = 0.0
+spread_bps = 10.0                  # full spread, half charged per side (CAD ETFs are wider than US)
+slippage_bps = 2.0
+
+[risk]
+max_drawdown_pct = 0.35            # hard kill: liquidate + halt, manual reset only
+min_equity_floor = 200.0           # hard kill: absolute floor
+max_daily_loss_pct = 0.08          # soft halt: stand down for the day
+max_position_weight = 0.50
+max_gross_exposure = 1.0           # no leverage, structurally
+allow_short = false
+allow_leverage = false
+max_orders_per_day = 10
+min_order_notional = 100.0         # full exits exempt (§5.4)
+max_cost_fraction = 0.02           # refuse any order whose all-in cost > 2% of its notional
+no_trade_band = 0.03               # skip weight changes under 3% (full exits exempt)
+rebalance_tolerance = 0.05
+max_rebalance_retries = 5
+
+[execution]
+live_min_equity = 2500.0           # automated live execution stays off below this
+escalation_max_hops = 1            # §5.10: one hop, never a chain (validated == 1)
+order_wait_seconds = 60.0
+
+[data]
+max_staleness_days = 5
+
+[strategy]
+# Opaque to the engine; read by the Phase 4 strategy module.
+lookback_months = 12
+skip_months = 1
+top_n = 1
+absolute_momentum_filter = true
+defensive_symbol = "ZAG.TO"        # where absolute momentum sends us when risk assets are negative
