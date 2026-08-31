@@ -1,6 +1,9 @@
 name: phase4-backtest
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - "trigger/phase4"   # touch this file to run (dispatch is not available to the bot)
 
 permissions:
   contents: write
