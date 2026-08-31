@@ -63,6 +63,10 @@ MUTATIONS = [
      "        market = Order(symbol=order.symbol, side=order.side, shares=order.shares,\n                       is_full_exit=order.is_full_exit, limit_price=None)\n        journal.record(\"escalation\", original_id=order.id, escalated_id=market.id,\n                       symbol=order.symbol, note=\"limit unfilled -> market, single hop\")\n        more, more_dropped = _submit_single(broker, risk, market, prices)",
      "        market = Order(symbol=order.symbol, side=order.side, shares=order.shares,\n                       is_full_exit=order.is_full_exit, limit_price=order.limit_price)\n        journal.record(\"escalation\", original_id=order.id, escalated_id=market.id,\n                       symbol=order.symbol, note=\"limit unfilled -> market, single hop\")\n        more, more_dropped, _e = _submit_with_escalation(broker, risk, market, prices, max_hops, journal)"),
 
+    ("engine/risk.py", "FM11: equity floor kills accounts that never reached it",
+     "        floor_armed = prior_state.peak_equity >= self.cfg.min_equity_floor\n        if floor_armed and current_equity < self.cfg.min_equity_floor:",
+     "        floor_armed = True\n        if floor_armed and current_equity < self.cfg.min_equity_floor:"),
+
     ("engine/backtest.py", "INV1: strategy sees the whole price frame (lookahead)",
      "            visible = prices.iloc[: i + 1]",
      "            visible = prices"),

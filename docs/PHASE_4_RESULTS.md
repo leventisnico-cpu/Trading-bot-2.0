@@ -6,9 +6,9 @@ CAD universe: ['XUU.TO', 'XEF.TO', 'XEC.TO', 'XIC.TO', 'ZAG.TO'], 2015-02-20 →
 
 | config | CAGR (TWR) | vol | Sharpe | maxDD | fees paid | fee drag/yr | final $ |
 |---|---|---|---|---|---|---|---|
-| dual momentum 12-1 | 0.00% | 0.00% | nan | 0.00% | 0 | 0.00% | 52,700 |
-| buy-and-hold DCA 100% US equity | 0.00% | 0.00% | nan | 0.00% | 0 | 0.00% | 52,700 |
-| buy-and-hold DCA 60/40 | 0.00% | 0.00% | nan | 0.00% | 0 | 0.00% | 52,700 |
+| dual momentum 12-1 | 8.52% | 15.46% | 0.61 | -27.90% | 2,455 | 0.61% | 98,299 |
+| buy-and-hold DCA 100% US equity | 13.67% | 15.93% | 0.88 | -27.51% | 90 | 0.02% | 134,586 |
+| buy-and-hold DCA 60/40 | 8.58% | 10.21% | 0.86 | -20.01% | 119 | 0.03% | 94,699 |
 
 ## 2. Net return by account size (no contributions)
 

@@ -79,10 +79,15 @@ class RiskEngine:
         if prior_state.last_equity > 0 and prior_state.last_equity_date != today.isoformat():
             daily_return = current_equity / prior_state.last_equity - 1.0
 
-        if current_equity < self.cfg.min_equity_floor:
+        # The floor only ARMS once the account has ever reached it: an
+        # accumulation account starting near $0 is below the floor on day
+        # one by construction, and killing it there is a false positive
+        # (found in this build's own Phase 4 — see FM#11 regression test).
+        floor_armed = prior_state.peak_equity >= self.cfg.min_equity_floor
+        if floor_armed and current_equity < self.cfg.min_equity_floor:
             return PreTradeResult(
                 PreTradeDecision.HARD_KILL,
-                f"equity {current_equity:.2f} below floor {self.cfg.min_equity_floor:.2f}",
+                f"equity {current_equity:.2f} fell below floor {self.cfg.min_equity_floor:.2f}",
                 daily_return, drawdown,
             )
         if drawdown > self.cfg.max_drawdown_pct:

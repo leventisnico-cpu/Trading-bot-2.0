@@ -1,0 +1,38 @@
+name: paper-daily
+on:
+  schedule:
+    - cron: "30 21 * * 1-5"   # 21:30 UTC weekdays, shortly after TSX close
+  workflow_dispatch:
+  push:
+    paths:
+      - "trigger/paper"        # touch to run manually (dispatch unavailable to the bot)
+
+permissions:
+  contents: write
+
+concurrency:
+  group: paper-daily
+  cancel-in-progress: false
+
+jobs:
+  paper:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install numpy pandas pytest yfinance
+      - name: the daily job runs the test suite before it may trade (§8)
+        run: python -m pytest tests -q
+      - name: paper cycle
+        run: python scripts/daily_run.py
+      - name: persist state + report
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin ${GITHUB_REF_NAME}
+          git add state/ reports/
+          git diff --cached --quiet || git commit -m "paper cycle $(date -u +%F) [automated]"
+          git push

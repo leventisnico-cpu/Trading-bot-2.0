@@ -320,6 +320,41 @@ def test_fm10_escalation_is_one_hop_never_a_chain(cfg):
     assert broker.submissions[1].limit_price is None, "escalated order was not a market order"
 
 
+def test_fm11_equity_floor_does_not_kill_an_account_still_accumulating(cfg):
+    """FM#11 (found in THIS build's Phase 4): a $0-start account with weekly
+    contributions was hard-killed on its first decision day because equity
+    was 'below the floor' it had never reached — and 11 years of backtest
+    sat in cash while reporting success. The floor must only arm once
+    equity has ever reached it."""
+    risk = _mk_risk(cfg)
+    floor = cfg.risk.min_equity_floor
+    assert floor > 0, "config floor is 0 — test proves nothing"
+
+    # Never reached the floor: growing account must be left alone.
+    prior = EngineState(peak_equity=floor * 0.4, last_equity=floor * 0.4,
+                        last_equity_date=(TODAY - timedelta(days=1)).isoformat())
+    res = risk.pre_trade(prior, floor * 0.5, TODAY)
+    assert res.decision is PreTradeDecision.OK, \
+        f"accumulating account killed below a floor it never reached: {res.reason}"
+
+    # Once armed (peak above floor), falling below it must still kill.
+    armed = EngineState(peak_equity=floor * 10, last_equity=floor * 1.1,
+                        last_equity_date=(TODAY - timedelta(days=1)).isoformat())
+    res2 = risk.pre_trade(armed, floor * 0.9, TODAY)
+    assert res2.decision is PreTradeDecision.HARD_KILL, \
+        "armed floor no longer kills — the fix disabled the kill switch"
+
+
+def test_fm11_zero_start_backtest_actually_invests(cfg):
+    prices = flat_prices(list(cfg.universe), days=260)
+    from conftest import ConstWeights as CW
+    result = run_backtest(prices, CW({cfg.universe[0]: 1.0}), cfg, initial_equity=0.0,
+                          contribution=lambda d: 100.0 if d.weekday() == 0 else 0.0,
+                          is_decision_day=lambda i: i in (5, 40, 80, 120))
+    assert not result.halted, "zero-start accumulation run was halted"
+    assert result.orders_filled, "contribution stream never produced a trade"
+
+
 def test_fm10_successful_escalation_stops_there(cfg):
     risk = _mk_risk(cfg)
     prices = {"A": 100.0}

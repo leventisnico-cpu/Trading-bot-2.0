@@ -80,7 +80,17 @@ def run(prices, strategy, cfg, initial, contribution):
 
 
 def fmt_row(name: str, m: dict) -> str:
-    return (f"| {name} | {m['cagr']:.2%} | {m['vol']:.2%} | {m['sharpe']:.2f} | "
+    # A halted or refusal-laden run must be impossible to mistake for a
+    # clean one (§11) — flag it in the row itself.
+    marks = []
+    if m.get("halted"):
+        marks.append("⚠HALTED")
+    if m.get("refusals"):
+        marks.append(f"⚠{m['refusals']} data refusals")
+    if m.get("orders") == 0:
+        marks.append("⚠NO TRADES")
+    tag = (" " + " ".join(marks)) if marks else ""
+    return (f"| {name}{tag} | {m['cagr']:.2%} | {m['vol']:.2%} | {m['sharpe']:.2f} | "
             f"{m['max_dd']:.2%} | {m['costs']:,.0f} | {m['fee_drag_yr']:.2%} | "
             f"{m['final']:,.0f} |")
 
