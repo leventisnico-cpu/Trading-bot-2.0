@@ -28,7 +28,10 @@ slippage_bps = 2.0
 max_drawdown_pct = 0.35            # hard kill: liquidate + halt, manual reset only
 min_equity_floor = 200.0           # hard kill: absolute floor
 max_daily_loss_pct = 0.08          # soft halt: stand down for the day
-max_position_weight = 0.50
+# 1.0 is deliberate: dual momentum holds ONE broad-index ETF at a time
+# (the ETF itself is diversified); drawdown control comes from the
+# absolute-momentum filter and the hard-kill limits, not position count.
+max_position_weight = 1.00
 max_gross_exposure = 1.0           # no leverage, structurally
 allow_short = false
 allow_leverage = false

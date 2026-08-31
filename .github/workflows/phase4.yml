@@ -1,0 +1,29 @@
+name: phase4-backtest
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install numpy pandas pytest yfinance
+      - name: test suite must be green before any measurement (§8)
+        run: python -m pytest tests -q
+      - name: fetch price data
+        run: python scripts/fetch_data.py
+      - name: run honest backtest
+        run: python scripts/phase4_backtest.py
+      - name: commit results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/ docs/PHASE_4_RESULTS.md
+          git diff --cached --quiet || git commit -m "Phase 4: fetched data + measured results [automated]"
+          git push

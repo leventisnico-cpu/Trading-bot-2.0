@@ -1,0 +1,18 @@
+name: tests
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install numpy pandas pytest
+      - name: unit + invariant + regression tests
+        run: python -m pytest tests -q
+      - name: mutation testing (every safety fix must be detected)
+        run: python tools/mutation_test.py

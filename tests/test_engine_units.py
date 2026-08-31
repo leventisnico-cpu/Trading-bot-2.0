@@ -95,8 +95,10 @@ def test_spread_and_slippage_separate_from_commission(cost_model):
 # ---- risk clamps ----------------------------------------------------------
 
 def test_clamp_respects_config_position_cap(cfg, risk):
-    w = risk.clamp_weights({cfg.universe[0]: 1.0})
-    assert w[cfg.universe[0]] == pytest.approx(cfg.risk.max_position_weight)
+    # 2x the cap in, cap out — holds for any configured cap value.
+    w = risk.clamp_weights({cfg.universe[0]: cfg.risk.max_position_weight * 2})
+    assert w[cfg.universe[0]] == pytest.approx(
+        min(cfg.risk.max_position_weight, cfg.risk.max_gross_exposure))
 
 
 def test_halted_state_raises(cfg, risk):
