@@ -32,7 +32,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git pull --rebase origin ${GITHUB_REF_NAME}
+          git status --short
           git add state/ reports/
           git diff --cached --quiet || git commit -m "paper cycle $(date -u +%F) [automated]"
+          git pull --rebase --autostash origin ${GITHUB_REF_NAME}
           git push
