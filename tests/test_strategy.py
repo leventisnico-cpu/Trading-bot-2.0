@@ -57,11 +57,14 @@ def test_skip_month_excludes_the_most_recent_month():
         "last-month spike won — the skip month is not being excluded"
 
 
-def test_insufficient_history_stays_in_cash():
+def test_insufficient_history_refuses():
+    """Audit round 2 #2: a partial cross-section is a DataError refusal —
+    an empty target would liquidate a held book."""
+    from engine.errors import DataError
     idx = pd.bdate_range(end="2026-08-31", periods=60)
     prices = pd.DataFrame({s: np.linspace(100, 110, 60) for s in UNIVERSE}, index=idx)
-    w = DualMomentum(UNIVERSE, PARAMS).target_weights(prices, TODAY)
-    assert w == {}
+    with pytest.raises(DataError):
+        DualMomentum(UNIVERSE, PARAMS).target_weights(prices, TODAY)
 
 
 def test_top2_splits_equally():

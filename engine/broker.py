@@ -126,6 +126,12 @@ class PaperBroker(Broker):
             held = self._positions.get(o.symbol, 0.0)
             if filled > held + 1e-9:
                 return OrderResult(order=o, status=OrderStatus.REJECTED)
+            if cost.total > filled * px:
+                # Adapter contract: never execute a sell whose costs exceed
+                # its own proceeds — a 40%-filled dust exit once paid a $1
+                # minimum fee out of $0.88 proceeds and drove cash negative
+                # (audit round 2, finding #6). Real adapters enforce this too.
+                return OrderResult(order=o, status=OrderStatus.REJECTED)
             self._cash += filled * px - cost.total
             self._positions[o.symbol] = held - filled
             if self._positions[o.symbol] <= 1e-9:   # float dust is not a position

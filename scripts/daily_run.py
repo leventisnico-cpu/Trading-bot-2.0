@@ -80,34 +80,44 @@ def main() -> int:
     today = date.today()
     cfg = load_config(REPO / "config" / "engine.toml")
     journal = Journal(REPO / "state" / "journal.jsonl")
-
-    store = StateStore(STATE_PATH)
-    if not STATE_PATH.exists() and not store.backup_path.exists():
-        # Deliberate paper-mode bootstrap (allowed: no real money exists here).
-        store.save(EngineState(last_equity_date=today.isoformat()))
-        journal.record("bootstrap", mode="paper")
-    state_preview = store.load()
-
-    prices = fetch_prices(list(cfg.universe))
-    latest = {s: float(prices[s].dropna().iloc[-1]) for s in cfg.universe
-              if s in prices.columns and not prices[s].dropna().empty}
-
-    # Simulate the weekly contribution into the paper account.
-    contribution = contributions_due(state_preview, today)
-    broker = PaperBroker(cash=state_preview.cash + contribution,
-                         prices=latest, cost_model=CostModel(cfg.costs),
-                         positions=dict(state_preview.positions))
-    if contribution:
-        journal.record("contribution", amount=contribution)
-
-    strategy = DualMomentum(cfg.universe, cfg.strategy)
-    decision = is_last_trading_day_of_month(today, prices.index)
-
     REPORTS_DIR.mkdir(exist_ok=True)
+
+    # Everything from state load onward can legitimately refuse (StateError,
+    # DataError, halted engine — all HaltErrors): every refusal must still
+    # produce a report and a journal line, never a bare traceback
+    # (audit round 2, finding #14).
     try:
+        store = StateStore(STATE_PATH)
+        if not STATE_PATH.exists() and not store.backup_path.exists():
+            # Deliberate paper-mode bootstrap (no real money exists here).
+            # last_equity_date stays empty so the first run credits the
+            # first weekly contribution (audit round 2, finding #12).
+            store.save(EngineState())
+            journal.record("bootstrap", mode="paper")
+        state_preview = store.load()
+
+        prices = fetch_prices(list(cfg.universe))
+        latest = {s: float(prices[s].dropna().iloc[-1]) for s in cfg.universe
+                  if s in prices.columns and not prices[s].dropna().empty}
+
+        # Simulate the weekly contribution into the paper account.
+        contribution = contributions_due(state_preview, today)
+        broker = PaperBroker(cash=state_preview.cash + contribution,
+                             prices=latest, cost_model=CostModel(cfg.costs),
+                             positions=dict(state_preview.positions))
+
+        strategy = DualMomentum(cfg.universe, cfg.strategy)
+        decision = is_last_trading_day_of_month(today, prices.index)
+
         result = run_cycle(today=today, cfg=cfg, store=store, broker=broker,
                            strategy=strategy, prices=prices, journal=journal,
                            decision_day=decision, net_flows=contribution)
+        # Journal the deposit only once the cycle PERSISTED it — journaling
+        # up front double-logged the same Mondays on every refused run
+        # (audit round 2, finding #13).
+        if contribution:
+            journal.record("contribution", amount=contribution,
+                           since=state_preview.last_equity_date or "bootstrap")
         report = result.report
     except HaltError as exc:
         report = f"REFUSED TO TRADE\ndate: {today.isoformat()}\nreason: {exc}\n"

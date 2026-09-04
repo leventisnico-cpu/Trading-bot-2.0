@@ -11,7 +11,7 @@ The no-lookahead invariant is covered by a bit-identity test (§3.1).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 from typing import Callable, Protocol
 
 import pandas as pd
@@ -57,9 +57,14 @@ def month_end_schedule(index: pd.DatetimeIndex) -> Callable[[int], bool]:
     """
     period = pd.Series(index.to_period("M"), index=range(len(index)))
     flags = (period != period.shift(-1)).to_numpy().copy()
+    # Tolerance of one business day: exchanges close on holidays bdate_range
+    # doesn't know (e.g. Good Friday), so a final bar one bday short of the
+    # calendar month-end is still the month's real last trading day
+    # (audit round 2, finding #10).
     last = index[-1]
-    flags[-1] = last.date() == max(
-        d.date() for d in pd.bdate_range(last.replace(day=1), last + pd.offsets.MonthEnd(0)))
+    month_end = last + pd.offsets.MonthEnd(0)
+    remaining = pd.bdate_range(last + pd.offsets.BDay(1), month_end)
+    flags[-1] = len(remaining) <= 1
     return lambda i: bool(flags[i])
 
 
@@ -103,11 +108,25 @@ def run_backtest(
     prices_ff = prices.ffill()
 
     n = len(prices.index)
+    prev_date = None
     for i in range(n):
         today = prices.index[i].date()
-        c = float(contribution(today))
-        if c < 0:
-            raise ValueError("withdrawal schedules are not supported (negative contribution)")
+        # Credit contributions for EVERY calendar day since the previous
+        # bar, not just bar dates — a Monday the market is closed still
+        # deposits $100 (audit round 2, finding #8: ~10% of deposits went
+        # missing across holiday Mondays).
+        if prev_date is None:
+            span = [today]
+        else:
+            span = [prev_date + timedelta(days=k)
+                    for k in range(1, (today - prev_date).days + 1)]
+        c = 0.0
+        for d in span:
+            ci = float(contribution(d))
+            if ci < 0:
+                raise ValueError("withdrawal schedules are not supported (negative contribution)")
+            c += ci
+        prev_date = today
         if c > 0:
             cash += c
             contributions_total += c
@@ -162,17 +181,19 @@ def run_backtest(
                 visible = prices.iloc[: i + 1]
                 required = set(cfg.universe) | {s for s, sh in positions.items() if sh > 0}
                 try:
+                    # A DataError from ANY of these — validation, the
+                    # strategy's own view of its window, or order
+                    # computation — is a refusal for the cycle, never a
+                    # liquidation (§5.7; audit round 2, finding #2).
                     validate_prices(visible, required, today, cfg.data.max_staleness_days)
-                except DataError as exc:
-                    result.refusals.append((today, str(exc)))
-                    pending = None
-                else:
                     px_now = latest_prices(visible, required)
-                    weights = strategy.target_weights(visible, today)
-                    weights = risk.clamp_weights(weights)
+                    weights = risk.clamp_weights(strategy.target_weights(visible, today))
                     pending = compute_orders(
                         positions, weights, px_now, equity,
                         no_trade_band=cfg.risk.no_trade_band) or None
+                except DataError as exc:
+                    result.refusals.append((today, str(exc)))
+                    pending = None
 
         # Deposits raise the peak baseline 1:1 (a deposit is not a gain).
         state.peak_equity = max(state.peak_equity + max(c, 0.0), equity)

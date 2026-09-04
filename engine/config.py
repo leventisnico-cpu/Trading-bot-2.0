@@ -151,7 +151,11 @@ def validate_config(cfg: EngineConfig) -> None:
     _check(r.min_equity_floor >= 0, "risk.min_equity_floor must be >= 0")
     _check(0 < r.max_daily_loss_pct < 1, "risk.max_daily_loss_pct must be in (0,1)")
     _check(0 < r.max_position_weight <= 1, "risk.max_position_weight must be in (0,1]")
-    _check(0 < r.max_gross_exposure <= 1 or r.allow_leverage,
+    # Positivity holds regardless of the leverage flag — allow_leverage=true
+    # once disabled ALL gross validation and a negative cap flipped the
+    # clamp into emitting shorts (audit round 2, finding #11).
+    _check(0 < r.max_gross_exposure <= 10, "risk.max_gross_exposure must be in (0,10]")
+    _check(r.max_gross_exposure <= 1 or r.allow_leverage,
            "risk.max_gross_exposure > 1 requires allow_leverage=true (which §3.4 forbids by default)")
     _check(r.max_orders_per_day >= 1, "risk.max_orders_per_day must be >= 1")
     _check(r.min_order_notional >= 0, "risk.min_order_notional must be >= 0")

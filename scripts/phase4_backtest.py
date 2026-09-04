@@ -38,7 +38,22 @@ def no_contribution(d: date) -> float:
 
 
 def flows_for(index: pd.DatetimeIndex, contribution) -> pd.Series:
-    return pd.Series([contribution(ts.date()) for ts in index], index=index)
+    """Flows credited per BAR, accrued over all calendar days since the
+    previous bar — the exact rule run_backtest uses. Evaluating only bar
+    dates lets a holiday-Monday deposit (credited on Tuesday's bar) count
+    as return and inflate TWR."""
+    from datetime import timedelta
+    out = []
+    prev = None
+    for ts in index:
+        today = ts.date()
+        if prev is None:
+            span = [today]
+        else:
+            span = [prev + timedelta(days=k) for k in range(1, (today - prev).days + 1)]
+        out.append(sum(float(contribution(d)) for d in span))
+        prev = today
+    return pd.Series(out, index=index)
 
 
 def metrics(equity: pd.Series, flows: pd.Series) -> dict:

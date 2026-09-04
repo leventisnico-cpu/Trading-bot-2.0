@@ -78,25 +78,40 @@ def run_cycle(
     px = latest_prices(prices, required)
 
     # 5. Pre-trade risk gate against PRIOR equity (§5.1), flow-adjusted so a
-    #    deposit can neither mask a loss nor create drawdown headroom.
+    #    deposit can neither mask a loss nor create drawdown headroom. A
+    #    same-day re-run must not re-count the same flows: the deposit was
+    #    already folded into the state saved earlier today (audit r2 #9).
+    if prior.last_equity_date == today.isoformat():
+        net_flows = 0.0
     pre = risk.pre_trade(prior, equity, today, net_flows=net_flows)
     journal.record("pre_trade", decision=pre.decision.value, reason=pre.reason,
                    daily_return=pre.daily_return, drawdown=pre.drawdown_from_peak)
 
     outcome: RebalanceOutcome | None = None
     target_weights: dict[str, float] = {}
+    decided = False
     notes: list[str] = []
     state = prior  # mutated below, saved LAST
 
     if pre.decision is PreTradeDecision.HARD_KILL:
+        # Persist the kill BEFORE attempting liquidation: if the venue
+        # explodes mid-liquidation, tomorrow must load halted=True, not
+        # trade on as if nothing happened (audit round 2, finding #1).
         state.halted = True
         state.halt_reason = pre.reason
+        store.save(state)
         liquidation = [Order(symbol=s, side=Side.SELL, shares=sh, is_full_exit=True)
                        for s, sh in positions.items() if sh > 0]
         if liquidation:
-            outcome = execute_rebalance(
-                broker, risk, liquidation, px,
-                escalation_max_hops=cfg.execution.escalation_max_hops, journal=journal)
+            try:
+                outcome = execute_rebalance(
+                    broker, risk, liquidation, px,
+                    escalation_max_hops=cfg.execution.escalation_max_hops,
+                    journal=journal, liquidation=True)
+            except ExecutionError as exc:
+                journal.record("liquidation_aborted", reason=str(exc))
+                notes.append(f"LIQUIDATION ABORTED MID-FLIGHT: {exc} — halted with "
+                             "residual positions; manual attention required NOW")
         notes.append("HARD KILL fired: liquidated and halted; manual reset required")
         traded = bool(liquidation)
     elif pre.decision is PreTradeDecision.STAND_DOWN:
@@ -109,6 +124,7 @@ def run_cycle(
         traded = False
     elif decision_day:
         target_weights = risk.clamp_weights(strategy.target_weights(prices, today))
+        decided = True   # a real target was set today — even an all-cash {} one
         orders = compute_orders(positions, target_weights, px, equity,
                                 no_trade_band=cfg.risk.no_trade_band)
         period = today.strftime("%Y-%m")
@@ -146,7 +162,10 @@ def run_cycle(
     account = broker.get_account()
     equity = account.equity
     positions = dict(account.positions)
-    if decision_day and target_weights and not state.halted:
+    # `decided`, not `target_weights`: an all-cash target ({}) is a real
+    # decision whose convergence (book fully sold) must be tracked too
+    # (audit round 2, finding #4).
+    if decided and not state.halted:
         if converged(positions, target_weights, px, equity, cfg.risk.rebalance_tolerance):
             state.last_completed_period = today.strftime("%Y-%m")
             state.rebalance_retries = 0
@@ -165,6 +184,7 @@ def run_cycle(
     report = build_report(
         today=today, state=state, equity=equity, positions=positions,
         target_weights=target_weights, prices=px, outcome=outcome,
-        tolerance=cfg.risk.rebalance_tolerance, notes=notes)
+        tolerance=cfg.risk.rebalance_tolerance, notes=notes,
+        decided=decided or outcome is not None)
     journal.record("cycle_done", traded=traded, equity=equity, halted=state.halted)
     return CycleResult(traded=traded, report=report, outcome=outcome)

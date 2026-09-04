@@ -28,8 +28,28 @@ MUTATIONS = [
      "        available = broker.get_account().cash + sum(\n            s.shares * prices.get(s.symbol, 0.0) for s in sells)"),
 
     ("engine/execution.py", "A01: order cap not applied to the batch",
-     "    orders, cap_dropped = truncate_to_cap(orders, risk.cfg.max_orders_per_day)",
-     "    orders, cap_dropped = list(orders), []"),
+     "        budget = [float(risk.cfg.max_orders_per_day)]\n        orders, cap_dropped = truncate_to_cap(orders, risk.cfg.max_orders_per_day)",
+     "        budget = [math.inf]\n        orders, cap_dropped = list(orders), []"),
+
+    ("engine/execution.py", "R2-05: escalation resends bypass the submission budget",
+     "    if budget[0] < 1:",
+     "    if False:"),
+
+    ("engine/runner.py", "R2-01: hard kill not persisted before liquidation",
+     "        state.halt_reason = pre.reason\n        store.save(state)",
+     "        state.halt_reason = pre.reason"),
+
+    ("engine/runner.py", "R2-09: same-day re-runs re-count net_flows",
+     "    if prior.last_equity_date == today.isoformat():\n        net_flows = 0.0",
+     "    if False:\n        net_flows = 0.0"),
+
+    ("engine/broker.py", "R2-06: sell executes even when costs exceed proceeds",
+     "            if cost.total > filled * px:",
+     "            if False:"),
+
+    ("engine/strategies.py", "R2-02: partial cross-section becomes an all-cash target",
+     "            missing = sorted(set(self.risk_assets) - set(scored))\n            raise DataError(",
+     "            return {}\n            missing = sorted(set(self.risk_assets) - set(scored))\n            raise DataError("),
 
     ("engine/orders.py", "FM3: buys reordered ahead of sells",
      "    return [o for o in orders if o.side is Side.SELL] + [o for o in orders if o.side is Side.BUY]",
@@ -72,8 +92,8 @@ MUTATIONS = [
      "        if traded:"),
 
     ("engine/execution.py", "FM10: escalated order is itself escalatable (chain possible)",
-     "        more, more_dropped = _submit_single(broker, risk, market, prices, journal)",
-     "        market = Order(symbol=order.symbol, side=order.side, shares=order.shares,\n                       is_full_exit=order.is_full_exit, limit_price=order.limit_price)\n        more, more_dropped, _e = _submit_with_escalation(broker, risk, market, prices, max_hops, journal)"),
+     "        more, more_dropped = _submit_single(broker, risk, market, prices, journal, budget)",
+     "        market = Order(symbol=order.symbol, side=order.side, shares=order.shares,\n                       is_full_exit=order.is_full_exit, limit_price=order.limit_price)\n        more, more_dropped, _e = _submit_with_escalation(broker, risk, market, prices, max_hops, journal, budget)"),
 
     ("engine/risk.py", "FM11: equity floor kills accounts that never reached it",
      "        floor_armed = prior_state.peak_equity >= self.cfg.min_equity_floor\n        if floor_armed and current_equity < self.cfg.min_equity_floor:",

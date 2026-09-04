@@ -6,16 +6,17 @@ This system was built to prove its own strategy worthless and deploy only if tha
 attempt failed (§2). The attempt did not fail. On real data, with real per-order
 costs, the strategy loses to the boring alternative:
 
-| $0 start, $100/week, 2015–2026, CAD ETFs at IBKR fixed fees | CAGR | Sharpe | maxDD | final wealth |
+| $0 start, $100/week, 2015–2026, CAD ETFs at IBKR fixed fees | CAGR (TWR) | Sharpe | maxDD | final wealth |
 |---|---|---|---|---|
-| Dual momentum 12-1 | 7.98% | 0.58 | −27.4% | **$92,762** |
-| Buy-and-hold DCA, 100% US equity (XUU) | 13.67% | 0.88 | −27.5% | **$134,586** |
-| Buy-and-hold DCA, 60/40 | 8.58% | 0.86 | −20.0% | **$94,699** |
+| Dual momentum 12-1 | 7.95% | 0.58 | −27.4% | **$105,795** |
+| Buy-and-hold DCA, 100% US equity (XUU) | 13.59% | 0.88 | −27.8% | **$152,969** |
+| Buy-and-hold DCA, 60/40 | 8.63% | 0.86 | −20.0% | **$108,237** |
 
-*(Numbers re-measured after the round-1 adversarial audit: the audit found
-the first implementation's "12-1" momentum actually spanned 13 months, plus
-13 engine bugs, all fixed — see audit/ROUND1.md. The corrected strategy is
-slightly WORSE: it now trails both benchmarks on final wealth.)*
+*(Numbers re-measured TWICE, after each adversarial audit round. Round 1
+found the "12-1" momentum actually spanned 13 months plus 13 engine bugs;
+round 2 found 15 more, including ~10% of deposits going missing on holiday
+Mondays — see audit/ROUND1.md and audit/ROUND2.md. The verdict survived
+both corrections: the strategy trails both benchmarks on final wealth.)*
 
 The full measurements are in [PHASE_4_RESULTS.md](PHASE_4_RESULTS.md). What they say:
 

@@ -15,6 +15,8 @@ from datetime import date
 
 import pandas as pd
 
+from .errors import DataError
+
 TRADING_DAYS_PER_MONTH = 21
 
 
@@ -28,6 +30,10 @@ class DualMomentum:
         self.risk_assets = [s for s in universe if s != self.defensive]
         if self.top_n < 1 or self.top_n > len(self.risk_assets):
             raise ValueError(f"top_n {self.top_n} out of range for {len(self.risk_assets)} risk assets")
+        if not (0 <= self.skip_months < self.lookback_months):
+            raise ValueError(
+                f"skip_months ({self.skip_months}) must be in [0, lookback_months"
+                f"={self.lookback_months}) — anything else indexes outside the window")
 
     def _momentum(self, prices: pd.DataFrame, symbol: str) -> float | None:
         """Academic L-S momentum: the return from t-L to t-S (an (L-S)-month
@@ -62,9 +68,14 @@ class DualMomentum:
         moms = {s: self._momentum(prices, s) for s in self.risk_assets}
         scored = {s: m for s, m in moms.items() if m is not None}
         if len(scored) < len(self.risk_assets):
-            # Not enough history for a fair cross-section: stay in cash
-            # rather than rank a partial menu.
-            return {}
+            # A partial cross-section is a DATA problem, and the engine
+            # treats an empty dict as "target all cash" — which liquidates a
+            # held book. Refusing the cycle is the only safe answer (audit
+            # round 2, finding #2; same principle as §5.7).
+            missing = sorted(set(self.risk_assets) - set(scored))
+            raise DataError(
+                f"insufficient or gappy history to rank {missing} — refusing "
+                "to emit targets from a partial cross-section")
         winners = sorted(scored, key=scored.get, reverse=True)[: self.top_n]
         slice_w = 1.0 / self.top_n
         weights: dict[str, float] = {}

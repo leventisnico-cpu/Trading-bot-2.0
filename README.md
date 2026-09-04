@@ -17,8 +17,8 @@ allocation the evidence actually supports.
 | `docs/PHASE_4_RESULTS.md` / `PHASE_4_REPORT.md` | Measurements and the verdict |
 | `engine/` | Backtester (t+1 lag, shared live code path), risk layer with structural veto, atomic state, per-order cost model, execution sequencing |
 | `config/engine.toml` | Every limit and threshold. Tests read from here — retuning a limit cannot silently disable its test |
-| `tests/` | 81 tests: invariants (incl. bit-identical lookahead test), 11 named failure-mode regressions + 16 audit-round regressions, synthetic suite |
-| `tools/mutation_test.py` | 24 safety mutations, each must be detected by a failing test |
+| `tests/` | 96 tests: invariants (incl. bit-identical lookahead test), 11 named failure-mode regressions, 31 audit-round regressions, synthetic suite |
+| `tools/mutation_test.py` | 29 safety mutations, each must be detected by a failing test |
 | `scripts/daily_run.py` + `.github/workflows/paper.yml` | Daily **paper-mode** cycle on GitHub Actions (no credentials exist or are needed) |
 
 ## What this system CANNOT do

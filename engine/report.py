@@ -28,13 +28,16 @@ def build_report(
     outcome: RebalanceOutcome | None,
     tolerance: float,
     notes: list[str] | None = None,
+    decided: bool = True,
 ) -> str:
-    # No target today means no rebalance was attempted: comparing holdings
-    # against an empty target flagged every ordinary day "NOT AT TARGET"
-    # and trained the operator to ignore the one header that matters
-    # (audit round 1, finding #8).
-    if target_weights:
-        at_target = converged(positions, target_weights, prices, equity, tolerance)
+    # `decided` says whether a target was actually set this cycle. Keying
+    # on target_weights being truthy mislabeled BOTH directions: ordinary
+    # no-decision days cried "NOT AT TARGET" (audit round 1 #8), and an
+    # all-cash decision day that sold everything printed "HOLDINGS
+    # UNCHANGED" above its own sell list (audit round 2 #4).
+    if decided:
+        at_target = converged(positions, target_weights, prices, equity, tolerance) \
+            if equity > 0 else not positions
         devs = deviations(positions, target_weights, prices, equity) if equity > 0 else {}
         header = AT_TARGET_HEADER if at_target else NOT_AT_TARGET_HEADER
     else:
@@ -63,8 +66,11 @@ def build_report(
     else:
         lines.append("  (none)")
     lines.append("target allocation:")
-    for sym in sorted(target_weights):
-        lines.append(f"  {sym}: {target_weights[sym]:.2%}")
+    if target_weights:
+        for sym in sorted(target_weights):
+            lines.append(f"  {sym}: {target_weights[sym]:.2%}")
+    elif decided:
+        lines.append("  (all cash)")
     lines.append("")
     if outcome is not None:
         lines.append("orders this cycle:")

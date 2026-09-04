@@ -80,9 +80,12 @@ def deviations(
     out = {}
     for sym in set(positions) | set(target_weights):
         px = prices.get(sym)
-        actual = (positions.get(sym, 0.0) * px / equity) if px else 0.0
-        if px is None and positions.get(sym, 0.0) > 0:
-            raise DataError(f"held symbol {sym} has no price")
+        # NaN is truthy — `if px` once let a NaN price propagate into the
+        # deviations and poison convergence. Explicit checks only.
+        bad_px = px is None or px != px or px <= 0
+        if bad_px and positions.get(sym, 0.0) > 0:
+            raise DataError(f"held symbol {sym} has no usable price")
+        actual = 0.0 if bad_px else positions.get(sym, 0.0) * px / equity
         out[sym] = abs(actual - target_weights.get(sym, 0.0))
     return out
 
@@ -104,7 +107,7 @@ def converged(
     # one share is considered converged at its nearest representable weight.
     for sym, dev in devs.items():
         px = prices.get(sym)
-        granularity = (px / equity) if px else 0.0
+        granularity = 0.0 if (px is None or px != px or px <= 0) else px / equity
         if dev > max(tolerance, granularity):
             return False
     return True
