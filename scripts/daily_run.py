@@ -48,10 +48,19 @@ def fetch_prices(symbols: list[str]) -> pd.DataFrame:
 
 
 def is_last_trading_day_of_month(today: date, index: pd.DatetimeIndex) -> bool:
-    trading_days = index[index.to_period("M") == pd.Period(today, "M")]
-    if trading_days.empty:
-        return False
-    return trading_days.max().date() <= today
+    """True only on the last business day of the calendar month.
+
+    The first cut compared against the max of the FETCHED index — which by
+    construction never extends past today, so every day looked like the
+    month's last and the paper engine rebalanced at month START while the
+    backtest decided at month END (audit round 1, finding #2). The calendar
+    is the reference, not the data. (An exchange holiday on the last
+    business day shifts the decision one day early via the workflow simply
+    not producing fresher data — validation still gates on staleness.)
+    """
+    ts = pd.Timestamp(today)
+    last_bday = pd.bdate_range(ts.replace(day=1), ts + pd.offsets.MonthEnd(0))[-1]
+    return today == last_bday.date()
 
 
 def contributions_due(state: EngineState, today: date) -> float:
@@ -98,7 +107,7 @@ def main() -> int:
     try:
         result = run_cycle(today=today, cfg=cfg, store=store, broker=broker,
                            strategy=strategy, prices=prices, journal=journal,
-                           decision_day=decision)
+                           decision_day=decision, net_flows=contribution)
         report = result.report
     except HaltError as exc:
         report = f"REFUSED TO TRADE\ndate: {today.isoformat()}\nreason: {exc}\n"

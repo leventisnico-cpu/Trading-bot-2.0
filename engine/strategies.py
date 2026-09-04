@@ -30,13 +30,30 @@ class DualMomentum:
             raise ValueError(f"top_n {self.top_n} out of range for {len(self.risk_assets)} risk assets")
 
     def _momentum(self, prices: pd.DataFrame, symbol: str) -> float | None:
-        col = prices[symbol].dropna() if symbol in prices.columns else pd.Series(dtype=float)
+        """Academic L-S momentum: the return from t-L to t-S (an (L-S)-month
+        window ending S months ago). The first cut of this code measured
+        t-(L+S) to t-S — a 13-month span for '12-1' — which is NOT the
+        configuration the literature's evidence belongs to (audit round 1).
+
+        The window must be contiguous: positional indexing over dropna()'d
+        data silently stretched 'trading days' across calendar months.
+        """
+        if symbol not in prices.columns:
+            return None
         skip = self.skip_months * TRADING_DAYS_PER_MONTH
         look = self.lookback_months * TRADING_DAYS_PER_MONTH
-        if len(col) < skip + look + 1:
+        window = prices[symbol].iloc[-(look + 1):]
+        if len(window) < look + 1:
             return None
-        end = col.iloc[-1 - skip]
-        start = col.iloc[-1 - skip - look]
+        # Tolerate isolated data holes (holidays, feed glitches) but refuse
+        # a window that is materially incomplete or starts/ends unknown.
+        if window.isna().mean() > 0.05:
+            return None
+        window = window.ffill()
+        if window.isna().iloc[0] or pd.isna(window.iloc[-1 - skip]):
+            return None
+        end = window.iloc[-1 - skip]
+        start = window.iloc[0]
         if start <= 0:
             return None
         return float(end / start - 1.0)

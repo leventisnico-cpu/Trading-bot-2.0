@@ -31,6 +31,7 @@ class EngineState:
     last_equity_date: str = ""           # ISO date of last_equity
     last_completed_period: str = ""      # e.g. "2026-08" once a rebalance CONVERGED (§5.9)
     rebalance_retries: int = 0
+    retry_period: str = ""               # period the retries belong to; a new period resets them
     positions: dict = field(default_factory=dict)   # symbol -> shares (engine's view; cross-checked vs broker)
     cash: float = 0.0
 
@@ -80,39 +81,31 @@ class StateStore:
                 "run bootstrap explicitly if this is genuinely a first run"
             )
 
-        errors = []
         if main_exists:
             try:
                 return _deserialize(self.path.read_text())
-            except Exception as exc:  # torn/corrupt main — try validated backup
-                errors.append(f"main: {exc}")
-        if bak_exists:
-            try:
-                state = _deserialize(self.backup_path.read_text())
-                # Backup is one save behind; using it is safe only because every
-                # field that must never regress (halted) is checked by callers
-                # against both. Halted in EITHER copy means halted.
-                if main_exists:
-                    state = self._merge_halt_flags(state)
-                return state
             except Exception as exc:
-                errors.append(f"backup: {exc}")
+                # A corrupt main file is a refusal, full stop. The backup is
+                # one save behind and may carry halted=False from before a
+                # kill — silently resuming from it once resurrected a halted
+                # engine (audit round 1, finding #4). The backup exists for
+                # MANUAL recovery by a human, never for automatic fallback.
+                raise StateError(
+                    f"state file {self.path} is corrupt ({exc}) — refusing to "
+                    f"trade. A validated backup exists at {self.backup_path} "
+                    "for manual inspection; do not restore it without checking "
+                    "whether the lost save carried a halt."
+                    if bak_exists else
+                    f"state file {self.path} is corrupt ({exc}) and no backup "
+                    "exists — refusing to trade (never resetting to defaults)"
+                )
+        # Main missing but a backup exists: a crash landed between the two
+        # renames in save(). The lost save may have carried a halt — refuse.
         raise StateError(
-            "state unreadable — refusing to trade (never resetting to defaults): "
-            + "; ".join(errors)
+            f"state file {self.path} is missing but backup {self.backup_path} "
+            "exists (interrupted save?) — refusing to trade; a human must "
+            "inspect and restore the backup deliberately"
         )
-
-    def _merge_halt_flags(self, state: EngineState) -> EngineState:
-        # If the corrupt main file still contains a legible halted:true anywhere
-        # in its bytes, honor it. Cheap, conservative, and errs toward halting.
-        try:
-            raw = self.path.read_text(errors="replace")
-            if '"halted": true' in raw or '\\"halted\\": true' in raw:
-                state.halted = True
-                state.halt_reason = state.halt_reason or "halt flag recovered from corrupt state file"
-        except OSError:
-            pass
-        return state
 
     def save(self, state: EngineState) -> None:
         payload = _serialize(state)

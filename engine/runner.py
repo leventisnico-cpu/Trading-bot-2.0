@@ -21,7 +21,7 @@ from .broker import Broker
 from .config import EngineConfig
 from .costs import CostModel
 from .data import latest_prices, validate_prices
-from .errors import HaltError
+from .errors import ExecutionError, HaltError
 from .execution import RebalanceOutcome, execute_rebalance
 from .journal import Journal
 from .orders import Order, Side
@@ -58,6 +58,7 @@ def run_cycle(
     prices: pd.DataFrame,
     journal: Journal,
     decision_day: bool,
+    net_flows: float = 0.0,   # deposits credited since the prior cycle (never a gain)
 ) -> CycleResult:
     # 1. READ prior state first; it is passed, not re-derived (§5.1).
     prior = store.load()
@@ -76,8 +77,9 @@ def run_cycle(
     validate_prices(prices, required, today, cfg.data.max_staleness_days)
     px = latest_prices(prices, required)
 
-    # 5. Pre-trade risk gate against PRIOR equity (§5.1).
-    pre = risk.pre_trade(prior, equity, today)
+    # 5. Pre-trade risk gate against PRIOR equity (§5.1), flow-adjusted so a
+    #    deposit can neither mask a loss nor create drawdown headroom.
+    pre = risk.pre_trade(prior, equity, today, net_flows=net_flows)
     journal.record("pre_trade", decision=pre.decision.value, reason=pre.reason,
                    daily_return=pre.daily_return, drawdown=pre.drawdown_from_peak)
 
@@ -100,11 +102,21 @@ def run_cycle(
     elif pre.decision is PreTradeDecision.STAND_DOWN:
         notes.append(f"soft halt: {pre.reason} — standing down for the day")
         traded = False
+    elif decision_day and equity <= 0:
+        # $0-start deployment before the first contribution lands: nothing
+        # to do, and crashing here killed the scheduled job (audit #11).
+        notes.append("no capital yet — waiting for the first contribution")
+        traded = False
     elif decision_day:
         target_weights = risk.clamp_weights(strategy.target_weights(prices, today))
         orders = compute_orders(positions, target_weights, px, equity,
                                 no_trade_band=cfg.risk.no_trade_band)
         period = today.strftime("%Y-%m")
+        # Retries belong to ONE period; a fresh month starts clean (audit #9
+        # — one bad month must not soft-brick every future month).
+        if state.retry_period != period:
+            state.retry_period = period
+            state.rebalance_retries = 0
         if state.last_completed_period == period:
             notes.append(f"period {period} already converged; not re-trading (§5.9)")
             traded = False
@@ -116,9 +128,16 @@ def run_cycle(
                 f"reached for {period} without convergence — manual attention needed (§5.9)")
             traded = False
         else:
-            outcome = execute_rebalance(
-                broker, risk, orders, px,
-                escalation_max_hops=cfg.execution.escalation_max_hops, journal=journal)
+            try:
+                outcome = execute_rebalance(
+                    broker, risk, orders, px,
+                    escalation_max_hops=cfg.execution.escalation_max_hops, journal=journal)
+            except ExecutionError as exc:
+                # Orders may have really filled before the abort; the journal
+                # already has them (per-order logging). Re-read reality below,
+                # count the attempt, and surface the abort loudly (audit #12).
+                journal.record("rebalance_aborted", reason=str(exc))
+                notes.append(f"EXECUTION ABORTED MID-FLIGHT: {exc} — see journal for fills")
             traded = True
     else:
         traded = False
@@ -134,8 +153,9 @@ def run_cycle(
         elif traded:
             state.rebalance_retries += 1
 
-    # 7. Only NOW overwrite state (§5.1: prior was read first, passed explicitly).
-    state.peak_equity = max(state.peak_equity, equity)
+    # 7. Only NOW overwrite state (§5.1: prior was read first, passed
+    #    explicitly). Deposits raise the peak baseline 1:1 — not a gain.
+    state.peak_equity = max(state.peak_equity + max(net_flows, 0.0), equity)
     state.last_equity = equity
     state.last_equity_date = today.isoformat()
     state.positions = positions

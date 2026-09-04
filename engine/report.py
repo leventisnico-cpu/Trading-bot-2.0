@@ -14,6 +14,7 @@ from .state import EngineState
 
 AT_TARGET_HEADER = "PORTFOLIO AT TARGET"
 NOT_AT_TARGET_HEADER = "PARTIAL REBALANCE — PORTFOLIO NOT AT TARGET"
+NO_REBALANCE_HEADER = "NO REBALANCE TODAY — HOLDINGS UNCHANGED"
 
 
 def build_report(
@@ -28,14 +29,23 @@ def build_report(
     tolerance: float,
     notes: list[str] | None = None,
 ) -> str:
-    at_target = converged(positions, target_weights, prices, equity, tolerance)
-    devs = deviations(positions, target_weights, prices, equity) if equity > 0 else {}
+    # No target today means no rebalance was attempted: comparing holdings
+    # against an empty target flagged every ordinary day "NOT AT TARGET"
+    # and trained the operator to ignore the one header that matters
+    # (audit round 1, finding #8).
+    if target_weights:
+        at_target = converged(positions, target_weights, prices, equity, tolerance)
+        devs = deviations(positions, target_weights, prices, equity) if equity > 0 else {}
+        header = AT_TARGET_HEADER if at_target else NOT_AT_TARGET_HEADER
+    else:
+        devs = {}
+        header = NO_REBALANCE_HEADER
     worst = max(devs.items(), key=lambda kv: kv[1]) if devs else ("-", 0.0)
     peak = max(state.peak_equity, equity)
     dd = 0.0 if peak <= 0 else (peak - equity) / peak
 
     lines = []
-    lines.append(AT_TARGET_HEADER if at_target else NOT_AT_TARGET_HEADER)
+    lines.append(header)
     lines.append(f"date: {today.isoformat()}")
     if state.halted:
         lines.append(f"*** SYSTEM HALTED: {state.halt_reason} — manual reset required ***")

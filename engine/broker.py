@@ -128,7 +128,7 @@ class PaperBroker(Broker):
                 return OrderResult(order=o, status=OrderStatus.REJECTED)
             self._cash += filled * px - cost.total
             self._positions[o.symbol] = held - filled
-            if self._positions[o.symbol] == 0:
+            if self._positions[o.symbol] <= 1e-9:   # float dust is not a position
                 del self._positions[o.symbol]
         status = OrderStatus.FILLED if frac >= 1.0 else OrderStatus.PARTIALLY_FILLED
         return OrderResult(order=o, status=status, filled_shares=filled,

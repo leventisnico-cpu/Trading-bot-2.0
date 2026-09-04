@@ -49,9 +49,17 @@ class BacktestResult:
 
 
 def month_end_schedule(index: pd.DatetimeIndex) -> Callable[[int], bool]:
-    """Decision on the last trading day of each month."""
-    is_last = pd.Series(index.to_period("M"), index=range(len(index)))
-    flags = (is_last != is_last.shift(-1)).values
+    """Decision on the last trading day of each month.
+
+    The final bar of the dataset counts only if it genuinely is the last
+    business day of its month — data that happens to end mid-month must
+    not fabricate a decision day (audit round 1, finding #14).
+    """
+    period = pd.Series(index.to_period("M"), index=range(len(index)))
+    flags = (period != period.shift(-1)).to_numpy().copy()
+    last = index[-1]
+    flags[-1] = last.date() == max(
+        d.date() for d in pd.bdate_range(last.replace(day=1), last + pd.offsets.MonthEnd(0)))
     return lambda i: bool(flags[i])
 
 
@@ -88,29 +96,30 @@ def run_backtest(
     equity_curve = []
     result = BacktestResult(equity=None, contributions_total=0.0, costs_paid=0.0)
 
+    # Carry-forward frame for marking and fills: only PAST values feed each
+    # row (ffill looks backward), so no lookahead — and a symbol whose close
+    # is missing on a given bar keeps its last known mark instead of
+    # cratering the equity curve to $0 (audit round 1, finding #5).
+    prices_ff = prices.ffill()
+
     n = len(prices.index)
     for i in range(n):
         today = prices.index[i].date()
         c = float(contribution(today))
+        if c < 0:
+            raise ValueError("withdrawal schedules are not supported (negative contribution)")
         if c > 0:
             cash += c
             contributions_total += c
 
-        row = prices.iloc[i]
-        # Mark held positions at today's close; a NaN close for a held symbol
-        # carries the last known mark (sale would be blocked by validation anyway).
-        mark = 0.0
-        for sym, sh in positions.items():
-            px = row.get(sym)
-            if pd.isna(px):
-                px = prices[sym].iloc[:i + 1].dropna().iloc[-1] if not prices[sym].iloc[:i + 1].dropna().empty else 0.0
-            mark += sh * float(px)
-        equity = cash + mark
+        row_ff = prices_ff.iloc[i]
+        mark_prices = {s: float(row_ff[s]) for s in prices.columns if not pd.isna(row_ff[s])}
+        equity = cash + sum(sh * mark_prices.get(sym, 0.0) for sym, sh in positions.items())
 
         # ---- fill leg: orders decided on bar i-1 fill at bar i (§3.2). ----
         # Liquidation orders from a hard kill also fill here, so no halted guard.
         if pending is not None:
-            fill_prices = {s: float(row[s]) for s in prices.columns if not pd.isna(row[s])}
+            fill_prices = mark_prices
             broker = PaperBroker(cash=cash, prices=fill_prices, cost_model=cost_model,
                                  positions=positions)
             pre_cost_equity = broker.get_account().equity
@@ -126,39 +135,47 @@ def run_backtest(
             equity = account.equity
             pending = None
 
+        # ---- risk gate: kill switches run EVERY bar, exactly as live does
+        # (audit round 1, finding #3 — evaluating them only on decision days
+        # let the backtest sail through drawdowns that live would kill on).
+        pre = None
+        if not state.halted and equity > 0:
+            pre = risk.pre_trade(state, equity, today, net_flows=c)
+            if pre.decision is PreTradeDecision.HARD_KILL:
+                # Liquidate at next bar and halt permanently (§7).
+                state.halted = True
+                state.halt_reason = pre.reason
+                result.halts.append((today, pre.reason))
+                liquidation = [
+                    Order(symbol=s, side=Side.SELL, shares=sh, is_full_exit=True)
+                    for s, sh in positions.items() if sh > 0
+                ]
+                pending = liquidation or None
+
         # ---- decision leg: bar i sees prices[: i + 1] only (§3.1) --------
-        if is_decision_day(i) and not state.halted and equity > 0:
-            visible = prices.iloc[: i + 1]
-            required = set(cfg.universe) | {s for s, sh in positions.items() if sh > 0}
-            try:
-                validate_prices(visible, required, today, cfg.data.max_staleness_days)
-            except DataError as exc:
-                result.refusals.append((today, str(exc)))
+        if (is_decision_day(i) and not state.halted and equity > 0
+                and pre is not None and pre.decision is not PreTradeDecision.HARD_KILL):
+            if pre.decision is PreTradeDecision.STAND_DOWN:
+                result.halts.append((today, pre.reason))
                 pending = None
             else:
-                px_now = latest_prices(visible, required)
-                pre = risk.pre_trade(state, equity, today)
-                if pre.decision is PreTradeDecision.HARD_KILL:
-                    # Liquidate at next bar and halt permanently (§7).
-                    state.halted = True
-                    state.halt_reason = pre.reason
-                    result.halts.append((today, pre.reason))
-                    liquidation = [
-                        Order(symbol=s, side=Side.SELL, shares=sh, is_full_exit=True)
-                        for s, sh in positions.items() if sh > 0
-                    ]
-                    pending = liquidation or None
-                elif pre.decision is PreTradeDecision.STAND_DOWN:
-                    result.halts.append((today, pre.reason))
+                visible = prices.iloc[: i + 1]
+                required = set(cfg.universe) | {s for s, sh in positions.items() if sh > 0}
+                try:
+                    validate_prices(visible, required, today, cfg.data.max_staleness_days)
+                except DataError as exc:
+                    result.refusals.append((today, str(exc)))
                     pending = None
                 else:
+                    px_now = latest_prices(visible, required)
                     weights = strategy.target_weights(visible, today)
                     weights = risk.clamp_weights(weights)
                     pending = compute_orders(
                         positions, weights, px_now, equity,
                         no_trade_band=cfg.risk.no_trade_band) or None
 
-        state.peak_equity = max(state.peak_equity, equity)
+        # Deposits raise the peak baseline 1:1 (a deposit is not a gain).
+        state.peak_equity = max(state.peak_equity + max(c, 0.0), equity)
         if state.last_equity_date != today.isoformat():
             state.last_equity = equity
             state.last_equity_date = today.isoformat()

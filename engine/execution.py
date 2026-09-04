@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from .broker import Broker, OrderResult
 from .errors import ExecutionError
 from .journal import Journal, NullJournal
-from .orders import DroppedOrder, Order, Side, is_success, is_terminal
+from .orders import DroppedOrder, Order, Side, is_success, is_terminal, truncate_to_cap
 from .risk import RiskEngine
 
 
@@ -32,12 +32,22 @@ class RebalanceOutcome:
 
 
 def _submit_single(broker: Broker, risk: RiskEngine, order: Order,
-                   prices: dict[str, float]) -> tuple[list[OrderResult], list[DroppedOrder]]:
+                   prices: dict[str, float], journal: Journal
+                   ) -> tuple[list[OrderResult], list[DroppedOrder]]:
     approved, dropped = risk.filter_orders([order], prices)
+    for dr in dropped:
+        journal.record("order_dropped", order_id=dr.order.id, symbol=dr.order.symbol,
+                       side=dr.order.side.value, reason=dr.reason)
     if not approved.orders:
         return [], dropped
     results = broker.submit(approved)
+    # Journal each result the moment it exists: a rebalance that aborts
+    # mid-flight must still leave evidence of the fills that really
+    # happened (audit round 1, finding #12).
     for r in results:
+        journal.record("order_result", order_id=r.order.id, symbol=r.order.symbol,
+                       side=r.order.side.value, status=r.status.value,
+                       filled=r.filled_shares, price=r.fill_price)
         if not is_terminal(r.status):
             # A real async broker adapter must block here until terminal
             # (§5.2). The engine refuses to treat a pending order as done.
@@ -56,7 +66,7 @@ def _submit_with_escalation(broker: Broker, risk: RiskEngine, order: Order,
     The escalated order is a market order with no remaining budget — there
     is structurally no second hop (§5.10).
     """
-    results, dropped = _submit_single(broker, risk, order, prices)
+    results, dropped = _submit_single(broker, risk, order, prices, journal)
     escalations = 0
     # Escalate only a limit order that got NOTHING: a partial fill must not
     # be re-sent at full size.
@@ -67,7 +77,7 @@ def _submit_with_escalation(broker: Broker, risk: RiskEngine, order: Order,
                        is_full_exit=order.is_full_exit, limit_price=None)
         journal.record("escalation", original_id=order.id, escalated_id=market.id,
                        symbol=order.symbol, note="limit unfilled -> market, single hop")
-        more, more_dropped = _submit_single(broker, risk, market, prices)
+        more, more_dropped = _submit_single(broker, risk, market, prices, journal)
         escalations = 1
         if more and not any(is_success(r.status) for r in more):
             journal.record("escalation_failed", order_id=market.id, symbol=order.symbol,
@@ -89,6 +99,15 @@ def execute_rebalance(
     journal = journal or NullJournal()
     outcome = RebalanceOutcome()
 
+    # 0. The order cap applies to the BATCH (buys dropped first, sells
+    #    last). Filtering one order at a time made the cap a no-op —
+    #    audit round 1, finding #1.
+    orders, cap_dropped = truncate_to_cap(orders, risk.cfg.max_orders_per_day)
+    outcome.dropped += cap_dropped
+    for dr in cap_dropped:
+        journal.record("order_dropped", order_id=dr.order.id, symbol=dr.order.symbol,
+                       side=dr.order.side.value, reason=dr.reason)
+
     sells = [o for o in orders if o.side is Side.SELL]
     buys = [o for o in orders if o.side is Side.BUY]
 
@@ -100,12 +119,12 @@ def execute_rebalance(
         outcome.dropped += dropped
         outcome.escalations += esc
 
-    # 2. Re-read the account: buys are sized off cash that DEMONSTRABLY
-    #    exists, not cash the sells were supposed to free (§5.2).
-    account = broker.get_account()
-    available = account.cash
-
+    # 2. Buys are sized off cash that DEMONSTRABLY exists (§5.2): the
+    #    account is re-read from the broker before EVERY buy, so partial
+    #    fills and fees can never leave a stale local cash tracker (audit
+    #    round 1, finding #7).
     for o in buys:
+        available = broker.get_account().cash
         px = prices.get(o.symbol)
         if px is None or px <= 0:
             outcome.dropped.append(DroppedOrder(o, "no valid price at buy sizing"))
@@ -115,6 +134,13 @@ def execute_rebalance(
         order = o
         if needed > available:
             resized = math.floor((available - cost.total) / px) if px > 0 else 0
+            # The resized order pays the SMALLER commission — re-check
+            # affordability at its own cost, not the original order's.
+            while resized > 0:
+                cost_r = risk.cost_model.order_cost(shares=resized, price=px)
+                if resized * px + cost_r.total <= available:
+                    break
+                resized -= 1
             if resized <= 0:
                 outcome.dropped.append(DroppedOrder(
                     o, f"insufficient confirmed cash ({available:.2f}) after sells"))
@@ -128,15 +154,4 @@ def execute_rebalance(
         outcome.results += results
         outcome.dropped += dropped
         outcome.escalations += esc
-        for r in results:
-            if is_success(r.status):
-                available -= r.filled_shares * r.fill_price + r.commission
-
-    for r in outcome.results:
-        journal.record("order_result", order_id=r.order.id, symbol=r.order.symbol,
-                       side=r.order.side.value, status=r.status.value,
-                       filled=r.filled_shares, price=r.fill_price)
-    for dr in outcome.dropped:
-        journal.record("order_dropped", order_id=dr.order.id, symbol=dr.order.symbol,
-                       side=dr.order.side.value, reason=dr.reason)
     return outcome

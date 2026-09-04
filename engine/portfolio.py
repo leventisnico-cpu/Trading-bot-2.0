@@ -48,7 +48,11 @@ def compute_orders(
         tgt_w = target_weights.get(sym, 0.0)
         tgt_shares = math.floor((tgt_w * equity) / px)
         delta = tgt_shares - cur_shares
-        full_exit = tgt_w == 0.0 and cur_shares > 0
+        # Full exit whenever the TARGET SHARE COUNT is zero — including a
+        # small nonzero weight that floors to 0 shares. Keying on the raw
+        # weight let min-size filters eat a sell of the entire position
+        # forever (audit round 1, finding #13).
+        full_exit = tgt_shares == 0 and cur_shares > 0
         if full_exit:
             orders.append(Order(symbol=sym, side=Side.SELL, shares=cur_shares, is_full_exit=True))
             continue

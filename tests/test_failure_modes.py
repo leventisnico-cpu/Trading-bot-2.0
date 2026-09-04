@@ -148,20 +148,21 @@ def test_fm04_full_exits_exempt_from_minimum_size_filters(cfg):
 
 
 # ---------------------------------------------------------------------------
-def test_fm05_torn_state_file_refuses_or_recovers_halted(cfg, tmp_path):
+def test_fm05_torn_state_file_refuses_to_trade(cfg, tmp_path):
     """FM#5: a torn state file once reloaded as 'not halted' and resurrected
-    a killed system."""
+    a killed system. Strict semantics after audit round 1 finding #4: any
+    corrupt main file is a refusal — never a silent fallback to the stale
+    backup, which may predate the halt."""
     store = StateStore(tmp_path / "state.json")
     store.save(EngineState(halted=False, peak_equity=1.0))
     store.save(EngineState(halted=True, halt_reason="hard kill", peak_equity=1.0))
 
-    # Tear the main file mid-write.
+    # Tear the main file mid-write (both before and after the halted bytes).
     raw = store.path.read_text()
-    store.path.write_text(raw[: len(raw) // 2])
-
-    loaded = store.load()
-    assert loaded.halted is True, \
-        "torn state file read back as not-halted — the kill switch was resurrected"
+    for cut in (len(raw) // 3, len(raw) // 2, 9 * len(raw) // 10):
+        store.path.write_text(raw[:cut])
+        with pytest.raises(StateError):
+            store.load()
 
 
 def test_fm05_unreadable_state_and_backup_refuse_to_trade(tmp_path):

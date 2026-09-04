@@ -16,12 +16,20 @@ REPO = Path(__file__).resolve().parents[1]
 # (path, description, old_snippet, mutated_snippet)
 MUTATIONS = [
     ("engine/risk.py", "FM1: daily-loss check compares today with today (always 0)",
-     "daily_return = current_equity / prior_state.last_equity - 1.0",
+     "daily_return = (current_equity - net_flows) / prior_state.last_equity - 1.0",
      "daily_return = current_equity / current_equity - 1.0"),
 
+    ("engine/risk.py", "A10: deposits leak into the measured daily return",
+     "daily_return = (current_equity - net_flows) / prior_state.last_equity - 1.0",
+     "daily_return = current_equity / prior_state.last_equity - 1.0"),
+
     ("engine/execution.py", "FM2: buys sized off planned cash incl. unconfirmed sell proceeds",
-     "    account = broker.get_account()\n    available = account.cash",
-     "    account = broker.get_account()\n    available = account.cash + sum(\n        o.shares * prices.get(o.symbol, 0.0) for o in sells)"),
+     "        available = broker.get_account().cash",
+     "        available = broker.get_account().cash + sum(\n            s.shares * prices.get(s.symbol, 0.0) for s in sells)"),
+
+    ("engine/execution.py", "A01: order cap not applied to the batch",
+     "    orders, cap_dropped = truncate_to_cap(orders, risk.cfg.max_orders_per_day)",
+     "    orders, cap_dropped = list(orders), []"),
 
     ("engine/orders.py", "FM3: buys reordered ahead of sells",
      "    return [o for o in orders if o.side is Side.SELL] + [o for o in orders if o.side is Side.BUY]",
@@ -32,12 +40,16 @@ MUTATIONS = [
      "if notional < self.cfg.min_order_notional:"),
 
     ("engine/portfolio.py", "FM4b: no-trade band swallows full exits",
-     "        full_exit = tgt_w == 0.0 and cur_shares > 0\n        if full_exit:",
+     "        full_exit = tgt_shares == 0 and cur_shares > 0\n        if full_exit:",
      "        full_exit = False\n        if full_exit:"),
 
+    ("engine/portfolio.py", "A13: full exit keyed on raw weight, not target shares",
+     "        full_exit = tgt_shares == 0 and cur_shares > 0\n        if full_exit:",
+     "        full_exit = tgt_w == 0.0 and cur_shares > 0\n        if full_exit:"),
+
     ("engine/state.py", "FM5: unreadable state resets to defaults",
-     "        raise StateError(\n            \"state unreadable — refusing to trade (never resetting to defaults): \"\n            + \"; \".join(errors)\n        )",
-     "        return EngineState()"),
+     "            try:\n                return _deserialize(self.path.read_text())\n            except Exception as exc:",
+     "            try:\n                return _deserialize(self.path.read_text())\n            except Exception as exc:\n                return EngineState()"),
 
     ("engine/orders.py", "FM6: success decided by failure blacklist",
      "def is_success(status: OrderStatus) -> bool:\n    return status in SUCCESS_STATUSES",
@@ -60,8 +72,8 @@ MUTATIONS = [
      "        if traded:"),
 
     ("engine/execution.py", "FM10: escalated order is itself escalatable (chain possible)",
-     "        market = Order(symbol=order.symbol, side=order.side, shares=order.shares,\n                       is_full_exit=order.is_full_exit, limit_price=None)\n        journal.record(\"escalation\", original_id=order.id, escalated_id=market.id,\n                       symbol=order.symbol, note=\"limit unfilled -> market, single hop\")\n        more, more_dropped = _submit_single(broker, risk, market, prices)",
-     "        market = Order(symbol=order.symbol, side=order.side, shares=order.shares,\n                       is_full_exit=order.is_full_exit, limit_price=order.limit_price)\n        journal.record(\"escalation\", original_id=order.id, escalated_id=market.id,\n                       symbol=order.symbol, note=\"limit unfilled -> market, single hop\")\n        more, more_dropped, _e = _submit_with_escalation(broker, risk, market, prices, max_hops, journal)"),
+     "        more, more_dropped = _submit_single(broker, risk, market, prices, journal)",
+     "        market = Order(symbol=order.symbol, side=order.side, shares=order.shares,\n                       is_full_exit=order.is_full_exit, limit_price=order.limit_price)\n        more, more_dropped, _e = _submit_with_escalation(broker, risk, market, prices, max_hops, journal)"),
 
     ("engine/risk.py", "FM11: equity floor kills accounts that never reached it",
      "        floor_armed = prior_state.peak_equity >= self.cfg.min_equity_floor\n        if floor_armed and current_equity < self.cfg.min_equity_floor:",
@@ -72,8 +84,16 @@ MUTATIONS = [
      "            visible = prices"),
 
     ("engine/backtest.py", "INV2: fills at the decision bar's price (no execution lag)",
-     "            fill_prices = {s: float(row[s]) for s in prices.columns if not pd.isna(row[s])}",
-     "            decision_row = prices.iloc[max(i - 1, 0)]\n            fill_prices = {s: float(decision_row[s]) for s in prices.columns if not pd.isna(decision_row[s])}"),
+     "        row_ff = prices_ff.iloc[i]",
+     "        row_ff = prices_ff.iloc[max(i - 1, 0)]"),
+
+    ("engine/backtest.py", "A03: kill switches evaluated only on decision days",
+     "        pre = None\n        if not state.halted and equity > 0:",
+     "        pre = None\n        if not state.halted and equity > 0 and is_decision_day(i):"),
+
+    ("engine/runner.py", "A09: retry counter survives into new periods",
+     "        if state.retry_period != period:\n            state.retry_period = period\n            state.rebalance_retries = 0",
+     "        if False:\n            state.retry_period = period\n            state.rebalance_retries = 0"),
 
     ("engine/risk.py", "INV4: shorts survive the clamp",
      "            if not self.cfg.allow_short:\n                w = max(0.0, w)",

@@ -16,7 +16,7 @@ from enum import Enum
 
 from .config import RiskConfig
 from .costs import CostModel
-from .errors import HaltError
+from .errors import DataError, HaltError
 from .orders import DroppedOrder, Order, truncate_to_cap
 from .state import EngineState
 
@@ -36,7 +36,13 @@ class PreTradeResult:
 
 
 class ApprovedOrders:
-    """Only RiskEngine may construct this. Brokers require it."""
+    """Brokers require this; only RiskEngine is meant to construct it.
+
+    Honesty note (audit round 1): Python cannot make this unforgeable — a
+    determined caller can read the token off the class. The guard exists to
+    make BYPASSING the risk layer impossible to do by accident and loud to
+    do on purpose; it is a tripwire, not a cryptographic boundary.
+    """
 
     _token = object()
 
@@ -65,19 +71,28 @@ class RiskEngine:
                 "manual reset required — no automatic recovery, ever (§7)"
             )
 
-    def pre_trade(self, prior_state: EngineState, current_equity: float, today: date) -> PreTradeResult:
+    def pre_trade(self, prior_state: EngineState, current_equity: float, today: date,
+                  *, net_flows: float = 0.0) -> PreTradeResult:
         """Evaluate kill/halt conditions BEFORE state is overwritten (§5.1).
 
         prior_state must be the state as loaded at the start of the cycle.
+        net_flows: deposits since prior_state was recorded. A deposit is not
+        a gain: it must neither mask a daily loss nor create drawdown
+        headroom (audit round 1, finding #10). Withdrawals are unsupported.
         """
         self.check_not_halted(prior_state)
+        if net_flows < 0:
+            raise ValueError("withdrawals are not supported; net_flows must be >= 0")
 
-        peak = max(prior_state.peak_equity, current_equity)
+        # Deposits raise the drawdown baseline 1:1 — money added is not
+        # equity 'gained' and cannot be 'given back' before limits fire.
+        flow_adjusted_peak = prior_state.peak_equity + net_flows
+        peak = max(flow_adjusted_peak, current_equity)
         drawdown = 0.0 if peak <= 0 else (peak - current_equity) / peak
 
         daily_return = 0.0
         if prior_state.last_equity > 0 and prior_state.last_equity_date != today.isoformat():
-            daily_return = current_equity / prior_state.last_equity - 1.0
+            daily_return = (current_equity - net_flows) / prior_state.last_equity - 1.0
 
         # The floor only ARMS once the account has ever reached it: an
         # accumulation account starting near $0 is below the floor on day
@@ -109,6 +124,8 @@ class RiskEngine:
     def clamp_weights(self, weights: dict[str, float]) -> dict[str, float]:
         clamped = {}
         for sym, w in weights.items():
+            if w != w:  # NaN target is bad data, not a weight: refuse the cycle
+                raise DataError(f"NaN target weight for {sym} — refusing to trade")
             if not self.cfg.allow_short:
                 w = max(0.0, w)
             w = min(w, self.cfg.max_position_weight)
@@ -146,6 +163,15 @@ class RiskEngine:
                 dropped.append(DroppedOrder(
                     o, f"all-in cost {frac:.2%} of notional exceeds max_cost_fraction "
                        f"{self.cfg.max_cost_fraction:.2%}"))
+                continue
+            # A full exit is exempt from cost limits — EXCEPT when closing
+            # costs more than the position is worth: paying $1.00 to free
+            # $0.50 drives cash negative (audit round 1, finding #6). Leave
+            # dust; convergence tolerance already ignores it.
+            if o.is_full_exit and frac >= 1.0:
+                dropped.append(DroppedOrder(
+                    o, f"dust position: all-in close cost ({frac:.0%} of notional) "
+                       "exceeds its value — leaving as dust rather than paying to exit"))
                 continue
             kept.append(o)
         kept, cap_dropped = truncate_to_cap(kept, self.cfg.max_orders_per_day)

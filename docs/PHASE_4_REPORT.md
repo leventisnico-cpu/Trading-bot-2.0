@@ -8,33 +8,40 @@ costs, the strategy loses to the boring alternative:
 
 | $0 start, $100/week, 2015–2026, CAD ETFs at IBKR fixed fees | CAGR | Sharpe | maxDD | final wealth |
 |---|---|---|---|---|
-| Dual momentum 12-1 | 8.52% | 0.61 | −27.9% | **$98,299** |
+| Dual momentum 12-1 | 7.98% | 0.58 | −27.4% | **$92,762** |
 | Buy-and-hold DCA, 100% US equity (XUU) | 13.67% | 0.88 | −27.5% | **$134,586** |
 | Buy-and-hold DCA, 60/40 | 8.58% | 0.86 | −20.0% | **$94,699** |
+
+*(Numbers re-measured after the round-1 adversarial audit: the audit found
+the first implementation's "12-1" momentum actually spanned 13 months, plus
+13 engine bugs, all fixed — see audit/ROUND1.md. The corrected strategy is
+slightly WORSE: it now trails both benchmarks on final wealth.)*
 
 The full measurements are in [PHASE_4_RESULTS.md](PHASE_4_RESULTS.md). What they say:
 
 1. **The strategy underperforms buy-and-hold on risk-adjusted terms in every
    fold.** Not one bad stretch: 60/40's Sharpe beats the strategy's in all three
-   sub-periods (0.62/0.65/1.49 vs 0.32/0.40/1.12). Against 100% equity DCA it is
-   ~$36,000 of final wealth behind, with the *same* maximum drawdown.
+   sub-periods (0.62/0.66/1.49 vs 0.42/0.30/1.09). Against 100% equity DCA it is
+   ~$42,000 of final wealth behind, with the *same* maximum drawdown — and it
+   now trails even the 60/40 on final wealth.
 
 2. **The advertised crash protection did not show up.** On the long-history US
    proxy including 2008 (SPY/EFA/EEM with AGG defensive, 2004–2026), the
-   strategy's crisis drawdown was −37.1% vs −35.3% for 60/40. Top-1 concentration
-   walked the book into the fastest-crashing asset (EM after its 2007 run) faster
-   than a 12-1 monthly filter could walk it out. Dual momentum's headline
-   drawdown claims did not survive contact with this implementation and sample.
+   strategy's crisis drawdown was −35.0% vs −35.3% for 60/40 — statistically
+   nothing. Top-1 concentration walked the book into the fastest-crashing asset
+   (EM after its 2007 run) faster than a 12-1 monthly filter could walk it out.
+   Dual momentum's headline drawdown claims did not survive contact with this
+   implementation and sample.
 
-3. **Costs are NOT the problem — the strategy is.** Fee drag is 0.56%/yr at
+3. **Costs are NOT the problem — the strategy is.** Fee drag is ~0.6%/yr at
    $2,500 and barely better at $100,000 (net-return-by-size table, §6). The
    $100/week account CAN express this strategy at IBKR Canada's fixed fees.
    It just shouldn't.
 
-4. **The measurement is credible.** Net Sharpe of 0.61 sits exactly inside the
+4. **The measurement is credible.** Net Sharpe of 0.58 sits inside the
    0.4–0.7 band the post-publication-decay literature predicts (Phase 2). No
    result tripped the Sharpe > 1.5 assume-a-bug flag (§2). The parameter grid
-   (16 cells, Sharpe 0.35–0.74) shows the whole family underperforming the
+   (16 cells, Sharpe 0.35–0.71) shows the whole family underperforming the
    benchmark's 0.86 — this is not one unlucky parameter cell, and no cell was
    cherry-picked (§10).
 
