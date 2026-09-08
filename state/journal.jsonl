@@ -6,3 +6,4 @@
 {"daily_return": 0.0, "decision": "OK", "drawdown": 0.0, "reason": "ok", "ts": "2026-09-07T23:36:21.367355+00:00", "type": "pre_trade"}
 {"equity": 100.0, "halted": false, "traded": false, "ts": "2026-09-07T23:36:21.368818+00:00", "type": "cycle_done"}
 {"amount": 100.0, "since": "2026-09-04", "ts": "2026-09-07T23:36:21.369081+00:00", "type": "contribution"}
+{"reason": "refusing to trade \u2014 bad price data: XUU.TO: last value is NaN", "ts": "2026-09-08T23:28:10.527931+00:00", "type": "refusal"}
