@@ -1,0 +1,51 @@
+# Mini-Prop OS configuration.
+# Every key is validated at startup (mini_prop_os/core/config.py); unknown
+# keys and out-of-range values abort before any connection is attempted.
+
+connection:
+  host: 127.0.0.1
+  port: 7497          # 7497 = TWS paper, 4002 = IB Gateway paper.
+                      # 7496 / 4001 are LIVE — set deliberately, never by default.
+  client_id: 17
+  account: ""         # empty = first managed account
+  connect_timeout_s: 15.0
+  heartbeat_interval_s: 10.0
+  heartbeat_timeout_s: 5.0
+  heartbeat_max_misses: 3
+  reconnect_backoff_base_s: 2.0
+  reconnect_backoff_max_s: 120.0
+  reconnect_max_attempts: 0   # 0 = retry forever
+
+contract:
+  symbol: SPY
+  sec_type: STK
+  exchange: SMART
+  currency: USD
+
+strategy:
+  name: ema_crossover
+  bar_size: "1 min"
+  fast_period: 9
+  slow_period: 21
+  order_quantity: 10
+  warmup_bars: 0      # 0 = derived (3 * slow_period)
+
+risk:
+  max_position_shares: 100
+  max_position_notional: 60000.0
+  max_order_quantity: 50
+  max_gross_notional: 120000.0
+  max_daily_loss: 1000.0        # currency; effective limit is the tighter of
+  max_daily_loss_pct: 0.02      # this and pct * start-of-day equity
+  allow_short: false
+  kill_switch_flattens: true    # breach -> cancel all + flatten book
+
+execution:
+  execution_log_path: state/executions.jsonl
+  order_timeout_s: 60.0
+  cancel_on_shutdown: true
+  flatten_on_shutdown: false
+
+logging:
+  level: INFO
+  file: state/mini_prop_os.log
