@@ -7,10 +7,18 @@ dependencies = ["numpy>=1.26", "pandas>=2.0"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+live = ["ib_insync>=0.9.86", "PyYAML>=6.0"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
 
 [tool.setuptools]
-packages = ["engine"]
+packages = [
+    "engine",
+    "mini_prop_os",
+    "mini_prop_os.core",
+    "mini_prop_os.strategy",
+    "mini_prop_os.risk",
+    "mini_prop_os.execution",
+]
