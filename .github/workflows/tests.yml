@@ -16,3 +16,5 @@ jobs:
         run: python -m pytest tests -q
       - name: mutation testing (every safety fix must be detected)
         run: python tools/mutation_test.py
+      - name: mini_prop_os validation scorecard (>= 75% must pass)
+        run: python scripts/validate_minipropos.py --quiet
