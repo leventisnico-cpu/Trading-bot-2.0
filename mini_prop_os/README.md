@@ -37,6 +37,12 @@ core/
 strategy/
   base.py               BaseStrategy ABC (bars in -> OrderIntents out)
   ema_crossover.py      incremental EMA crossover, long-only, position-aware
+  adaptive_ema.py       volatility-adaptive crossover (shipped default):
+                        regime detection (LOW/NORMAL/HIGH/EXTREME), size
+                        scaled down as vol rises, EXTREME = risk-off (exit,
+                        no entries), whipsaw entry-confirmation filter, and
+                        bounded online learning of per-regime entry
+                        thresholds from its own trade outcomes
 risk/
   guardrails.py         mandatory pre-trade gate + daily-loss kill switch
 execution/
@@ -85,6 +91,19 @@ Ctrl-C / SIGTERM triggers a clean shutdown: working orders are cancelled
 
 Logs go to the console and `state/mini_prop_os.log`; every order state
 transition and fill is also appended to `state/executions.jsonl`.
+
+## Adaptation, honestly stated
+
+The adaptive strategy's "learning" is a bounded, transparent rule — losing
+round trips in a volatility regime raise that regime's entry-confirmation
+threshold (winning ones relax it), hard-capped to `[k_min, k_max]`, with
+every update logged and the learned state inspectable. It can only make
+entries more selective; it can never raise size, invert the signal, or
+filter an exit. In the validation stress windows it cut combined drawdown
+roughly 40% versus the plain crossover (standing aside entirely in some),
+at the measured cost of skipping some winning trades — volatility
+adaptation trades upside for exposure control, and none of it is evidence
+of edge.
 
 ## Tests
 

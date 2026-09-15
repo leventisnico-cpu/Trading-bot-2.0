@@ -21,6 +21,7 @@ from .core.connection import IBConnectionManager
 from .core.types import Bar, Fill, OrderIntent, OrderType
 from .execution.oms import ManagedOrder, OrderManagementSystem, OrderState
 from .risk.guardrails import PortfolioSnapshot, RiskGuardrails
+from .strategy.adaptive_ema import AdaptiveEmaCrossoverStrategy
 from .strategy.base import BaseStrategy
 from .strategy.ema_crossover import EmaCrossoverStrategy
 
@@ -128,15 +129,30 @@ def build_contract(cfg: ContractConfig) -> Contract:
 
 def build_strategy(cfg: AppConfig) -> BaseStrategy:
     """Strategy factory keyed on ``strategy.name`` in config.yaml."""
-    if cfg.strategy.name == "ema_crossover":
+    s = cfg.strategy
+    if s.name == "ema_crossover":
         return EmaCrossoverStrategy(
             symbol=cfg.contract.symbol,
-            fast_period=cfg.strategy.fast_period,
-            slow_period=cfg.strategy.slow_period,
-            order_quantity=cfg.strategy.order_quantity,
-            warmup_bars=cfg.strategy.warmup_bars,
+            fast_period=s.fast_period,
+            slow_period=s.slow_period,
+            order_quantity=s.order_quantity,
+            warmup_bars=s.warmup_bars,
         )
-    raise ValueError(f"unknown strategy {cfg.strategy.name!r}")
+    if s.name == "adaptive_ema":
+        return AdaptiveEmaCrossoverStrategy(
+            symbol=cfg.contract.symbol,
+            fast_period=s.fast_period,
+            slow_period=s.slow_period,
+            base_quantity=s.order_quantity,
+            warmup_bars=s.warmup_bars,
+            vol_fast_period=s.vol_fast_period,
+            vol_slow_period=s.vol_slow_period,
+            high_vol_ratio=s.high_vol_ratio,
+            extreme_vol_ratio=s.extreme_vol_ratio,
+            confirm_window=s.confirm_window,
+            learn=s.learn,
+        )
+    raise ValueError(f"unknown strategy {s.name!r}")
 
 
 class TradingApp:

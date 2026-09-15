@@ -93,19 +93,35 @@ class ContractConfig:
 
 @dataclass(frozen=True)
 class StrategyConfig:
-    """Parameters of the EMA-crossover sample strategy."""
+    """Parameters of the shipped strategies.
 
-    name: str = "ema_crossover"
+    ``name`` selects the strategy: ``adaptive_ema`` (volatility-adaptive:
+    regime sizing, EXTREME risk-off, confirmed entries, bounded online
+    threshold learning) or ``ema_crossover`` (the plain baseline). The
+    ``vol_*`` / ``confirm_window`` / ``learn`` fields apply only to
+    ``adaptive_ema``; for it, ``order_quantity`` is the base size in
+    LOW/NORMAL volatility (halved in HIGH, zero in EXTREME).
+    """
+
+    name: str = "adaptive_ema"
     bar_size: str = "1 min"
     fast_period: int = 9
     slow_period: int = 21
-    order_quantity: int = 1
-    warmup_bars: int = 0  # 0 = derived from slow_period by the strategy
+    order_quantity: int = 2
+    warmup_bars: int = 0  # 0 = derived by the strategy
     #: Restrict bars to regular trading hours. Keep False for futures
     #: (they trade nearly 24h); True is the sane choice for stocks.
     use_rth: bool = False
+    vol_fast_period: int = 10
+    vol_slow_period: int = 100
+    high_vol_ratio: float = 1.6
+    extreme_vol_ratio: float = 2.5
+    confirm_window: int = 10
+    learn: bool = True
 
     def __post_init__(self) -> None:
+        if self.name not in ("adaptive_ema", "ema_crossover"):
+            raise ConfigError(f"unknown strategy.name {self.name!r}")
         if self.fast_period < 1 or self.slow_period < 2:
             raise ConfigError("strategy periods must be positive")
         if self.fast_period >= self.slow_period:
@@ -115,6 +131,14 @@ class StrategyConfig:
             raise ConfigError("strategy.order_quantity must be >= 1")
         if self.warmup_bars < 0:
             raise ConfigError("strategy.warmup_bars must be >= 0")
+        if self.vol_fast_period < 2 or self.vol_slow_period <= self.vol_fast_period:
+            raise ConfigError(
+                "need strategy.vol_fast_period >= 2 and vol_slow > vol_fast")
+        if not (1.0 < self.high_vol_ratio < self.extreme_vol_ratio):
+            raise ConfigError(
+                "need 1 < strategy.high_vol_ratio < extreme_vol_ratio")
+        if self.confirm_window < 1:
+            raise ConfigError("strategy.confirm_window must be >= 1")
 
 
 @dataclass(frozen=True)
