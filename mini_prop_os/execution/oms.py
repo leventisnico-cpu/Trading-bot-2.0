@@ -215,6 +215,11 @@ class OrderManagementSystem:
             log.warning("status %s for unknown order %d", state.value,
                         order_id)
             return
+        if state == mo.state:
+            # IBKR emits several broker statuses that normalize to the same
+            # OMS state (PendingSubmit -> PreSubmitted -> Submitted); a
+            # same-state echo is a no-op, not an illegal transition.
+            return
         if state in (OrderState.PARTIALLY_FILLED, OrderState.FILLED):
             # Fill-derived states are owned by on_fill; a status echo that
             # matches current knowledge is fine, anything else is suspect.

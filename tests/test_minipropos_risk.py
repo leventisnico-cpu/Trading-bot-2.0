@@ -126,6 +126,42 @@ def test_gross_notional_cap_across_symbols():
     assert d.approved, d.reason
 
 
+# ------------------------------------------------ futures multipliers
+
+def test_futures_multiplier_scales_position_notional():
+    g = guard(max_position_notional=70_000.0, max_position_shares=10,
+              max_order_quantity=10)
+    # 2 MES contracts @ 6500 with $5 multiplier = 65,000 notional: allowed.
+    snap_fut = PortfolioSnapshot(positions={}, last_prices={"MES": 6500.0},
+                                 multipliers={"MES": 5.0})
+    d = g.validate(intent(symbol="MES", qty=2), snap_fut)
+    assert d.approved, d.reason
+    # 3 contracts = 97,500 > 70,000: rejected, even though 3 * 6500 alone
+    # (without the multiplier) would have passed.
+    d = g.validate(intent(symbol="MES", qty=3), snap_fut)
+    assert not d.approved and "max_position_notional" in d.reason
+
+
+def test_futures_multiplier_scales_gross_notional():
+    g = guard(max_gross_notional=100_000.0, max_position_notional=200_000.0,
+              max_position_shares=10, max_order_quantity=10)
+    # Existing: 2 MES @ 6500 x5 = 65,000 gross.
+    snap_fut = PortfolioSnapshot(positions={"MES": 2},
+                                 last_prices={"MES": 6500.0},
+                                 multipliers={"MES": 5.0})
+    # +1 -> 3 contracts = 97,500 gross: allowed.
+    assert g.validate(intent(symbol="MES", qty=1), snap_fut).approved
+    # +2 -> 4 contracts = 130,000 gross > 100,000: rejected.
+    d = g.validate(intent(symbol="MES", qty=2), snap_fut)
+    assert not d.approved and "max_gross_notional" in d.reason
+
+
+def test_missing_multiplier_defaults_to_one_for_stocks():
+    snap_stk = PortfolioSnapshot(positions={}, last_prices={"SPY": 500.0})
+    assert snap_stk.multiplier("SPY") == 1.0
+    assert guard().validate(intent(qty=10), snap_stk).approved
+
+
 def test_unpriceable_existing_position_blocks_new_exposure():
     d = guard().validate(
         intent(), PortfolioSnapshot(positions={"QQQ": 10},

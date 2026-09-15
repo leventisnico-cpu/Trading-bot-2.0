@@ -11,14 +11,14 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
-from ib_insync import (IB, BarDataList, Contract, Fill as IbFill, LimitOrder,
-                       MarketOrder, Stock, Trade)
+from ib_insync import (IB, BarDataList, ContFuture, Contract, Fill as IbFill,
+                       Future, LimitOrder, MarketOrder, Stock, Trade)
 
-from .core.config import AppConfig
+from .core.config import AppConfig, ContractConfig
 from .core.connection import IBConnectionManager
-from .core.types import Bar, Fill, IntentSource, OrderIntent, OrderType
+from .core.types import Bar, Fill, OrderIntent, OrderType
 from .execution.oms import ManagedOrder, OrderManagementSystem, OrderState
 from .risk.guardrails import PortfolioSnapshot, RiskGuardrails
 from .strategy.base import BaseStrategy
@@ -45,6 +45,10 @@ class IbBrokerAdapter:
         self._contract = contract
         self._trades: Dict[int, Trade] = {}
         self.oms: Optional[OrderManagementSystem] = None
+
+    def set_contract(self, contract: Contract) -> None:
+        """Swap the qualified contract (e.g. resolved front-month future)."""
+        self._contract = contract
 
     async def place_order(self, intent: OrderIntent) -> int:
         """Translate an approved intent to an IBKR order and transmit it."""
@@ -103,6 +107,25 @@ class IbBrokerAdapter:
         ))
 
 
+def build_contract(cfg: ContractConfig) -> Contract:
+    """Translate the contract config into an ib_insync contract.
+
+    For futures with no explicit expiry this returns a :class:`ContFuture`;
+    the app resolves it to the tradeable front-month :class:`Future` at
+    connect time (orders cannot be placed against a continuous future).
+    """
+    if cfg.sec_type == "STK":
+        return Stock(cfg.symbol, cfg.exchange, cfg.currency)
+    if cfg.sec_type == "FUT":
+        if cfg.last_trade_date:
+            return Future(cfg.symbol,
+                          lastTradeDateOrContractMonth=cfg.last_trade_date,
+                          exchange=cfg.exchange, currency=cfg.currency)
+        return ContFuture(cfg.symbol, exchange=cfg.exchange,
+                          currency=cfg.currency)
+    raise ValueError(f"unsupported sec_type {cfg.sec_type!r}")
+
+
 def build_strategy(cfg: AppConfig) -> BaseStrategy:
     """Strategy factory keyed on ``strategy.name`` in config.yaml."""
     if cfg.strategy.name == "ema_crossover":
@@ -128,8 +151,7 @@ class TradingApp:
         )
         self.risk = RiskGuardrails(cfg.risk)
         self.strategy = build_strategy(cfg)
-        self.contract: Contract = Stock(
-            cfg.contract.symbol, cfg.contract.exchange, cfg.contract.currency)
+        self.contract: Contract = build_contract(cfg.contract)
         self.broker = IbBrokerAdapter(self.conn.ib, self.contract)
         self.oms = OrderManagementSystem(
             self.broker,
@@ -196,18 +218,45 @@ class TradingApp:
 
     async def _on_connected(self) -> None:
         """(Re)establish contract, warmup data, and live bar subscription."""
-        ib = self.conn.ib
         try:
-            qualified = await ib.qualifyContractsAsync(self.contract)
-            if not qualified:
-                raise RuntimeError(
-                    f"could not qualify contract {self.cfg.contract.symbol}")
+            await self._qualify_contract()
             await self._mark_equity(start_of_day=(
                 self.risk.start_of_day_equity is None))
             await self._subscribe_bars()
             self._trading_enabled.set()
         except Exception:
             log.exception("post-connect setup failed; trading stays disabled")
+
+    async def _qualify_contract(self) -> None:
+        """Qualify the configured contract; resolve a continuous future to
+        the tradeable front-month Future (ContFuture cannot take orders)."""
+        ib = self.conn.ib
+        qualified = await ib.qualifyContractsAsync(self.contract)
+        if not qualified:
+            raise RuntimeError(
+                f"could not qualify contract {self.cfg.contract.symbol}")
+        if isinstance(self.contract, ContFuture):
+            front = Future(conId=self.contract.conId,
+                           exchange=self.cfg.contract.exchange)
+            if not await ib.qualifyContractsAsync(front):
+                raise RuntimeError(
+                    f"could not resolve front-month future for "
+                    f"{self.cfg.contract.symbol}")
+            self.contract = front
+            self.broker.set_contract(front)
+            log.info("resolved front month: %s %s (conId=%d, mult=%s)",
+                     front.symbol, front.lastTradeDateOrContractMonth,
+                     front.conId, front.multiplier)
+        if self.contract.secType == "FUT" and self.contract.multiplier:
+            venue_mult = float(self.contract.multiplier)
+            if abs(venue_mult - self.cfg.contract.multiplier) > 1e-9:
+                # Never trade with a wrong economic multiplier: all notional
+                # risk caps depend on it.
+                raise RuntimeError(
+                    f"configured contract.multiplier "
+                    f"{self.cfg.contract.multiplier} does not match the "
+                    f"venue's {venue_mult} for {self.contract.symbol} — fix "
+                    f"config.yaml before trading")
 
     async def _on_disconnected(self) -> None:
         self._trading_enabled.clear()
@@ -225,20 +274,30 @@ class TradingApp:
             durationStr="2 D",
             barSizeSetting=self.cfg.strategy.bar_size,
             whatToShow="TRADES",
-            useRTH=True,
+            useRTH=self.cfg.strategy.use_rth,
             formatDate=2,
             keepUpToDate=True,
         )
         self._bars = bars
         history = [self._to_bar(b) for b in bars[:-1]] if len(bars) > 1 else []
-        if history and self._last_bar_time is None:
+        if self._last_bar_time is not None:
+            # Reconnect: feed only the bars we missed while disconnected, as
+            # warmup (indicators stay continuous, no trading on stale bars).
+            missed = [b for b in history if b.timestamp > self._last_bar_time]
+            if missed:
+                self.strategy.prime(missed)
+                log.info("primed %d bar(s) missed during disconnect",
+                         len(missed))
+                self._last_bar_time = missed[-1].timestamp
+                self._last_price = missed[-1].close
+        elif history:
             self.strategy.prime(history)
             self._last_bar_time = history[-1].timestamp
             self._last_price = history[-1].close
         bars.updateEvent += self._on_bar_update
-        log.info("subscribed to %s bars for %s (%d warmup bars)",
+        log.info("subscribed to %s bars for %s (useRTH=%s, %d warmup bars)",
                  self.cfg.strategy.bar_size, self.cfg.contract.symbol,
-                 len(history))
+                 self.cfg.strategy.use_rth, len(history))
 
     @staticmethod
     def _to_bar(b: object) -> Bar:
@@ -261,13 +320,21 @@ class TradingApp:
         if not has_new_bar or len(bars) < 2:
             return
         completed = bars[-2]
-        raw = self._to_bar(completed)
-        if self._last_bar_time is not None and raw.timestamp <= self._last_bar_time:
-            return  # duplicate after resubscribe
-        self._last_bar_time = raw.timestamp
-        bar = Bar(symbol=self.cfg.contract.symbol, timestamp=raw.timestamp,
-                  open=raw.open, high=raw.high, low=raw.low, close=raw.close,
-                  volume=raw.volume)
+        try:
+            raw = self._to_bar(completed)
+            if (self._last_bar_time is not None
+                    and raw.timestamp <= self._last_bar_time):
+                return  # duplicate after resubscribe
+            bar = Bar(symbol=self.cfg.contract.symbol,
+                      timestamp=raw.timestamp, open=raw.open, high=raw.high,
+                      low=raw.low, close=raw.close, volume=raw.volume)
+        except (ValueError, AttributeError) as exc:
+            # A glitchy bar from the feed must not blow up inside the
+            # ib_insync event dispatch — skip it and keep the stream alive.
+            log.error("skipping corrupt bar at %r: %s",
+                      getattr(completed, "date", None), exc)
+            return
+        self._last_bar_time = bar.timestamp
         self._last_price = bar.close
         asyncio.ensure_future(self._process_bar(bar))
 
@@ -287,11 +354,16 @@ class TradingApp:
 
     # -------------------------------------------------------- order routing
 
-    async def _route_intent(self, intent: OrderIntent) -> None:
-        snapshot = PortfolioSnapshot(
+    def _snapshot(self) -> PortfolioSnapshot:
+        sym = self.cfg.contract.symbol
+        return PortfolioSnapshot(
             positions=self.oms.position_quantities(),
-            last_prices={self.cfg.contract.symbol: self._last_price or 0.0},
+            last_prices={sym: self._last_price or 0.0},
+            multipliers={sym: self.cfg.contract.multiplier},
         )
+
+    async def _route_intent(self, intent: OrderIntent) -> None:
+        snapshot = self._snapshot()
         decision = self.risk.validate(intent, snapshot)
         if not decision.approved:
             log.warning("RISK REJECT [%s %d %s]: %s", intent.action.value,
@@ -364,12 +436,7 @@ class TradingApp:
             log.info("flatten (%s): book already flat", why)
             return
         for intent in self.risk.flatten_intents(positions):
-            snapshot = PortfolioSnapshot(
-                positions=self.oms.position_quantities(),
-                last_prices={self.cfg.contract.symbol:
-                             self._last_price or 0.0},
-            )
-            decision = self.risk.validate(intent, snapshot)
+            decision = self.risk.validate(intent, self._snapshot())
             if not decision.approved:
                 log.error("flatten intent rejected (%s) — manual "
                           "intervention required", decision.reason)

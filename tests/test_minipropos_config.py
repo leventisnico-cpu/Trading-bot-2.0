@@ -25,8 +25,14 @@ def test_shipped_config_loads_and_defaults_to_paper_port():
     assert isinstance(cfg, AppConfig)
     assert cfg.connection.port in (7497, 4002), \
         "shipped config must point at a PAPER port"
-    assert cfg.contract.symbol == "SPY"
+    assert cfg.contract.sec_type == "FUT"
+    assert cfg.contract.symbol == "MES"
+    assert cfg.contract.multiplier == 5.0  # MES is $5/point
+    assert cfg.strategy.use_rth is False   # futures trade nearly 24h
     assert cfg.strategy.fast_period < cfg.strategy.slow_period
+    # One contract must fit within the per-order and position caps.
+    assert cfg.strategy.order_quantity <= cfg.risk.max_order_quantity
+    assert cfg.strategy.order_quantity <= cfg.risk.max_position_shares
 
 
 def test_missing_file_raises():
@@ -58,6 +64,25 @@ def test_invalid_values_rejected(tmp_path):
         load_config(write(tmp_path, "risk:\n  max_daily_loss_pct: 1.5\n"))
     with pytest.raises(ConfigError, match="port"):
         load_config(write(tmp_path, "connection:\n  port: 0\n"))
+
+
+def test_invalid_contract_values_rejected(tmp_path):
+    with pytest.raises(ConfigError, match="sec_type"):
+        load_config(write(tmp_path, "contract:\n  sec_type: OPT\n"))
+    with pytest.raises(ConfigError, match="multiplier"):
+        load_config(write(tmp_path, "contract:\n  multiplier: 0\n"))
+    with pytest.raises(ConfigError, match="last_trade_date"):
+        load_config(write(
+            tmp_path, "contract:\n  last_trade_date: 'dec-2026'\n"))
+
+
+def test_stock_contract_still_configurable(tmp_path):
+    cfg = load_config(write(tmp_path, (
+        "contract:\n  symbol: SPY\n  sec_type: STK\n  exchange: SMART\n"
+        "  multiplier: 1.0\nstrategy:\n  use_rth: true\n")))
+    assert cfg.contract.sec_type == "STK"
+    assert cfg.contract.multiplier == 1.0
+    assert cfg.strategy.use_rth is True
 
 
 def test_malformed_yaml_rejected(tmp_path):

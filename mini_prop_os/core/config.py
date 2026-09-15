@@ -57,16 +57,38 @@ class ConnectionConfig:
 
 @dataclass(frozen=True)
 class ContractConfig:
-    """The instrument the sample strategy trades."""
+    """The instrument the sample strategy trades.
 
-    symbol: str = "SPY"
-    sec_type: str = "STK"
-    exchange: str = "SMART"
+    For futures (``sec_type: FUT``):
+
+    * ``last_trade_date`` selects a specific expiry ("202612" or "20261218");
+      leave it empty to auto-resolve the current front month via a
+      continuous-future lookup at connect time.
+    * ``multiplier`` is the contract multiplier used for all notional risk
+      math (e.g. 5 for MES, 50 for ES, 2 for MNQ, 20 for NQ). It MUST match
+      the venue's real multiplier or every notional cap is wrong.
+    """
+
+    symbol: str = "MES"
+    sec_type: str = "FUT"
+    exchange: str = "CME"
     currency: str = "USD"
+    multiplier: float = 5.0
+    last_trade_date: str = ""
 
     def __post_init__(self) -> None:
         if not self.symbol:
             raise ConfigError("contract.symbol must be non-empty")
+        if self.sec_type not in ("STK", "FUT"):
+            raise ConfigError(
+                f"contract.sec_type must be STK or FUT, got {self.sec_type!r}")
+        if self.multiplier <= 0:
+            raise ConfigError("contract.multiplier must be > 0")
+        if self.last_trade_date and not (
+                self.last_trade_date.isdigit()
+                and len(self.last_trade_date) in (6, 8)):
+            raise ConfigError(
+                "contract.last_trade_date must be YYYYMM or YYYYMMDD")
 
 
 @dataclass(frozen=True)
@@ -77,8 +99,11 @@ class StrategyConfig:
     bar_size: str = "1 min"
     fast_period: int = 9
     slow_period: int = 21
-    order_quantity: int = 10
+    order_quantity: int = 1
     warmup_bars: int = 0  # 0 = derived from slow_period by the strategy
+    #: Restrict bars to regular trading hours. Keep False for futures
+    #: (they trade nearly 24h); True is the sane choice for stocks.
+    use_rth: bool = False
 
     def __post_init__(self) -> None:
         if self.fast_period < 1 or self.slow_period < 2:
@@ -94,12 +119,16 @@ class StrategyConfig:
 
 @dataclass(frozen=True)
 class RiskConfig:
-    """Hard limits enforced by the pre-trade risk layer. See guardrails.py."""
+    """Hard limits enforced by the pre-trade risk layer. See guardrails.py.
 
-    max_position_shares: int = 100
-    max_position_notional: float = 60_000.0
-    max_order_quantity: int = 50
-    max_gross_notional: float = 120_000.0
+    Quantities are in units of the traded instrument (shares for stocks,
+    contracts for futures); notional caps are |units| * price * multiplier.
+    """
+
+    max_position_shares: int = 4
+    max_position_notional: float = 150_000.0
+    max_order_quantity: int = 2
+    max_gross_notional: float = 300_000.0
     max_daily_loss: float = 1_000.0
     max_daily_loss_pct: float = 0.02
     allow_short: bool = False

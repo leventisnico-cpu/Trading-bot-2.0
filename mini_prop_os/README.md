@@ -12,6 +12,18 @@ defaults to the IBKR **paper trading** port.
 > and change the port deliberately. The EMA-crossover strategy shipped here
 > is a reference implementation of the architecture, not an edge.
 
+The shipped config trades **MES (Micro E-mini S&P 500) futures on CME**:
+the front-month contract is auto-resolved at connect time (or pin an expiry
+with `contract.last_trade_date`), all notional risk math uses the contract
+multiplier (`$5/point` for MES), and the configured multiplier is verified
+against the venue's at connect — a mismatch refuses to trade. Futures data
+runs with `use_rth: false` since the product trades nearly 24h. To trade a
+stock instead, set `sec_type: STK`, `exchange: SMART`, `multiplier: 1.0`,
+`use_rth: true` (see `tests/test_minipropos_config.py` for an example).
+Note: futures leverage means one MES contract controls ~$30k+ of index
+exposure per ~$2k margin — size `order_quantity` and the risk caps
+accordingly, and remember MES trades in 0.25-point ticks ($1.25/tick).
+
 ## Architecture
 
 ```

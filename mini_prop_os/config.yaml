@@ -1,4 +1,4 @@
-# Mini-Prop OS configuration.
+# Mini-Prop OS configuration — futures (Micro E-mini S&P 500).
 # Every key is validated at startup (mini_prop_os/core/config.py); unknown
 # keys and out-of-range values abort before any connection is attempted.
 
@@ -17,24 +17,28 @@ connection:
   reconnect_max_attempts: 0   # 0 = retry forever
 
 contract:
-  symbol: SPY
-  sec_type: STK
-  exchange: SMART
+  symbol: MES         # Micro E-mini S&P 500 (use ES only if sized for it)
+  sec_type: FUT
+  exchange: CME
   currency: USD
+  multiplier: 5.0     # MES=$5/point (ES=50, MNQ=2, NQ=20). Verified against
+                      # the venue at connect time; mismatch refuses to trade.
+  last_trade_date: "" # empty = auto-resolve current front month at connect
 
 strategy:
   name: ema_crossover
   bar_size: "1 min"
   fast_period: 9
   slow_period: 21
-  order_quantity: 10
+  order_quantity: 1   # contracts per entry
   warmup_bars: 0      # 0 = derived (3 * slow_period)
+  use_rth: false      # futures trade nearly 24h; true only for stocks
 
 risk:
-  max_position_shares: 100
-  max_position_notional: 60000.0
-  max_order_quantity: 50
-  max_gross_notional: 120000.0
+  max_position_shares: 4        # max |contracts| per symbol
+  max_position_notional: 150000.0   # |contracts| * price * multiplier
+  max_order_quantity: 2         # contracts per order
+  max_gross_notional: 300000.0
   max_daily_loss: 1000.0        # currency; effective limit is the tighter of
   max_daily_loss_pct: 0.02      # this and pct * start-of-day equity
   allow_short: false

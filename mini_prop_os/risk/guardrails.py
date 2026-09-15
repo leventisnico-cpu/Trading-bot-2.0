@@ -55,13 +55,18 @@ class PortfolioSnapshot:
     """What the risk layer needs to know about the world for one check.
 
     Args:
-        positions: net signed shares per symbol.
+        positions: net signed units (shares / futures contracts) per symbol.
         last_prices: most recent trade/close price per symbol; the reference
             price for market orders and for all notional math.
+        multipliers: contract multiplier per symbol (5 for MES, 50 for ES,
+            ...). Missing symbols default to 1.0, which is correct for
+            stocks; futures callers MUST supply the real multiplier or all
+            notional caps are understated.
     """
 
     positions: Mapping[str, int] = field(default_factory=dict)
     last_prices: Mapping[str, float] = field(default_factory=dict)
+    multipliers: Mapping[str, float] = field(default_factory=dict)
 
     def position(self, symbol: str) -> int:
         return int(self.positions.get(symbol, 0))
@@ -70,8 +75,11 @@ class PortfolioSnapshot:
         p = self.last_prices.get(symbol)
         return float(p) if p is not None else None
 
+    def multiplier(self, symbol: str) -> float:
+        return float(self.multipliers.get(symbol, 1.0))
+
     def gross_notional(self) -> Optional[float]:
-        """Sum of |qty| * price across positions; None if any price missing."""
+        """Sum of |units| * price * multiplier; None if any price missing."""
         total = 0.0
         for sym, qty in self.positions.items():
             if qty == 0:
@@ -79,7 +87,7 @@ class PortfolioSnapshot:
             price = self.price(sym)
             if price is None or not math.isfinite(price) or price <= 0:
                 return None
-            total += abs(qty) * price
+            total += abs(qty) * price * self.multiplier(sym)
         return total
 
 
@@ -244,12 +252,15 @@ class RiskGuardrails:
                 f"order would short {intent.symbol} "
                 f"({current} -> {resulting}) and allow_short is false")
 
-        # 5. Position caps (shares and notional).
+        # 5. Position caps (units and notional; notional includes the
+        # contract multiplier so a futures contract is priced at its real
+        # economic exposure, not its quote).
         if abs(resulting) > self._cfg.max_position_shares:
             return RiskDecision.reject(
                 f"resulting position {resulting} exceeds max_position_shares "
                 f"{self._cfg.max_position_shares}")
-        resulting_notional = abs(resulting) * price
+        mult = snapshot.multiplier(intent.symbol)
+        resulting_notional = abs(resulting) * price * mult
         if resulting_notional > self._cfg.max_position_notional:
             return RiskDecision.reject(
                 f"resulting notional {resulting_notional:.2f} exceeds "
@@ -260,7 +271,7 @@ class RiskGuardrails:
         if gross is None:
             return RiskDecision.reject(
                 "cannot price existing positions — refusing to add exposure")
-        current_leg = abs(current) * price
+        current_leg = abs(current) * price * mult
         new_gross = gross - current_leg + resulting_notional
         if new_gross > self._cfg.max_gross_notional:
             return RiskDecision.reject(

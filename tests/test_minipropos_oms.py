@@ -202,6 +202,17 @@ def test_illegal_transitions_are_ignored():
     assert oms.positions["SPY"].quantity == 5
 
 
+def test_same_state_broker_echo_is_a_noop():
+    # IBKR emits PendingSubmit -> PreSubmitted -> Submitted, which all map
+    # to SUBMITTED; the repeats must not be treated as illegal transitions.
+    _, oms = make_oms()
+    mo = run(oms.submit(intent(qty=10)))
+    oms.on_order_status(mo.order_id, OrderState.SUBMITTED)
+    oms.on_order_status(mo.order_id, OrderState.SUBMITTED)
+    assert mo.state is OrderState.SUBMITTED
+    assert [s for s, _ in mo.history] == [OrderState.SUBMITTED]
+
+
 def test_status_echo_of_fill_states_does_not_transition():
     _, oms = make_oms()
     mo = run(oms.submit(intent(qty=10)))
