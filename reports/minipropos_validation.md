@@ -1,6 +1,6 @@
 # Mini-Prop OS validation scorecard
 
-Generated: 2026-09-16 18:37 UTC
+Generated: 2026-09-16 18:43 UTC
 
 **122/122 checks passed (100.0%) — PASS (gate: >= 75%)**
 
