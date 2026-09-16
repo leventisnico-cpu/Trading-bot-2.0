@@ -161,6 +161,31 @@ class OrderManagementSystem:
     def get(self, order_id: int) -> Optional[ManagedOrder]:
         return self._orders.get(order_id)
 
+    def seed_position(self, symbol: str, quantity: int,
+                      avg_price: float) -> None:
+        """Import an existing broker position into the ledger (startup
+        reconciliation) so risk caps and kill-switch flattening see the
+        account's real book. Refuses to overwrite a non-flat entry —
+        seeding is for cold starts, never for papering over a live
+        discrepancy."""
+        pos = self._positions.get(symbol)
+        if pos is not None and pos.quantity != 0:
+            raise ValueError(
+                f"refusing to seed over live position in {symbol} "
+                f"({pos.quantity})")
+        if quantity == 0:
+            return
+        self._positions[symbol] = Position(
+            symbol=symbol, quantity=int(quantity),
+            avg_price=float(avg_price))
+        log.warning("seeded broker position: %+d %s @ %.4f",
+                    quantity, symbol, avg_price)
+        self._log_event("seed", {
+            "symbol": symbol,
+            "quantity": int(quantity),
+            "avg_price": float(avg_price),
+        })
+
     # ------------------------------------------------------------ commands
 
     async def submit(self, intent: OrderIntent) -> ManagedOrder:

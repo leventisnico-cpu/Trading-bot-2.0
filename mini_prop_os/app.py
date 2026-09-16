@@ -291,6 +291,7 @@ class TradingApp:
         self._trading_enabled = asyncio.Event()
         self._shutdown_evt = asyncio.Event()
         self._flattening = False
+        self._setup_lock = asyncio.Lock()
 
     # ------------------------------------------------------------- public
 
@@ -342,15 +343,75 @@ class TradingApp:
     # ------------------------------------------------- connection callbacks
 
     async def _on_connected(self) -> None:
-        """(Re)establish contract, warmup data, and live bar subscription."""
-        try:
-            await self._qualify_contract()
-            await self._mark_equity(start_of_day=(
-                self.risk.start_of_day_equity is None))
-            await self._subscribe_bars()
-            self._trading_enabled.set()
-        except Exception:
-            log.exception("post-connect setup failed; trading stays disabled")
+        """(Re)establish contract, equity baseline, broker reconciliation,
+        and the live bar subscription. Trading is enabled only when every
+        step succeeds; failures leave it disabled and the equity monitor
+        retries the whole setup on its next tick."""
+        async with self._setup_lock:
+            if self._trading_enabled.is_set() or self.risk.kill_switch_active:
+                return
+            try:
+                await self._qualify_contract()
+                if self.risk.start_of_day_equity is None:
+                    equity = await self._mark_equity(start_of_day=True)
+                    if equity is None:
+                        raise RuntimeError(
+                            "cannot read account equity — the daily-loss "
+                            "breaker would have no baseline")
+                await self._reconcile_broker_state()
+                await self._subscribe_bars()
+                self._trading_enabled.set()
+                log.info("trading enabled")
+            except Exception:
+                log.exception(
+                    "post-connect setup failed; trading stays disabled "
+                    "(retrying on the next equity-monitor tick)")
+
+    async def _reconcile_broker_state(self) -> None:
+        """Align the OMS ledger with the broker before any order can route.
+
+        * A cold start with an existing position in the account imports it
+          into the ledger (risk caps and kill-switch flattening then cover
+          the real book).
+        * A mismatch on a warm ledger (fills that happened while
+          disconnected) is unexplained state: halt for operator review
+          rather than trade against a wrong book.
+        * Working orders on our contract that the OMS does not know are
+          cancelled — a stateless restart must start from a clean slate.
+        """
+        ib = self.conn.ib
+        symbol = self.cfg.contract.symbol
+        mult = self.cfg.contract.multiplier or 1.0
+        broker_qty = 0
+        broker_avg = 0.0
+        for pos in await ib.reqPositionsAsync():
+            if (pos.contract.symbol == symbol
+                    and pos.contract.secType == self.cfg.contract.sec_type
+                    and pos.position):
+                broker_qty += int(pos.position)
+                broker_avg = float(pos.avgCost) / mult
+        oms_qty = self.oms.position_quantities().get(symbol, 0)
+        if broker_qty != oms_qty:
+            if oms_qty == 0 and not self.oms.orders:
+                self.oms.seed_position(symbol, broker_qty, broker_avg)
+                log.warning("imported existing broker position at startup: "
+                            "%+d %s @ %.4f", broker_qty, symbol, broker_avg)
+            else:
+                await self._halt(
+                    f"position reconciliation mismatch for {symbol}: "
+                    f"broker={broker_qty} ledger={oms_qty} — fills may have "
+                    f"occurred while disconnected")
+                raise RuntimeError("position reconciliation mismatch")
+        for trade in await ib.reqAllOpenOrdersAsync():
+            if trade.contract.symbol != symbol:
+                continue
+            oid = trade.order.orderId
+            mo = self.oms.get(oid)
+            if mo is None or mo.is_terminal:
+                log.warning("cancelling unmanaged working order %d "
+                            "(%s %s %s)", oid, trade.order.action,
+                            trade.order.totalQuantity, symbol)
+                ib.cancelOrder(trade.order)
 
     async def _qualify_contract(self) -> None:
         self.contract = await qualify_tradeable_contract(
@@ -366,6 +427,8 @@ class TradingApp:
 
     async def _subscribe_bars(self) -> None:
         """Historical warmup + live keep-up-to-date bars in one request."""
+        if self._bars is not None:
+            return  # already subscribed on this connection (setup retry)
         ib = self.conn.ib
         bars = await ib.reqHistoricalDataAsync(
             self.contract,
@@ -443,11 +506,11 @@ class TradingApp:
             return
         try:
             intents = self.strategy.on_bar(bar)
-        except Exception:
-            log.exception("strategy failed on bar %s; halting via kill switch",
-                          bar.timestamp)
-            self.risk.trip("strategy exception")
-            intents = []
+        except Exception as exc:
+            log.exception("strategy failed on bar %s; halting via kill "
+                          "switch", bar.timestamp)
+            await self._halt(f"strategy exception: {exc}")
+            return
         for intent in intents:
             await self._route_intent(intent)
 
@@ -504,17 +567,28 @@ class TradingApp:
         return None
 
     async def _equity_monitor(self) -> None:
-        """Poll equity and enforce the daily-loss circuit breaker."""
+        """Poll equity, enforce the daily-loss circuit breaker, and retry
+        incomplete post-connect setup."""
         while True:
             await asyncio.sleep(30.0)
             if not self.conn.is_connected:
+                continue
+            if (not self._trading_enabled.is_set()
+                    and not self.risk.kill_switch_active):
+                await self._on_connected()  # retry failed setup
                 continue
             equity = await self._mark_equity(start_of_day=False)
             if equity is None:
                 continue
             tripped = self.risk.update_equity(equity)
-            if tripped and self.cfg.risk.kill_switch_flattens:
+            if tripped:
                 await self._kill_switch_fired()
+
+    async def _halt(self, reason: str) -> None:
+        """Single halt path: trip the kill switch, persist the marker,
+        cancel working orders, and flatten (per config)."""
+        self.risk.trip(reason)
+        await self._kill_switch_fired()
 
     async def _kill_switch_fired(self) -> None:
         """Cancel everything, flatten the book, persist the halt (once)."""
@@ -529,7 +603,8 @@ class TradingApp:
                           self.risk.kill_reason or "kill switch fired")
         try:
             await self.oms.cancel_all()
-            await self._flatten_all("kill switch")
+            if self.cfg.risk.kill_switch_flattens:
+                await self._flatten_all("kill switch")
         except Exception:
             log.exception("error while flattening after kill switch")
 

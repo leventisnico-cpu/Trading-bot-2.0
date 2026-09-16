@@ -85,4 +85,12 @@ supervisor or reboot — **refuses to trade** while that file exists.
   up the new front month; it will not auto-roll an open position.
 - **Daily-loss baseline is marked at connect** and per session; the
   paper/live account's overnight moves before connect are not counted.
+  If account equity cannot be read at connect, trading stays disabled
+  (no baseline = no breaker = no trading) and setup retries every 30s.
+- **Startup reconciliation.** An existing position in the account is
+  imported into the ledger at cold start (caps and flattening then cover
+  it), and working orders the bot doesn't recognize are cancelled. A
+  ledger/broker mismatch appearing later — e.g. fills during a
+  disconnect — halts trading with a persisted kill-switch marker for
+  operator review; it will not trade against a book it can't explain.
 - **No taxes, no currency effects, no overnight-margin modelling.**

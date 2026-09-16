@@ -231,6 +231,37 @@ def test_history_records_every_transition():
                       OrderState.FILLED]
 
 
+# ------------------------------------------------------------- seeding
+
+def test_seed_position_feeds_risk_view_and_flatten():
+    from mini_prop_os.core.config import RiskConfig
+    from mini_prop_os.risk.guardrails import RiskGuardrails
+
+    _, oms = make_oms()
+    oms.seed_position("MES", 3, 6400.0)
+    assert oms.position_quantities() == {"MES": 3}
+    # Kill-switch flattening must cover the imported position.
+    risk = RiskGuardrails(RiskConfig())
+    intents = risk.flatten_intents(oms.position_quantities())
+    assert len(intents) == 1
+    assert intents[0].action is Action.SELL and intents[0].quantity == 3
+
+
+def test_seed_refuses_to_overwrite_live_position():
+    _, oms = make_oms()
+    mo = run(oms.submit(intent(qty=5)))
+    oms.on_fill(fill(mo.order_id, 5, 500.0, exec_id="f"))
+    with pytest.raises(ValueError):
+        oms.seed_position("SPY", 2, 400.0)
+    assert oms.positions["SPY"].quantity == 5
+
+
+def test_seed_zero_is_noop():
+    _, oms = make_oms()
+    oms.seed_position("MES", 0, 0.0)
+    assert oms.position_quantities() == {}
+
+
 # ---------------------------------------------------------- execution log
 
 def test_execution_log_written_as_jsonl(tmp_path):
