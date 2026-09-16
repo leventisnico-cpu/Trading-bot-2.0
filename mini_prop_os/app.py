@@ -16,8 +16,12 @@ from typing import Dict, Optional
 from ib_insync import (IB, BarDataList, ContFuture, Contract, Fill as IbFill,
                        Future, LimitOrder, MarketOrder, Stock, Trade)
 
+from pathlib import Path
+from typing import List, Tuple
+
 from .core.config import AppConfig, ContractConfig
 from .core.connection import IBConnectionManager
+from .core.killfile import write_kill_marker
 from .core.types import Bar, Fill, OrderIntent, OrderType
 from .execution.oms import ManagedOrder, OrderManagementSystem, OrderState
 from .risk.guardrails import PortfolioSnapshot, RiskGuardrails
@@ -108,6 +112,83 @@ class IbBrokerAdapter:
         ))
 
 
+def kill_marker_path(cfg: AppConfig) -> Path:
+    """The persistent kill-switch marker lives next to the execution log."""
+    return Path(cfg.execution.execution_log_path).parent / "kill_switch.json"
+
+
+async def run_preflight(cfg: AppConfig) -> List[Tuple[str, bool, str]]:
+    """Read-only go/no-go check of the operator's IBKR setup.
+
+    Connects (with a clientId offset so it never clashes with a running
+    bot), qualifies the configured contract including front-month
+    resolution and multiplier verification, pulls a small historical bar
+    sample to prove market data entitlement, and reads account equity.
+    Places no orders and subscribes to nothing persistent.
+
+    Returns (check name, passed, detail) tuples; the caller renders them.
+    """
+    results: List[Tuple[str, bool, str]] = []
+    c = cfg.connection
+    paper = c.port in (7497, 4002)
+    results.append(("port mode", True,
+                    f"{c.port} = {'PAPER' if paper else 'LIVE — real money'}"))
+    ib = IB()
+    try:
+        await asyncio.wait_for(
+            ib.connectAsync(host=c.host, port=c.port,
+                            clientId=c.client_id + 1,
+                            account=c.account or "",
+                            timeout=c.connect_timeout_s),
+            timeout=c.connect_timeout_s + 5.0)
+        results.append(("connect to TWS/Gateway", True,
+                        f"{c.host}:{c.port} serverVersion="
+                        f"{ib.client.serverVersion()} "
+                        f"accounts={ib.managedAccounts()}"))
+    except Exception as exc:
+        results.append(("connect to TWS/Gateway", False,
+                        f"{type(exc).__name__}: {exc} — is Gateway/TWS "
+                        f"running with API enabled on this port?"))
+        return results
+    try:
+        contract = await qualify_tradeable_contract(
+            ib, cfg.contract, build_contract(cfg.contract))
+        results.append(("qualify contract", True,
+                        f"{contract.symbol} "
+                        f"{contract.lastTradeDateOrContractMonth or ''} "
+                        f"conId={contract.conId} "
+                        f"multiplier={contract.multiplier or '1'}".strip()))
+    except Exception as exc:
+        results.append(("qualify contract", False, str(exc)))
+        ib.disconnect()
+        return results
+    try:
+        bars = await asyncio.wait_for(ib.reqHistoricalDataAsync(
+            contract, endDateTime="", durationStr="3600 S",
+            barSizeSetting=cfg.strategy.bar_size, whatToShow="TRADES",
+            useRTH=cfg.strategy.use_rth, formatDate=2), timeout=30.0)
+        ok = bool(bars)
+        results.append(("market data (historical bars)", ok,
+                        f"{len(bars)} bars, last close "
+                        f"{bars[-1].close}" if ok else
+                        "no bars returned — check CME data subscription"))
+    except Exception as exc:
+        results.append(("market data (historical bars)", False,
+                        f"{exc} — check market data subscriptions"))
+    try:
+        rows = await asyncio.wait_for(
+            ib.accountSummaryAsync(c.account or ""), timeout=15.0)
+        equity = next((r.value for r in rows
+                       if r.tag == "NetLiquidation"), None)
+        results.append(("account equity readable", equity is not None,
+                        f"NetLiquidation={equity}" if equity is not None
+                        else "NetLiquidation missing from account summary"))
+    except Exception as exc:
+        results.append(("account equity readable", False, str(exc)))
+    ib.disconnect()
+    return results
+
+
 def build_contract(cfg: ContractConfig) -> Contract:
     """Translate the contract config into an ib_insync contract.
 
@@ -125,6 +206,34 @@ def build_contract(cfg: ContractConfig) -> Contract:
         return ContFuture(cfg.symbol, exchange=cfg.exchange,
                           currency=cfg.currency)
     raise ValueError(f"unsupported sec_type {cfg.sec_type!r}")
+
+
+async def qualify_tradeable_contract(ib: IB, cfg: ContractConfig,
+                                     contract: Contract) -> Contract:
+    """Qualify ``contract``; resolve a continuous future to the tradeable
+    front-month Future (ContFuture cannot take orders) and verify the
+    configured multiplier against the venue's. Raises on any mismatch —
+    trading with a wrong economic multiplier breaks every notional cap."""
+    qualified = await ib.qualifyContractsAsync(contract)
+    if not qualified:
+        raise RuntimeError(f"could not qualify contract {cfg.symbol}")
+    if isinstance(contract, ContFuture):
+        front = Future(conId=contract.conId, exchange=cfg.exchange)
+        if not await ib.qualifyContractsAsync(front):
+            raise RuntimeError(
+                f"could not resolve front-month future for {cfg.symbol}")
+        log.info("resolved front month: %s %s (conId=%d, mult=%s)",
+                 front.symbol, front.lastTradeDateOrContractMonth,
+                 front.conId, front.multiplier)
+        contract = front
+    if contract.secType == "FUT" and contract.multiplier:
+        venue_mult = float(contract.multiplier)
+        if abs(venue_mult - cfg.multiplier) > 1e-9:
+            raise RuntimeError(
+                f"configured contract.multiplier {cfg.multiplier} does not "
+                f"match the venue's {venue_mult} for {contract.symbol} — "
+                f"fix config.yaml before trading")
+    return contract
 
 
 def build_strategy(cfg: AppConfig) -> BaseStrategy:
@@ -244,35 +353,9 @@ class TradingApp:
             log.exception("post-connect setup failed; trading stays disabled")
 
     async def _qualify_contract(self) -> None:
-        """Qualify the configured contract; resolve a continuous future to
-        the tradeable front-month Future (ContFuture cannot take orders)."""
-        ib = self.conn.ib
-        qualified = await ib.qualifyContractsAsync(self.contract)
-        if not qualified:
-            raise RuntimeError(
-                f"could not qualify contract {self.cfg.contract.symbol}")
-        if isinstance(self.contract, ContFuture):
-            front = Future(conId=self.contract.conId,
-                           exchange=self.cfg.contract.exchange)
-            if not await ib.qualifyContractsAsync(front):
-                raise RuntimeError(
-                    f"could not resolve front-month future for "
-                    f"{self.cfg.contract.symbol}")
-            self.contract = front
-            self.broker.set_contract(front)
-            log.info("resolved front month: %s %s (conId=%d, mult=%s)",
-                     front.symbol, front.lastTradeDateOrContractMonth,
-                     front.conId, front.multiplier)
-        if self.contract.secType == "FUT" and self.contract.multiplier:
-            venue_mult = float(self.contract.multiplier)
-            if abs(venue_mult - self.cfg.contract.multiplier) > 1e-9:
-                # Never trade with a wrong economic multiplier: all notional
-                # risk caps depend on it.
-                raise RuntimeError(
-                    f"configured contract.multiplier "
-                    f"{self.cfg.contract.multiplier} does not match the "
-                    f"venue's {venue_mult} for {self.contract.symbol} — fix "
-                    f"config.yaml before trading")
+        self.contract = await qualify_tradeable_contract(
+            self.conn.ib, self.cfg.contract, self.contract)
+        self.broker.set_contract(self.contract)
 
     async def _on_disconnected(self) -> None:
         self._trading_enabled.clear()
@@ -434,12 +517,16 @@ class TradingApp:
                 await self._kill_switch_fired()
 
     async def _kill_switch_fired(self) -> None:
-        """Cancel everything and flatten the book (once)."""
+        """Cancel everything, flatten the book, persist the halt (once)."""
         if self._flattening:
             return
         self._flattening = True
         log.critical("kill switch fired: cancelling all orders and "
                      "flattening all positions")
+        # Persist first: even if flattening errors, a restart must not
+        # resume trading until an operator clears the marker.
+        write_kill_marker(kill_marker_path(self.cfg),
+                          self.risk.kill_reason or "kill switch fired")
         try:
             await self.oms.cancel_all()
             await self._flatten_all("kill switch")

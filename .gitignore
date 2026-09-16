@@ -1,3 +1,6 @@
 __pycache__/
 *.pyc
 .pytest_cache/
+state/mini_prop_os.log
+state/executions.jsonl
+state/kill_switch.json

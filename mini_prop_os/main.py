@@ -21,9 +21,10 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from .app import TradingApp
+from .app import TradingApp, kill_marker_path, run_preflight
 from .core.config import (AppConfig, ConfigError, default_config_path,
                           load_config)
+from .core.killfile import clear_kill_marker, read_kill_marker
 
 log = logging.getLogger("mini_prop_os")
 
@@ -57,7 +58,29 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         "--config", type=Path, default=None,
         help="path to config.yaml (default: $MINI_PROP_OS_CONFIG, ./config.yaml, "
              "or the packaged mini_prop_os/config.yaml)")
+    parser.add_argument(
+        "--preflight", action="store_true",
+        help="read-only go/no-go check of the IBKR setup (connection, "
+             "contract, market data, account equity); places no orders")
+    parser.add_argument(
+        "--reset-kill-switch", metavar="OPERATOR", default=None,
+        help="clear a persisted kill-switch halt, attributed to OPERATOR; "
+             "review state/executions.jsonl and the account first")
     return parser.parse_args(argv)
+
+
+def _run_preflight(cfg: AppConfig) -> int:
+    marker = read_kill_marker(kill_marker_path(cfg))
+    results = asyncio.run(run_preflight(cfg))
+    results.append(("no persisted kill-switch halt", marker is None,
+                    marker.get("reason", "") if marker else "clear"))
+    width = max(len(name) for name, _, _ in results)
+    print("\nMini-Prop OS preflight:")
+    for name, ok, detail in results:
+        print(f"  [{'PASS' if ok else 'FAIL'}] {name:<{width}}  {detail}")
+    go = all(ok for _, ok, _ in results)
+    print(f"\n{'GO — ready to trade on this setup.' if go else 'NO-GO — fix the failed checks above before trading.'}")
+    return 0 if go else 1
 
 
 async def _run(app: TradingApp) -> None:
@@ -87,6 +110,27 @@ def main(argv: Optional[list[str]] = None) -> int:
         return 2
     setup_logging(cfg)
     log.info("loaded config from %s", config_path)
+    if args.reset_kill_switch is not None:
+        try:
+            cleared = clear_kill_marker(kill_marker_path(cfg),
+                                        args.reset_kill_switch)
+        except ValueError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
+        print("kill-switch marker cleared" if cleared
+              else "no kill-switch marker present")
+        return 0
+    if args.preflight:
+        return _run_preflight(cfg)
+    marker = read_kill_marker(kill_marker_path(cfg))
+    if marker is not None:
+        log.critical(
+            "REFUSING TO START: persisted kill-switch halt from %s (%s). "
+            "Review the account and state/executions.jsonl, then clear it "
+            "with: python -m mini_prop_os --reset-kill-switch <your-name>",
+            marker.get("tripped_at", "unknown time"),
+            marker.get("reason", "no reason recorded"))
+        return 3
     if cfg.connection.port in (7496, 4001):
         log.warning("LIVE trading port %d configured — this is not paper. "
                     "Ensure this is intentional.", cfg.connection.port)
