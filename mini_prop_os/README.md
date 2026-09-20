@@ -127,6 +127,68 @@ not, and mathematically cannot, make **P&L** predictable. Fat tails mean
 even the risk figure understates gap moves — the daily-loss kill switch,
 not this math, is the tail defense.
 
+## What the AI-quant research contributes here
+
+Three widely-cited projects sit behind the newest modules. Each was adapted
+rather than copied, because the literal version does not survive contact
+with a single-instrument intraday futures bot.
+
+**Multi-agent LLM trading desks** (TradingAgents) → `strategy/ensemble.py`.
+The portable insight is *independent views plus an explicit agreement
+requirement*, not the LLMs. Literal agents in the order path would add
+seconds of latency to a one-minute bar, make failures non-reproducible
+(defeating the regression and mutation tests this system's safety rests
+on), and put hallucination directly upstream of order submission. The
+ensemble keeps the structure and drops the liability: entry needs
+`min_agreement` members, **exit needs one**, and size is the minimum any
+agreeing member proposed. LLM agents remain genuinely useful *around* the
+loop — proposing strategies, critiquing diffs, summarizing fills — where
+latency is free and a human reads the output first.
+
+**LLM news sentiment for allocation** (HARLF) → `risk/event_calendar.py`.
+Sentiment-driven *allocation* assumes a multi-asset portfolio rebalancing
+daily; this bot trades one contract on minute bars. The transferable core
+is that information outside price history predicts risk — and for an
+intraday trend-follower the reliable slice is the economic calendar. FOMC,
+CPI and NFP produce instant multi-point gaps; entering seconds before one
+is the strategy's edge removed and its tail risk multiplied. A calendar
+beats a live news model in the trade path on every axis that matters:
+deterministic, no network call, no latency, cannot hallucinate. Blackouts
+suppress **entries only** — never exits, flattening, or the kill switch.
+
+**LLM strategy discovery** (Automate Strategy Finding) → `quant/statistics.py`.
+This is the one that needs the most care. Automated factor search is a
+multiple-testing machine: test enough strategies on one history and some
+will look excellent through luck alone. The expected maximum Sharpe of N
+*worthless* strategies grows with √(2·ln N), so 100 searched strategies
+yield a best-of-breed near Sharpe 1.0 from noise. The valuable
+contribution is therefore not another generator but the gate every
+generator needs — Deflated Sharpe Ratio, Probabilistic Sharpe, and minimum
+track record length (Bailey & López de Prado).
+
+### What it says about our own strategy
+
+`python scripts/assess_strategy_credibility.py` points that gate at this
+repo's own strategies over the full history:
+
+| strategy | annualized Sharpe | DSR @ 1 trial | @ 10 | @ 100 |
+|---|---|---|---|---|
+| baseline crossover | 0.651 | 0.997 ✓ | 0.888 | 0.606 |
+| adaptive | 0.282 | 0.828 | 0.271 | 0.060 |
+
+The baseline looks **credible only if you pretend it was the first idea
+ever tested**. Correct for even ten variants and it fails. Both series
+also carry negative skew and kurtosis above 11 — fat-tailed losses that
+make a Sharpe less trustworthy, which the formulas penalize.
+
+Note the adaptive strategy earns a *lower* risk-adjusted return than the
+baseline while (as measured separately) cutting stress-window drawdown.
+That is the trade it makes, now quantified rather than assumed.
+
+The correct response to these numbers is more evidence — out-of-sample
+data, live paper fills — not more tuning. Every extra variant tried raises
+the bar the table measures against.
+
 ## Adaptation, honestly stated
 
 The adaptive strategy's "learning" is a bounded, transparent rule — losing

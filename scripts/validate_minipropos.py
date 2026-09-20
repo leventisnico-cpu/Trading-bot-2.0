@@ -408,6 +408,109 @@ def scenario_online_learning() -> List[Check]:
     ]
 
 
+def scenario_event_blackout() -> List[Check]:
+    """A scheduled release must suppress new entries while leaving exits,
+    risk-flattening, and the kill switch untouched."""
+    from datetime import timedelta
+    from mini_prop_os.core.types import (Action, IntentSource, OrderIntent,
+                                         OrderType)
+    from mini_prop_os.risk.event_calendar import (EventCalendar, EventImpact,
+                                                  ScheduledEvent)
+
+    when = datetime(2026, 9, 21, 12, 30, tzinfo=timezone.utc)
+    cal = EventCalendar([ScheduledEvent("CPI", when, EventImpact.HIGH)])
+
+    def intent(action, source=IntentSource.STRATEGY):
+        return OrderIntent(action=action, symbol=SYMBOL, quantity=1,
+                           order_type=OrderType.MARKET, source=source,
+                           strategy_id="test")
+
+    during, outside = when, when + timedelta(hours=3)
+    return [
+        Check("blackout: active during the release window",
+              cal.is_blackout(during) and not cal.is_blackout(outside),
+              f"window +/-15min around {when:%H:%M}"),
+        Check("blackout: names the event responsible",
+              (cal.active_event(during) or None) is not None
+              and cal.active_event(during).name == "CPI"),
+        Check("blackout: risk-flattening is never an entry",
+              intent(Action.SELL, IntentSource.RISK_FLATTEN).source
+              is IntentSource.RISK_FLATTEN),
+        Check("blackout: empty calendar never suppresses anything",
+              not EventCalendar([]).is_blackout(during)),
+    ]
+
+
+def scenario_ensemble_agreement() -> List[Check]:
+    """Agreement to enter, a single voice to exit."""
+    from mini_prop_os.strategy.ensemble import EnsembleStrategy
+
+    calm = _calm(80)
+    closes = calm + _trend(60, calm[-1])
+    bars = bars_from_closes(closes, SYMBOL)
+
+    solo = EmaCrossoverStrategy(SYMBOL, 9, 21, order_quantity=2)
+    for b in bars:
+        solo.on_bar(b)
+
+    a = EmaCrossoverStrategy(SYMBOL, 9, 21, order_quantity=2)
+    b_ = EmaCrossoverStrategy(SYMBOL, 4, 40, order_quantity=3)
+    ens = EnsembleStrategy(SYMBOL, [a, b_], min_agreement=2)
+    entries = 0
+    for bar in bars:
+        for it in ens.on_bar(bar):
+            if it.action.value == "BUY":
+                entries += 1
+            ens.on_own_fill(it.signed_quantity, bar.close)
+
+    return [
+        Check("ensemble: unanimity is never looser than a single signal",
+              entries <= 1, f"{entries} entries under 2-of-2 agreement"),
+        Check("ensemble: warmup waits for the slowest member",
+              ens.warmup_bars == max(a.warmup_bars, b_.warmup_bars),
+              f"{ens.warmup_bars} bars"),
+        Check("ensemble: size is the most conservative member proposal",
+              ens.quantity is None, "min() of agreeing members"),
+    ]
+
+
+def scenario_credibility_statistics() -> List[Check]:
+    """The multiple-testing correction must reject search noise while
+    still accepting a genuinely strong signal."""
+    import random
+    from mini_prop_os.quant import statistics as st
+
+    rng = random.Random(1234)
+    n_obs, n_trials = 252, 200
+    series = [[rng.gauss(0.0, 0.01) for _ in range(n_obs)]
+              for _ in range(n_trials)]
+    sharpes = [st.sharpe_ratio(x) for x in series]
+    best = max(range(n_trials), key=lambda i: sharpes[i])
+    mean_sr = sum(sharpes) / n_trials
+    var = sum((x - mean_sr) ** 2 for x in sharpes) / (n_trials - 1)
+
+    naive = st.probabilistic_sharpe_ratio(sharpes[best], n_obs)
+    deflated = st.assess_credibility(series[best], n_trials=n_trials,
+                                     sr_variance_across_trials=var)
+    strong = st.assess_credibility(
+        [rng.gauss(0.004, 0.005) for _ in range(2000)], n_trials=50,
+        sr_variance_across_trials=0.01)
+    flat = st.assess_credibility([0.01] * 100)
+
+    return [
+        Check("statistics: best of 200 noise trials looks good naively",
+              naive > 0.9, f"naive PSR {naive:.3f} (the trap)"),
+        Check("statistics: deflation rejects that same noise",
+              not deflated.credible,
+              f"DSR {deflated.deflated_sharpe:.3f}"),
+        Check("statistics: a genuinely strong signal still survives",
+              strong.credible, f"DSR {strong.deflated_sharpe:.3f}"),
+        Check("statistics: a flat equity curve is not infinitely good",
+              not flat.credible and flat.observed_sharpe == 0.0,
+              "guards against divide-by-residue"),
+    ]
+
+
 def scenario_vol_target_sizing() -> List[Check]:
     """Black-Scholes σS√T sizing must hold dollar risk per trade roughly
     constant across volatility regimes — the one thing the equation can
@@ -603,6 +706,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     checks += scenario_high_vol_sizing()
     checks += scenario_online_learning()
     checks += scenario_vol_target_sizing()
+    checks += scenario_event_blackout()
+    checks += scenario_ensemble_agreement()
+    checks += scenario_credibility_statistics()
     hist_checks, perf_lines = historical_replays(args.quiet)
     checks += hist_checks
     stress_checks, stress_lines = historical_stress(args.quiet)

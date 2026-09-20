@@ -11,19 +11,19 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime, timezone
-from typing import Dict, Optional
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
 
 from ib_insync import (IB, BarDataList, ContFuture, Contract, Fill as IbFill,
                        Future, LimitOrder, MarketOrder, Stock, Trade)
 
-from pathlib import Path
-from typing import List, Tuple
-
 from .core.config import AppConfig, ContractConfig
 from .core.connection import IBConnectionManager
 from .core.killfile import write_kill_marker
-from .core.types import Bar, Fill, OrderIntent, OrderType
+from .core.types import (Bar, Fill, IntentSource, OrderIntent, OrderType,
+                         utc_now)
 from .execution.oms import ManagedOrder, OrderManagementSystem, OrderState
+from .risk.event_calendar import BlackoutWindow, EventCalendar
 from .risk.guardrails import PortfolioSnapshot, RiskGuardrails
 from .strategy.adaptive_ema import AdaptiveEmaCrossoverStrategy
 from .strategy.base import BaseStrategy
@@ -294,6 +294,45 @@ class TradingApp:
         self._shutdown_evt = asyncio.Event()
         self._flattening = False
         self._setup_lock = asyncio.Lock()
+        self.calendar = self._load_calendar(cfg)
+
+    @staticmethod
+    def _load_calendar(cfg: AppConfig) -> Optional[EventCalendar]:
+        """Load the economic-event calendar, if one is configured."""
+        if not cfg.risk.event_calendar_path:
+            return None
+        before = cfg.risk.blackout_minutes_before
+        after = cfg.risk.blackout_minutes_after
+        window = BlackoutWindow(
+            high_before_minutes=before, high_after_minutes=after,
+            medium_before_minutes=before / 3.0,
+            medium_after_minutes=after / 3.0)
+        return EventCalendar.from_file(cfg.risk.event_calendar_path, window)
+
+    def _is_entry(self, intent: OrderIntent) -> bool:
+        """True when the intent increases exposure rather than reducing it."""
+        current = self.oms.position_quantities().get(intent.symbol, 0)
+        return abs(current + intent.signed_quantity) > abs(current)
+
+    def _blackout_block(self, intent: OrderIntent) -> Optional[str]:
+        """Reason to suppress this intent for a scheduled event, or None.
+
+        Only strategy-sourced *entries* are ever blocked: exits, risk
+        flattening, and operator orders must always get through — being
+        unable to leave a position during a release is the risk the
+        blackout exists to avoid.
+        """
+        if self.calendar is None or len(self.calendar) == 0:
+            return None
+        if intent.source is not IntentSource.STRATEGY:
+            return None
+        if not self._is_entry(intent):
+            return None
+        event = self.calendar.active_event(utc_now())
+        if event is None:
+            return None
+        return (f"scheduled {event.impact.value}-impact event "
+                f"{event.name!r} at {event.timestamp.isoformat()}")
 
     # ------------------------------------------------------------- public
 
@@ -527,6 +566,11 @@ class TradingApp:
         )
 
     async def _route_intent(self, intent: OrderIntent) -> None:
+        blackout = self._blackout_block(intent)
+        if blackout is not None:
+            log.info("BLACKOUT [%s %d %s]: %s", intent.action.value,
+                     intent.quantity, intent.symbol, blackout)
+            return
         snapshot = self._snapshot()
         decision = self.risk.validate(intent, snapshot)
         if not decision.approved:
