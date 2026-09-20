@@ -7,6 +7,7 @@ producing silent bad behavior at trade time.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Optional
@@ -118,6 +119,10 @@ class StrategyConfig:
     extreme_vol_ratio: float = 2.5
     confirm_window: int = 10
     learn: bool = True
+    #: Dollars a 1-sigma adverse move may cost per entry. > 0 enables
+    #: Black-Scholes volatility-target sizing (σS√T), which can only size
+    #: *down* from order_quantity, never up. 0 disables it.
+    risk_per_trade: float = 0.0
 
     def __post_init__(self) -> None:
         if self.name not in ("adaptive_ema", "ema_crossover"):
@@ -139,6 +144,8 @@ class StrategyConfig:
                 "need 1 < strategy.high_vol_ratio < extreme_vol_ratio")
         if self.confirm_window < 1:
             raise ConfigError("strategy.confirm_window must be >= 1")
+        if self.risk_per_trade < 0 or not math.isfinite(self.risk_per_trade):
+            raise ConfigError("strategy.risk_per_trade must be >= 0")
 
 
 @dataclass(frozen=True)

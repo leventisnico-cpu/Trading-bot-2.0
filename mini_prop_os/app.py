@@ -260,6 +260,8 @@ def build_strategy(cfg: AppConfig) -> BaseStrategy:
             extreme_vol_ratio=s.extreme_vol_ratio,
             confirm_window=s.confirm_window,
             learn=s.learn,
+            risk_per_trade=s.risk_per_trade,
+            multiplier=cfg.contract.multiplier,
         )
     raise ValueError(f"unknown strategy {s.name!r}")
 

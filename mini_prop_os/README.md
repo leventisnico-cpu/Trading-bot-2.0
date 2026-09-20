@@ -92,6 +92,41 @@ Ctrl-C / SIGTERM triggers a clean shutdown: working orders are cancelled
 Logs go to the console and `state/mini_prop_os.log`; every order state
 transition and fill is also appended to `state/executions.jsonl`.
 
+## Black-Scholes: what it does and does not do here
+
+`quant/blackscholes.py` implements Black-Scholes (spot), Black-76 (the
+correct model for options on futures), the Greeks, and an implied-volatility
+solver — verified against put-call parity, textbook values, and numerical
+derivatives rather than against itself.
+
+**It is not a prediction engine, and cannot be made into one.** The drift
+term μ cancels in the hedged-portfolio derivation; that cancellation *is*
+the theorem. The equation prices a derivative *relative* to its underlying
+precisely by assuming direction is unpredictable. Anyone claiming it makes
+trade outcomes predictable has the mathematics backwards.
+
+What the strategy genuinely takes from it is the diffusion term **σS√T**:
+
+- **Entry bands** — a trend must clear `k[regime] × σS√T` to count as
+  signal rather than noise. This replaces the earlier ATR proxy with the
+  quantity ATR was approximating. The EWMA of `|log return|` is converted
+  to a true σ with the `√(π/2)` factor; skipping that understates
+  volatility by ~20%.
+- **Volatility-target sizing** (`strategy.risk_per_trade`) — position size
+  such that a 1-sigma adverse move costs a fixed dollar amount, so a trade
+  in a turbulent regime carries the same risk as one in a calm regime. It
+  can only size *down* from `order_quantity`, never up.
+
+Measured in the validation scorecard: at four times the volatility, fixed
+sizing would have risked **$6,800 against a $2,000 budget**, while
+vol-targeted sizing held it to $1,360 — and risk varied by $372 across
+regimes instead of $5,068.
+
+So the honest summary: this makes **risk per trade** predictable. It does
+not, and mathematically cannot, make **P&L** predictable. Fat tails mean
+even the risk figure understates gap moves — the daily-loss kill switch,
+not this math, is the tail defense.
+
 ## Adaptation, honestly stated
 
 The adaptive strategy's "learning" is a bounded, transparent rule — losing

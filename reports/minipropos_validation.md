@@ -1,8 +1,8 @@
 # Mini-Prop OS validation scorecard
 
-Generated: 2026-09-16 18:43 UTC
+Generated: 2026-09-20 03:01 UTC
 
-**122/122 checks passed (100.0%) — PASS (gate: >= 75%)**
+**127/127 checks passed (100.0%) — PASS (gate: >= 75%)**
 
 Simulation: real RiskGuardrails + OMS + EmaCrossoverStrategy, simulated broker (fills at next bar open, 1 tick adverse slippage, $0.62/side commission, partial fills on 2+ units). Historical data: SPY daily adjusted closes (data/prices_us.csv) x10 as an S&P-index/MES proxy, 1 contract, $5 multiplier.
 
@@ -51,6 +51,11 @@ Simulation: real RiskGuardrails + OMS + EmaCrossoverStrategy, simulated broker (
 - [PASS] learning: sawtooth produced losing round trips to learn from — 5 losses / 6 trips
 - [PASS] learning: entry thresholds tightened after losses — {'LOW': 0.05, 'NORMAL': 0.55, 'HIGH': 0.35}
 - [PASS] learning: thresholds stay hard-bounded
+- [PASS] vol-target: quiet market takes a larger position — 10 vs 2 contracts
+- [PASS] vol-target: dollar risk stays within budget in both regimes — calm $1,732, loud $1,360 (budget $2,000)
+- [PASS] vol-target: risk is far more uniform than fixed sizing — sized spread $372 vs unsized $5,068
+- [PASS] vol-target: fixed sizing would have blown the budget — $6,800 at 10 contracts
+- [PASS] vol-target: never sizes above the configured base — max 10 <= 10
 - [PASS] GFC 2007-2009: never short (long-only enforced) — min position 0
 - [PASS] GFC 2007-2009: position cap never exceeded — max 1 <= 4
 - [PASS] GFC 2007-2009: order-size cap never exceeded — max order 1

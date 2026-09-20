@@ -189,6 +189,91 @@ def test_extreme_threshold_is_never_learnable():
     assert math.isinf(s.entry_thresholds[VolRegime.EXTREME])
 
 
+# ------------------------------------- Black-Scholes volatility sizing
+
+def test_sigma_conversion_applies_mad_factor():
+    """The strategy tracks E|log return|; sigma must be 1.2533x that."""
+    s = strat()
+    run(s, calm(120))
+    assert s._vol_fast is not None and s._vol_fast > 0
+    assert s.sigma_per_bar() == pytest.approx(s._vol_fast * 1.2533, rel=1e-3)
+
+
+def test_expected_move_scales_with_price_and_horizon():
+    s = strat()
+    run(s, calm(120))
+    one = s.expected_move_points(5000.0, bars=1)
+    four = s.expected_move_points(5000.0, bars=4)
+    assert one > 0
+    assert four == pytest.approx(2.0 * one, rel=1e-9)   # sqrt(4) = 2
+    # Linear in price.
+    assert s.expected_move_points(10_000.0, 1) == pytest.approx(2.0 * one,
+                                                                rel=1e-9)
+
+
+def test_risk_budget_sizes_down_but_never_up():
+    """The budget layer may only reduce the regime quantity."""
+    s = strat(base_quantity=4, risk_per_trade=1_000_000.0, multiplier=5.0)
+    run(s, calm(120))
+    # An enormous budget must still not exceed the configured base size.
+    assert s.entry_quantity(VolRegime.NORMAL, 5000.0) == 4
+    # A tiny budget sizes down.
+    tight = strat(base_quantity=4, risk_per_trade=1.0, multiplier=5.0)
+    run(tight, calm(120))
+    assert tight.entry_quantity(VolRegime.NORMAL, 5000.0) == 0
+
+
+def test_risk_budget_holds_dollar_risk_roughly_constant():
+    """Same budget, different volatility: risk taken stays within budget."""
+    budget, mult = 2000.0, 5.0
+    quiet = strat(base_quantity=10, risk_per_trade=budget, multiplier=mult,
+                  high_vol_ratio=9.0, extreme_vol_ratio=10.0)
+    run(quiet, calm(150))
+    loud = strat(base_quantity=10, risk_per_trade=budget, multiplier=mult,
+                 high_vol_ratio=9.0, extreme_vol_ratio=10.0)
+    run(loud, [5000 + (60 if i % 2 == 0 else -60) for i in range(150)])
+
+    q_qty = quiet.entry_quantity(VolRegime.NORMAL, 5000.0)
+    l_qty = loud.entry_quantity(VolRegime.NORMAL, 5000.0)
+    assert quiet.sigma_per_bar() < loud.sigma_per_bar()
+    assert q_qty > l_qty        # louder market, smaller position
+    for s_, qty in ((quiet, q_qty), (loud, l_qty)):
+        risk = s_.expected_move_points(
+            5000.0, s_.confirm_window) * mult * qty
+        assert risk <= budget + 1e-6
+
+
+def test_zero_risk_budget_keeps_pure_regime_sizing():
+    s = strat(base_quantity=4, risk_per_trade=0.0)
+    run(s, calm(120))
+    assert s.entry_quantity(VolRegime.NORMAL, 5000.0) == 4
+    assert s.entry_quantity(VolRegime.HIGH, 5000.0) == 2
+    assert s.entry_quantity(VolRegime.EXTREME, 5000.0) == 0
+
+
+def test_extreme_regime_still_sizes_to_zero_with_budget():
+    """Risk-off must not be overridden by a generous budget."""
+    s = strat(base_quantity=4, risk_per_trade=1_000_000.0)
+    run(s, calm(120))
+    assert s.entry_quantity(VolRegime.EXTREME, 5000.0) == 0
+
+
+def test_invalid_risk_parameters_rejected():
+    with pytest.raises(ValueError):
+        strat(risk_per_trade=-1.0)
+    with pytest.raises(ValueError):
+        strat(multiplier=0.0)
+
+
+def test_entry_band_uses_sigma_not_atr():
+    """The confirmation band must come from the sigma diffusion scale."""
+    s = strat()
+    run(s, calm(60) + trend_up(40, calm(60)[-1]))
+    band = s.expected_move_points(5000.0)
+    assert band == pytest.approx(5000.0 * s.sigma_per_bar(), rel=1e-9)
+    assert band > 0
+
+
 def test_partial_fills_learn_from_true_average_prices():
     s = strat(k_step=0.1)
     s._entry_regime = VolRegime.NORMAL

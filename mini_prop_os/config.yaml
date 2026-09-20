@@ -39,6 +39,11 @@ strategy:
   extreme_vol_ratio: 2.5  # EXTREME above this -> risk-off (exit, no entries)
   confirm_window: 10      # bars a golden cross has to confirm before expiry
   learn: true             # bounded per-regime entry-threshold adaptation
+  risk_per_trade: 250.0   # $ a 1-sigma adverse move may cost per entry.
+                          # Enables Black-Scholes volatility-target sizing
+                          # (σS√T): constant dollar risk across regimes.
+                          # Only ever sizes DOWN from order_quantity.
+                          # 0 disables it (pure regime sizing).
 
 risk:
   max_position_shares: 4        # max |contracts| per symbol

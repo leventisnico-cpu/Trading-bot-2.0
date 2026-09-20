@@ -408,6 +408,56 @@ def scenario_online_learning() -> List[Check]:
     ]
 
 
+def scenario_vol_target_sizing() -> List[Check]:
+    """Black-Scholes σS√T sizing must hold dollar risk per trade roughly
+    constant across volatility regimes — the one thing the equation can
+    genuinely make predictable. Direction is NOT claimed to be."""
+    budget, mult = 2000.0, 5.0
+    calm_closes = _calm(160)
+    # Same structure, four times the bar-to-bar noise.
+    loud_closes = [5000 - 2 * i + _noise(i, 16.0) for i in range(160)]
+
+    sized: List[Tuple[str, float, int]] = []
+    for label, closes in (("calm", calm_closes), ("loud", loud_closes)):
+        s = AdaptiveEmaCrossoverStrategy(
+            SYMBOL, 9, 21, base_quantity=10, risk_per_trade=budget,
+            multiplier=mult, high_vol_ratio=9.0, extreme_vol_ratio=10.0)
+        for bar in bars_from_closes(closes, SYMBOL):
+            s.on_bar(bar)
+        qty = s.entry_quantity(VolRegime.NORMAL, 5000.0)
+        risk = s.expected_move_points(5000.0, s.confirm_window) * mult * qty
+        sized.append((label, risk, qty))
+
+    (_, calm_risk, calm_qty), (_, loud_risk, loud_qty) = sized
+    unsized = AdaptiveEmaCrossoverStrategy(
+        SYMBOL, 9, 21, base_quantity=10, risk_per_trade=0.0, multiplier=mult,
+        high_vol_ratio=9.0, extreme_vol_ratio=10.0)
+    for bar in bars_from_closes(loud_closes, SYMBOL):
+        unsized.on_bar(bar)
+    unsized_qty = unsized.entry_quantity(VolRegime.NORMAL, 5000.0)
+    unsized_risk = unsized.expected_move_points(
+        5000.0, unsized.confirm_window) * mult * unsized_qty
+
+    return [
+        Check("vol-target: quiet market takes a larger position",
+              calm_qty > loud_qty, f"{calm_qty} vs {loud_qty} contracts"),
+        Check("vol-target: dollar risk stays within budget in both regimes",
+              calm_risk <= budget and loud_risk <= budget,
+              f"calm ${calm_risk:,.0f}, loud ${loud_risk:,.0f} "
+              f"(budget ${budget:,.0f})"),
+        Check("vol-target: risk is far more uniform than fixed sizing",
+              abs(calm_risk - loud_risk) < abs(calm_risk - unsized_risk),
+              f"sized spread ${abs(calm_risk - loud_risk):,.0f} vs "
+              f"unsized ${abs(calm_risk - unsized_risk):,.0f}"),
+        Check("vol-target: fixed sizing would have blown the budget",
+              unsized_risk > budget,
+              f"${unsized_risk:,.0f} at {unsized_qty} contracts"),
+        Check("vol-target: never sizes above the configured base",
+              calm_qty <= 10 and loud_qty <= 10,
+              f"max {max(calm_qty, loud_qty)} <= 10"),
+    ]
+
+
 HIGH_VOL_WINDOWS: Sequence[Tuple[str, Tuple[int, int], Tuple[int, int]]] = (
     ("GFC autumn 2008", (2008, 8), (2009, 3)),
     ("euro crisis 2011", (2011, 7), (2011, 12)),
@@ -552,6 +602,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     checks += scenario_flash_crash_risk_off()
     checks += scenario_high_vol_sizing()
     checks += scenario_online_learning()
+    checks += scenario_vol_target_sizing()
     hist_checks, perf_lines = historical_replays(args.quiet)
     checks += hist_checks
     stress_checks, stress_lines = historical_stress(args.quiet)

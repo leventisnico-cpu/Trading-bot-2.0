@@ -36,6 +36,8 @@ from enum import Enum
 from typing import Dict, List, Optional
 
 from ..core.types import Action, Bar, IntentSource, OrderIntent, OrderType
+from ..quant.blackscholes import (expected_move, sigma_from_mad_ewma,
+                                  vol_target_quantity)
 from .base import BaseStrategy
 
 log = logging.getLogger(__name__)
@@ -89,6 +91,8 @@ class AdaptiveEmaCrossoverStrategy(BaseStrategy):
         k_step: float = 0.05,
         k_min: float = 0.0,
         k_max: float = 1.0,
+        risk_per_trade: float = 0.0,
+        multiplier: float = 1.0,
     ) -> None:
         """
         Args:
@@ -102,6 +106,14 @@ class AdaptiveEmaCrossoverStrategy(BaseStrategy):
                 confirmed entry may trigger.
             learn: enable the bounded per-regime threshold adaptation.
             k_step / k_min / k_max: learning step size and hard bounds.
+            risk_per_trade: dollars a 1-sigma adverse move may cost. When
+                > 0, entries are sized by the Black-Scholes diffusion term
+                (``σS√T``) so each trade carries the same dollar risk
+                across volatility regimes. It can only size *down* from
+                the regime quantity — never up — so the configured caps
+                remain the ceiling.
+            multiplier: contract multiplier used for that dollar math
+                (5.0 for MES, 50.0 for ES, 1.0 for shares).
         """
         super().__init__()
         if fast_period < 1 or slow_period < 2 or fast_period >= slow_period:
@@ -116,6 +128,10 @@ class AdaptiveEmaCrossoverStrategy(BaseStrategy):
             raise ValueError("confirm_window must be >= 1")
         if not (0.0 <= k_min <= k_max) or k_step <= 0:
             raise ValueError("bad learning bounds")
+        if risk_per_trade < 0:
+            raise ValueError("risk_per_trade must be >= 0")
+        if multiplier <= 0:
+            raise ValueError("multiplier must be > 0")
         self.symbol = symbol
         self.fast_period = fast_period
         self.slow_period = slow_period
@@ -131,6 +147,8 @@ class AdaptiveEmaCrossoverStrategy(BaseStrategy):
         self.k_step = k_step
         self.k_min = k_min
         self.k_max = k_max
+        self.risk_per_trade = risk_per_trade
+        self.multiplier = multiplier
 
         self._alpha_fast = 2.0 / (fast_period + 1)
         self._alpha_slow = 2.0 / (slow_period + 1)
@@ -181,12 +199,56 @@ class AdaptiveEmaCrossoverStrategy(BaseStrategy):
         return VolRegime.NORMAL
 
     def size_for_regime(self, regime: VolRegime) -> int:
-        """Entry size under the given volatility regime."""
+        """Entry size under the given volatility regime (before sizing by
+        risk budget — see :meth:`entry_quantity`)."""
         if regime is VolRegime.EXTREME:
             return 0
         if regime is VolRegime.HIGH:
             return max(1, self.base_quantity // 2)
         return self.base_quantity
+
+    def sigma_per_bar(self) -> float:
+        """Current per-bar σ, converted from the |log-return| EWMA.
+
+        The EWMA tracks a mean absolute deviation; σ = E|X|·√(π/2). Skipping
+        that conversion would understate volatility by about 20%.
+        """
+        return sigma_from_mad_ewma(self._vol_fast or 0.0)
+
+    def expected_move_points(self, spot: float, bars: int = 1) -> float:
+        """The ``σS√T`` diffusion scale over ``bars`` bars, in price points.
+
+        This is the Black-Scholes framework's estimate of how far price
+        travels over a horizon — the principled version of the ATR proxy,
+        and the natural unit for entry bands and stops.
+        """
+        return expected_move(spot, self.sigma_per_bar(), float(max(bars, 1)))
+
+    def entry_quantity(self, regime: VolRegime, spot: float) -> int:
+        """Contracts to buy: the regime size, then capped by the risk budget.
+
+        With ``risk_per_trade`` set, size is chosen so a 1-sigma adverse
+        move over the confirmation horizon costs about that many dollars.
+        The result is clamped to the regime size, so this layer can only
+        reduce exposure — it can never size above the configured base.
+        """
+        regime_qty = self.size_for_regime(regime)
+        if regime_qty <= 0 or self.risk_per_trade <= 0:
+            return regime_qty
+        budgeted = vol_target_quantity(
+            risk_budget=self.risk_per_trade,
+            spot=spot,
+            sigma=self.sigma_per_bar(),
+            multiplier=self.multiplier,
+            horizon=float(self.confirm_window),
+            max_quantity=regime_qty,
+        )
+        if budgeted < regime_qty:
+            log.debug("vol-target sizing: %d -> %d contracts "
+                      "(sigma=%.5f/bar, budget=$%.0f)",
+                      regime_qty, budgeted, self.sigma_per_bar(),
+                      self.risk_per_trade)
+        return budgeted
 
     # ------------------------------------------------------------- signals
 
@@ -261,8 +323,12 @@ class AdaptiveEmaCrossoverStrategy(BaseStrategy):
         if self._pending_entry_bars > 0 and self.position == 0:
             self._pending_entry_bars -= 1
             spread = self._ema_fast - self._ema_slow
-            threshold = self.entry_thresholds[regime] * (self._atr or 0.0)
-            qty = self.size_for_regime(regime)
+            # Band the entry by the σS√T diffusion scale: the trend must
+            # stand out against how far price moves on noise alone. ATR is
+            # the fallback only while σ has no estimate yet.
+            band = self.expected_move_points(bar.close) or (self._atr or 0.0)
+            threshold = self.entry_thresholds[regime] * band
+            qty = self.entry_quantity(regime, bar.close)
             if spread >= threshold and qty > 0 and spread > 0:
                 self._pending_entry_bars = 0
                 intents.append(OrderIntent(
@@ -272,8 +338,8 @@ class AdaptiveEmaCrossoverStrategy(BaseStrategy):
                     strategy_id=self.strategy_id,
                     reason=(f"confirmed golden cross in {regime.value} vol "
                             f"(spread {spread:.2f} >= "
-                            f"{self.entry_thresholds[regime]:.2f}*ATR, "
-                            f"size {qty})")))
+                            f"{self.entry_thresholds[regime]:.2f}x1σ band "
+                            f"{band:.2f}, size {qty})")))
                 self._entry_regime = regime
         return intents
 
