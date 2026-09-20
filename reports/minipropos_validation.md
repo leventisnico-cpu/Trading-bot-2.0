@@ -1,8 +1,8 @@
 # Mini-Prop OS validation scorecard
 
-Generated: 2026-09-20 03:01 UTC
+Generated: 2026-09-20 20:07 UTC
 
-**127/127 checks passed (100.0%) — PASS (gate: >= 75%)**
+**138/138 checks passed (100.0%) — PASS (gate: >= 75%)**
 
 Simulation: real RiskGuardrails + OMS + EmaCrossoverStrategy, simulated broker (fills at next bar open, 1 tick adverse slippage, $0.62/side commission, partial fills on 2+ units). Historical data: SPY daily adjusted closes (data/prices_us.csv) x10 as an S&P-index/MES proxy, 1 contract, $5 multiplier.
 
@@ -56,6 +56,17 @@ Simulation: real RiskGuardrails + OMS + EmaCrossoverStrategy, simulated broker (
 - [PASS] vol-target: risk is far more uniform than fixed sizing — sized spread $372 vs unsized $5,068
 - [PASS] vol-target: fixed sizing would have blown the budget — $6,800 at 10 contracts
 - [PASS] vol-target: never sizes above the configured base — max 10 <= 10
+- [PASS] blackout: active during the release window — window +/-15min around 12:30
+- [PASS] blackout: names the event responsible
+- [PASS] blackout: risk-flattening is never an entry
+- [PASS] blackout: empty calendar never suppresses anything
+- [PASS] ensemble: unanimity is never looser than a single signal — 0 entries under 2-of-2 agreement
+- [PASS] ensemble: warmup waits for the slowest member — 120 bars
+- [PASS] ensemble: size is the most conservative member proposal — min() of agreeing members
+- [PASS] statistics: best of 200 noise trials looks good naively — naive PSR 0.990 (the trap)
+- [PASS] statistics: deflation rejects that same noise — DSR 0.322
+- [PASS] statistics: a genuinely strong signal still survives — DSR 1.000
+- [PASS] statistics: a flat equity curve is not infinitely good — guards against divide-by-residue
 - [PASS] GFC 2007-2009: never short (long-only enforced) — min position 0
 - [PASS] GFC 2007-2009: position cap never exceeded — max 1 <= 4
 - [PASS] GFC 2007-2009: order-size cap never exceeded — max order 1

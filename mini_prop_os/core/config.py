@@ -164,6 +164,13 @@ class RiskConfig:
     max_daily_loss_pct: float = 0.02
     allow_short: bool = False
     kill_switch_flattens: bool = True
+    #: JSON file of scheduled economic events; "" disables blackouts.
+    event_calendar_path: str = ""
+    #: Minutes either side of a HIGH-impact release during which NEW
+    #: entries are suppressed. Exits and risk-flattening are never blocked.
+    #: MEDIUM-impact events use a third of these; LOW impact none.
+    blackout_minutes_before: float = 15.0
+    blackout_minutes_after: float = 15.0
 
     def __post_init__(self) -> None:
         for name in ("max_position_shares", "max_order_quantity"):
@@ -175,6 +182,10 @@ class RiskConfig:
                 raise ConfigError(f"risk.{name} must be > 0")
         if not (0 < self.max_daily_loss_pct < 1):
             raise ConfigError("risk.max_daily_loss_pct must be in (0, 1)")
+        for name in ("blackout_minutes_before", "blackout_minutes_after"):
+            v = getattr(self, name)
+            if v < 0 or not math.isfinite(v):
+                raise ConfigError(f"risk.{name} must be >= 0")
 
 
 @dataclass(frozen=True)
