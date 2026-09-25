@@ -8,6 +8,10 @@ Usage::
 Lifecycle: load config -> configure logging -> connect to IBKR -> run the
 event loop -> on SIGINT/SIGTERM cancel working orders (and flatten, if
 ``execution.flatten_on_shutdown``) -> disconnect -> exit.
+
+Exit codes: 0 clean, 1 fatal error, 2 config/usage, 3 persisted
+kill-switch halt present, 4 live port with a strategy not marked
+``DEPLOYABLE: yes`` (see strategy/registry.py).
 """
 
 from __future__ import annotations
@@ -25,6 +29,7 @@ from .app import TradingApp, kill_marker_path, run_preflight
 from .core.config import (AppConfig, ConfigError, default_config_path,
                           is_live_port, load_config)
 from .core.killfile import clear_kill_marker, read_kill_marker
+from .strategy.registry import refuse_live_reason
 
 log = logging.getLogger("mini_prop_os")
 
@@ -131,6 +136,10 @@ def main(argv: Optional[list[str]] = None) -> int:
             marker.get("tripped_at", "unknown time"),
             marker.get("reason", "no reason recorded"))
         return 3
+    refusal = refuse_live_reason(cfg.strategy.name, cfg.connection.port)
+    if refusal is not None:
+        log.critical("REFUSING TO START: %s", refusal)
+        return 4
     if is_live_port(cfg.connection.port):
         log.warning("LIVE trading port %d configured — this is not paper. "
                     "Ensure this is intentional.", cfg.connection.port)

@@ -1,0 +1,35 @@
+name: expectancy-gate
+# No strategy ships without beating buy-and-hold of the same lot, out of
+# sample, across walk-forward folds. This job runs scripts/expectancy.py
+# for every registered strategy and fails the build if a strategy whose
+# module docstring says "DEPLOYABLE: yes" does not pass the gate, or if a
+# strategy module exists that is not registered (and so never faced it).
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install numpy pandas pyyaml
+      - name: expectancy gate for every strategy (SPY, 3 walk-forward folds)
+        run: >-
+          python scripts/expectancy.py --all --symbol SPY
+          --data data/prices_us.csv --folds 3
+          --report reports/minipropos_expectancy_spy.md
+      - name: no strategy marked deployable may fail the gate
+        run: |
+          if grep -q "MISMATCH" reports/minipropos_expectancy_spy.md; then
+            echo "a strategy marked DEPLOYABLE: yes fails the gate"; exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: expectancy-report
+          path: reports/minipropos_expectancy_spy.md
