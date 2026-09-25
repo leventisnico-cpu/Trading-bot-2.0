@@ -31,6 +31,7 @@ from .strategy.adaptive_ema import AdaptiveEmaCrossoverStrategy
 from .strategy.base import BaseStrategy
 from .strategy.ema_crossover import EmaCrossoverStrategy
 from .strategy.scheduled_dca import ScheduledDcaStrategy
+from .strategy.tsmom_12_1 import TimeSeriesMomentumStrategy
 
 log = logging.getLogger(__name__)
 
@@ -284,6 +285,9 @@ def build_strategy(cfg: AppConfig) -> BaseStrategy:
             timezone=s.dca_timezone,
             state_path=s.dca_state_path,
         )
+    if s.name == "tsmom_12_1":
+        return TimeSeriesMomentumStrategy(
+            symbol=cfg.contract.symbol, order_quantity=s.order_quantity)
     raise ValueError(f"unknown strategy {s.name!r}")
 
 
@@ -585,7 +589,7 @@ class TradingApp:
         bars = await ib.reqHistoricalDataAsync(
             self.contract,
             endDateTime="",
-            durationStr="2 D",
+            durationStr=self.cfg.strategy.history_duration,
             barSizeSetting=self.cfg.strategy.bar_size,
             whatToShow="TRADES",
             useRTH=self.cfg.strategy.use_rth,

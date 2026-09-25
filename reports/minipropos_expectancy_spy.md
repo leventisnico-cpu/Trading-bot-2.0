@@ -47,3 +47,17 @@ Note: scheduled_dca never sells, so the account was funded with $10,829,645 (one
 
 Gate: DEPLOYABLE only if final equity beats buy-and-hold of the same lot in >= 2 of 3 walk-forward folds AND on the full sample.
 Result: beats B&H in 3/3 folds, full sample YES → **DEPLOYABLE** (docstring marks it DEPLOYABLE: yes)
+
+## tsmom_12_1 on SPY (lot 10, $10,000 start)
+
+Data: `data/prices_us.csv` · 1999-01-04 → 2026-08-28 · 3 walk-forward folds · costs: IBKR $0.005/share (min $1.00/order) + 0.01 adverse slippage per fill, both sides.
+
+| window | dates | bars | final $ | CAGR | maxDD | trips | win% | B&H final $ | B&H CAGR | B&H maxDD | beats B&H |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| fold 1/3 | 1999-01-04–2008-03-25 | 2319 | 10,166 | 0.2% | 235 (2.3%) | 3 | 33.3% | 10,201 | 0.2% | 4.5% | no |
+| fold 2/3 | 2008-03-26–2017-06-07 | 2318 | 11,156 | 1.2% | 235 (2.2%) | 5 | 80.0% | 11,153 | 1.2% | 5.2% | YES |
+| fold 3/3 | 2017-06-08–2026-08-28 | 2319 | 14,855 | 4.4% | 1,130 (9.8%) | 3 | 100.0% | 15,584 | 4.9% | 9.5% | no |
+| full sample | 1999-01-04–2026-08-28 | 6956 | 16,478 | 1.8% | 1,130 (8.5%) | 11 | 72.7% | 16,930 | 1.9% | 8.4% | no |
+
+Gate: DEPLOYABLE only if final equity beats buy-and-hold of the same lot in >= 2 of 3 walk-forward folds AND on the full sample.
+Result: beats B&H in 1/3 folds, full sample no → **NOT DEPLOYABLE** (docstring marks it DEPLOYABLE: no)

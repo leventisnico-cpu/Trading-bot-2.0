@@ -46,6 +46,8 @@ strategy/
   ema_crossover.py      incremental EMA crossover, long-only, position-aware
   scheduled_dca.py      mechanical periodic buying, never sells — the only
                         strategy marked DEPLOYABLE: yes (see the gate below)
+  tsmom_12_1.py         12-1 month time-series momentum, monthly, long-only
+                        (research survivor that failed the gate)
   registry.py           name -> factory, DEPLOYABLE marker, live-port refusal
   adaptive_ema.py       volatility-adaptive crossover (shipped default):
                         regime detection (LOW/NORMAL/HIGH/EXTREME), size
@@ -127,6 +129,17 @@ marked `no`. Current results (`reports/minipropos_expectancy_spy.md`):
 | ema_crossover | 0/3 | no | NOT DEPLOYABLE |
 | adaptive_ema | 0/3 | no | NOT DEPLOYABLE |
 | scheduled_dca | 3/3 | yes | DEPLOYABLE (accumulated exposure vs one lot — see the report's note; not timing skill) |
+| tsmom_12_1 | 1/3 | no | NOT DEPLOYABLE (passed the research pass on SPY, failed the gate — `research/momentum_12_1_vs_tbills.md`) |
+
+## Strategy research (`research/`)
+
+No strategy is coded without a note written first from
+`research/TEMPLATE.md`: hypothesis, universe, data, cost model, folds,
+benchmark, and a pass/fail rule fixed *before* the numbers are seen.
+`python research/run_candidates.py` regenerates the notes; losers are
+kept. So far: 200-day SMA filter (FAIL everywhere), 12-1 momentum (PASS
+on SPY at the research level, FAIL at the gate), vol-target sizing (FAIL
+everywhere).
 
 ## Black-Scholes: what it does and does not do here
 

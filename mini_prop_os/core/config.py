@@ -139,6 +139,9 @@ class StrategyConfig:
 
     name: str = "adaptive_ema"
     bar_size: str = "1 min"
+    #: IBKR duration string for the historical warmup request ("2 D",
+    #: "400 D", "1 Y"). Monthly strategies need ~13 months of bars.
+    history_duration: str = "2 D"
     fast_period: int = 9
     slow_period: int = 21
     order_quantity: int = 2
@@ -168,8 +171,14 @@ class StrategyConfig:
 
     def __post_init__(self) -> None:
         if self.name not in ("adaptive_ema", "ema_crossover",
-                             "scheduled_dca"):
+                             "scheduled_dca", "tsmom_12_1"):
             raise ConfigError(f"unknown strategy.name {self.name!r}")
+        parts = self.history_duration.split()
+        if (len(parts) != 2 or not parts[0].isdigit() or int(parts[0]) < 1
+                or parts[1] not in ("S", "D", "W", "M", "Y")):
+            raise ConfigError(
+                "strategy.history_duration must be like '2 D', '400 D', "
+                f"'1 Y'; got {self.history_duration!r}")
         if self.fast_period < 1 or self.slow_period < 2:
             raise ConfigError("strategy periods must be positive")
         if self.fast_period >= self.slow_period:

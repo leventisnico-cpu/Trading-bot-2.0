@@ -68,6 +68,11 @@ def _dca(symbol: str, lot: int, multiplier: float) -> BaseStrategy:
                                 timezone="UTC", state_path=None)
 
 
+def _tsmom(symbol: str, lot: int, multiplier: float) -> BaseStrategy:
+    from .tsmom_12_1 import TimeSeriesMomentumStrategy
+    return TimeSeriesMomentumStrategy(symbol, order_quantity=lot)
+
+
 STRATEGIES: Dict[str, StrategySpec] = {
     "ema_crossover": StrategySpec("ema_crossover",
                                   "mini_prop_os.strategy.ema_crossover", _ema),
@@ -77,6 +82,8 @@ STRATEGIES: Dict[str, StrategySpec] = {
     "scheduled_dca": StrategySpec("scheduled_dca",
                                   "mini_prop_os.strategy.scheduled_dca", _dca,
                                   accumulates=True),
+    "tsmom_12_1": StrategySpec("tsmom_12_1",
+                               "mini_prop_os.strategy.tsmom_12_1", _tsmom),
 }
 
 
