@@ -98,6 +98,8 @@ class Leg:
     bh_cagr: float
     bh_max_dd_pct: float
     kill_tripped: bool
+    cash: float = 0.0
+    final_shares: int = 0
 
     @property
     def beats(self) -> bool:
@@ -130,10 +132,23 @@ def buy_and_hold(closes: Sequence[float], lot: int, cash: float,
     return curve[-1], curve
 
 
+def funding_for(strategy_name: str, closes: Sequence[float], lot: int,
+                cash: float) -> float:
+    """Starting cash for a leg. Lot-in/lot-out strategies get ``cash``.
+    An accumulating strategy (never sells) is funded for one lot per
+    week at the window's highest price, so no buy ever fails for lack
+    of cash and the comparison is between exposures, not budgets."""
+    if not get_spec(strategy_name).accumulates:
+        return cash
+    weeks = len(closes) / 5 + 1
+    return max(cash, lot * max(closes) * weeks)
+
+
 def run_leg(label: str, strategy_name: str, symbol: str,
             dates: Sequence[datetime], closes: Sequence[float], lot: int,
             cash: float) -> Leg:
     commission = max(IBKR_PER_SHARE, IBKR_MIN_PER_ORDER / lot)
+    cash = funding_for(strategy_name, closes, lot, cash)
     sim_cfg = SimConfig(multiplier=1.0, tick_size=TICK, slippage_ticks=1,
                         commission_per_unit=commission, initial_cash=cash,
                         split_fills=False)
@@ -158,7 +173,8 @@ def run_leg(label: str, strategy_name: str, symbol: str,
         trips=len(res.round_trips), win_rate=res.win_rate,
         bh_final=bh_final, bh_cagr=cagr(cash, bh_final, dates[0], dates[-1]),
         bh_max_dd_pct=drawdown_pct(bh_curve),
-        kill_tripped=res.kill_switch_tripped)
+        kill_tripped=res.kill_switch_tripped, cash=cash,
+        final_shares=res.final_position)
 
 
 @dataclass
@@ -211,6 +227,23 @@ def table(v: Verdict) -> List[str]:
     return lines
 
 
+def exposure_note(v: Verdict) -> List[str]:
+    """For accumulating strategies, say what the gate is measuring."""
+    if not get_spec(v.strategy).accumulates:
+        return []
+    full = v.legs[-1]
+    return [
+        "",
+        f"Note: {v.strategy} never sells, so the account was funded with "
+        f"${full.cash:,.0f} (one lot per week at the window high) and "
+        f"ended holding {full.final_shares:,} shares versus the benchmark's "
+        f"one lot. Beating buy-and-hold here means accumulated exposure "
+        f"outperformed idle cash — it is not evidence of timing skill, "
+        f"and it loses in any window where the market ends lower than "
+        f"the strategy's average cost.",
+    ]
+
+
 def render(v: Verdict, symbol: str, lot: int, cash: float,
            data: Path, marked: Optional[bool]) -> str:
     n_folds = len(v.legs) - 1
@@ -224,6 +257,7 @@ def render(v: Verdict, symbol: str, lot: int, cash: float,
         "per fill, both sides.",
         "",
         *table(v),
+        *exposure_note(v),
         "",
         f"Gate: {GATE_RULE}",
         f"Result: beats B&H in {v.fold_wins}/{n_folds} folds, full sample "

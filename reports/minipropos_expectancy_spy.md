@@ -31,3 +31,19 @@ Data: `data/prices_us.csv` · 1999-01-04 → 2026-08-28 · 3 walk-forward folds 
 
 Gate: DEPLOYABLE only if final equity beats buy-and-hold of the same lot in >= 2 of 3 walk-forward folds AND on the full sample.
 Result: beats B&H in 0/3 folds, full sample no → **NOT DEPLOYABLE** (docstring marks it DEPLOYABLE: no)
+
+## scheduled_dca on SPY (lot 10, $10,000 start)
+
+Data: `data/prices_us.csv` · 1999-01-04 → 2026-08-28 · 3 walk-forward folds · costs: IBKR $0.005/share (min $1.00/order) + 0.01 adverse slippage per fill, both sides.
+
+| window | dates | bars | final $ | CAGR | maxDD | trips | win% | B&H final $ | B&H CAGR | B&H maxDD | beats B&H |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| fold 1/3 | 1999-01-04–2008-03-25 | 2319 | 587,350 | 1.4% | 92,239 (14.1%) | 0 | - | 515,516 | 0.0% | 0.1% | YES |
+| fold 2/3 | 2008-03-26–2017-06-07 | 2318 | 1,390,489 | 3.9% | 92,292 (7.5%) | 0 | - | 982,317 | 0.0% | 0.1% | YES |
+| fold 3/3 | 2017-06-08–2026-08-28 | 2319 | 5,371,120 | 4.4% | 458,932 (9.9%) | 0 | - | 3,621,170 | 0.0% | 0.0% | YES |
+| full sample | 1999-01-04–2026-08-28 | 6956 | 18,984,135 | 2.1% | 1,545,069 (9.3%) | 0 | - | 10,836,575 | 0.0% | 0.0% | YES |
+
+Note: scheduled_dca never sells, so the account was funded with $10,829,645 (one lot per week at the window high) and ended holding 14,420 shares versus the benchmark's one lot. Beating buy-and-hold here means accumulated exposure outperformed idle cash — it is not evidence of timing skill, and it loses in any window where the market ends lower than the strategy's average cost.
+
+Gate: DEPLOYABLE only if final equity beats buy-and-hold of the same lot in >= 2 of 3 walk-forward folds AND on the full sample.
+Result: beats B&H in 3/3 folds, full sample YES → **DEPLOYABLE** (docstring marks it DEPLOYABLE: yes)

@@ -128,10 +128,13 @@ class StrategyConfig:
 
     ``name`` selects the strategy: ``adaptive_ema`` (volatility-adaptive:
     regime sizing, EXTREME risk-off, confirmed entries, bounded online
-    threshold learning) or ``ema_crossover`` (the plain baseline). The
+    threshold learning), ``ema_crossover`` (the plain baseline), or
+    ``scheduled_dca`` (mechanical periodic buying, never sells). The
     ``vol_*`` / ``confirm_window`` / ``learn`` fields apply only to
     ``adaptive_ema``; for it, ``order_quantity`` is the base size in
-    LOW/NORMAL volatility (halved in HIGH, zero in EXTREME).
+    LOW/NORMAL volatility (halved in HIGH, zero in EXTREME). The ``dca_*``
+    fields apply only to ``scheduled_dca``, which buys ``order_quantity``
+    shares per period unless ``dca_amount`` > 0.
     """
 
     name: str = "adaptive_ema"
@@ -153,9 +156,19 @@ class StrategyConfig:
     #: Black-Scholes volatility-target sizing (σS√T), which can only size
     #: *down* from order_quantity, never up. 0 disables it.
     risk_per_trade: float = 0.0
+    #: scheduled_dca only: currency amount per period converted to shares
+    #: at the last close (0 = buy ``order_quantity`` shares instead).
+    dca_amount: float = 0.0
+    dca_schedule: str = "weekly"          # daily | weekly
+    dca_weekday: str = "Monday"           # weekly only
+    dca_time: str = "10:00"               # HH:MM in dca_timezone
+    dca_timezone: str = "America/New_York"
+    #: Persisted last-bought slot; makes buys idempotent across restarts.
+    dca_state_path: str = "state/dca_state.json"
 
     def __post_init__(self) -> None:
-        if self.name not in ("adaptive_ema", "ema_crossover"):
+        if self.name not in ("adaptive_ema", "ema_crossover",
+                             "scheduled_dca"):
             raise ConfigError(f"unknown strategy.name {self.name!r}")
         if self.fast_period < 1 or self.slow_period < 2:
             raise ConfigError("strategy periods must be positive")
@@ -176,6 +189,26 @@ class StrategyConfig:
             raise ConfigError("strategy.confirm_window must be >= 1")
         if self.risk_per_trade < 0 or not math.isfinite(self.risk_per_trade):
             raise ConfigError("strategy.risk_per_trade must be >= 0")
+        if self.dca_amount < 0 or not math.isfinite(self.dca_amount):
+            raise ConfigError("strategy.dca_amount must be >= 0")
+        if self.dca_schedule not in ("daily", "weekly"):
+            raise ConfigError("strategy.dca_schedule must be daily or weekly")
+        if self.dca_weekday.lower() not in (
+                "monday", "tuesday", "wednesday", "thursday", "friday",
+                "saturday", "sunday"):
+            raise ConfigError(f"strategy.dca_weekday invalid: {self.dca_weekday!r}")
+        parts = self.dca_time.split(":")
+        if (len(parts) != 2 or not all(p.isdigit() for p in parts)
+                or not (0 <= int(parts[0]) < 24 and 0 <= int(parts[1]) < 60)):
+            raise ConfigError("strategy.dca_time must be HH:MM")
+        try:
+            from zoneinfo import ZoneInfo
+            ZoneInfo(self.dca_timezone)
+        except Exception:
+            raise ConfigError(
+                f"strategy.dca_timezone unknown: {self.dca_timezone!r}") from None
+        if not self.dca_state_path:
+            raise ConfigError("strategy.dca_state_path must be non-empty")
 
 
 @dataclass(frozen=True)

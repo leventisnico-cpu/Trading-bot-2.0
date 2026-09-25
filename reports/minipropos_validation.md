@@ -1,8 +1,8 @@
 # Mini-Prop OS validation scorecard
 
-Generated: 2026-09-20 20:07 UTC
+Generated: 2026-09-25 01:31 UTC
 
-**138/138 checks passed (100.0%) — PASS (gate: >= 75%)**
+**143/143 checks passed (100.0%) — PASS (gate: >= 75%)**
 
 Simulation: real RiskGuardrails + OMS + EmaCrossoverStrategy, simulated broker (fills at next bar open, 1 tick adverse slippage, $0.62/side commission, partial fills on 2+ units). Historical data: SPY daily adjusted closes (data/prices_us.csv) x10 as an S&P-index/MES proxy, 1 contract, $5 multiplier.
 
@@ -103,6 +103,11 @@ Simulation: real RiskGuardrails + OMS + EmaCrossoverStrategy, simulated broker (
 - [PASS] recent 2023-2026: no strategy orders after kill switch — 0 leaked
 - [PASS] recent 2023-2026: accounting reconciles (OMS ledger vs raw fills) — error $0.0000
 - [PASS] recent 2023-2026: no working orders left at shutdown — 0 open
+- [PASS] scheduled_dca: final equity within $50 of the analytic DCA figure (commissions + slippage included) — sim $18,984,135.38 vs analytic $18,984,135.38 (diff $0.00)
+- [PASS] scheduled_dca: exactly one order per schedule slot — 1442 buys, 14420 shares vs analytic 1442 slots, 14420 shares
+- [PASS] scheduled_dca: never sells — 0 sell intents
+- [PASS] scheduled_dca: no risk rejections at measurement caps — 0 rejected
+- [PASS] scheduled_dca: accounting reconciles — error $0.0000
 - [PASS] stress GFC autumn 2008 (adaptive): never short (long-only enforced) — min position 0
 - [PASS] stress GFC autumn 2008 (adaptive): position cap never exceeded — max 2 <= 4
 - [PASS] stress GFC autumn 2008 (adaptive): order-size cap never exceeded — max order 2
@@ -176,5 +181,11 @@ High-volatility stress windows, baseline vs volatility-adaptive (regime sizing +
 | COVID crash 2020 | adaptive | 0 | - | +0 | 0 | no |
 | bear market 2022 | baseline | 1 | 0% | -1,965 | 2,453 | TRIPPED |
 | bear market 2022 | adaptive | 1 | 0% | -2,457 | 2,457 | TRIPPED |
+
+Scheduled DCA (never sells) over the full SPY share-price history, real pipeline vs the analytic figure (same fills, commissions, 1-tick slippage; gate: within $50):
+
+| strategy | bars | buys | final shares | sim PnL ($) | analytic PnL ($) | diff ($) |
+|---|---|---|---|---|---|---|
+| scheduled_dca weekly, lot 10 | 6956 | 1442 | 14420 | +8,154,490 | +8,154,490 | 0.00 |
 
 Win rates for a trend-following crossover are typically well below 50% (few large winners pay for many small losers); the 75% gate applies to the system-behavior checks above, and no strategy metric here is evidence of live edge (see the repo's Phase 4 verdict).

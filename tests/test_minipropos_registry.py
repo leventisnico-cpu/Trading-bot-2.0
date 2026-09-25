@@ -111,7 +111,6 @@ def test_gate_requires_two_of_three_folds_and_full_sample(monkeypatch):
     def fake_run_leg(label, *a, **k):
         return outcomes[label]
     monkeypatch.setattr(expectancy, "run_leg", fake_run_leg)
-    monkeypatch.setattr(expectancy, "get_spec", lambda n: None)
     dates = [datetime(2020, 1, i + 1, tzinfo=timezone.utc) for i in range(9)]
     closes = [100.0] * 9
 

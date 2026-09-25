@@ -30,6 +30,7 @@ from .risk.guardrails import PortfolioSnapshot, RiskGuardrails
 from .strategy.adaptive_ema import AdaptiveEmaCrossoverStrategy
 from .strategy.base import BaseStrategy
 from .strategy.ema_crossover import EmaCrossoverStrategy
+from .strategy.scheduled_dca import ScheduledDcaStrategy
 
 log = logging.getLogger(__name__)
 
@@ -271,6 +272,17 @@ def build_strategy(cfg: AppConfig) -> BaseStrategy:
             learn=s.learn,
             risk_per_trade=s.risk_per_trade,
             multiplier=cfg.contract.multiplier,
+        )
+    if s.name == "scheduled_dca":
+        return ScheduledDcaStrategy(
+            symbol=cfg.contract.symbol,
+            quantity=0 if s.dca_amount > 0 else s.order_quantity,
+            amount=s.dca_amount,
+            schedule=s.dca_schedule,
+            weekday=s.dca_weekday,
+            time_of_day=s.dca_time,
+            timezone=s.dca_timezone,
+            state_path=s.dca_state_path,
         )
     raise ValueError(f"unknown strategy {s.name!r}")
 

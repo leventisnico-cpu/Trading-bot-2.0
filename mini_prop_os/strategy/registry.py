@@ -40,6 +40,10 @@ class StrategySpec:
     name: str
     module: str
     factory: Factory
+    #: True for strategies that only ever add exposure (never sell). The
+    #: expectancy gate funds such an account for every scheduled lot so
+    #: the measurement is not an artifact of running out of cash.
+    accumulates: bool = False
 
 
 def _ema(symbol: str, lot: int, multiplier: float) -> BaseStrategy:
@@ -55,12 +59,24 @@ def _adaptive(symbol: str, lot: int, multiplier: float) -> BaseStrategy:
         multiplier=multiplier)
 
 
+def _dca(symbol: str, lot: int, multiplier: float) -> BaseStrategy:
+    from .scheduled_dca import ScheduledDcaStrategy
+    # Daily replay bars are stamped at 00:00 UTC, so the schedule is
+    # evaluated in UTC at midnight; state stays in memory for measurement.
+    return ScheduledDcaStrategy(symbol, quantity=lot, schedule="weekly",
+                                weekday="Monday", time_of_day="00:00",
+                                timezone="UTC", state_path=None)
+
+
 STRATEGIES: Dict[str, StrategySpec] = {
     "ema_crossover": StrategySpec("ema_crossover",
                                   "mini_prop_os.strategy.ema_crossover", _ema),
     "adaptive_ema": StrategySpec("adaptive_ema",
                                  "mini_prop_os.strategy.adaptive_ema",
                                  _adaptive),
+    "scheduled_dca": StrategySpec("scheduled_dca",
+                                  "mini_prop_os.strategy.scheduled_dca", _dca,
+                                  accumulates=True),
 }
 
 
