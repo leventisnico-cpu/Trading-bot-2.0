@@ -1,0 +1,76 @@
+# Mini-Prop OS — IBKR PAPER account inheriting TFSA permissions (stocks/ETFs
+# only, no futures). This is the config deploy/windows/setup.ps1 installs as
+# state\config.yaml. Every key is validated at startup (core/config.py).
+#
+# PAPER ONLY. Port 4002 is IB Gateway's paper port. A live port (4001 / 4003 /
+# 7496) in this file is a bug until the live-readiness order is signed off.
+
+connection:
+  host: 127.0.0.1
+  port: 4002            # IB Gateway PAPER. 7497 = TWS paper.
+  client_id: 17
+  account: ""           # empty = first managed account (the paper account)
+  connect_timeout_s: 15.0
+  heartbeat_interval_s: 10.0
+  heartbeat_timeout_s: 5.0
+  heartbeat_max_misses: 3
+  reconnect_backoff_base_s: 2.0
+  reconnect_backoff_max_s: 120.0
+  reconnect_max_attempts: 0     # 0 = retry forever
+  market_data_type: delayed     # no paid subscription on an unfunded account;
+                                # delayed (15-20 min) is enough for paper
+
+contract:
+  symbol: SPY
+  sec_type: STK
+  exchange: SMART
+  currency: USD
+  multiplier: 1.0
+
+strategy:
+  name: adaptive_ema    # NOT deployable (loses to holding SPY in every fold);
+                        # runs on paper only to exercise the pipeline
+  bar_size: "1 min"
+  fast_period: 9
+  slow_period: 21
+  order_quantity: 10    # shares per entry
+  warmup_bars: 0        # 0 = derived by the strategy
+  use_rth: true         # stocks: regular trading hours only
+  vol_fast_period: 10
+  vol_slow_period: 100
+  high_vol_ratio: 1.6
+  extreme_vol_ratio: 2.5
+  confirm_window: 10
+  learn: true
+  risk_per_trade: 0.0   # 0 = fixed 10-share lot (regime sizing still applies)
+
+risk:
+  max_position_shares: 50           # 5 lots of 10
+  max_position_notional: 40000.0    # 50 shares * ~$700 SPY, with headroom
+  max_order_quantity: 10            # one lot per order
+  max_gross_notional: 40000.0
+  max_daily_loss: 500.0             # currency; effective limit is the tighter
+  max_daily_loss_pct: 0.02          # of this and pct * start-of-day equity
+  allow_short: false
+  kill_switch_flattens: true
+
+execution:
+  execution_log_path: state/executions.jsonl
+  order_timeout_s: 60.0
+  cancel_on_shutdown: true
+  flatten_on_shutdown: false
+
+notifications:
+  enabled: true
+  provider: telegram
+  # Credentials are NEVER written here. The bot token and chat id are read
+  # from these environment variables (set them in the shell / .env that
+  # launches the bot; .env is git-ignored).
+  bot_token_env: TELEGRAM_BOT_TOKEN
+  chat_id_env: TELEGRAM_CHAT_ID
+  commands_enabled: true            # answer /status, /positions, /orders
+  poll_interval_s: 3.0
+
+logging:
+  level: INFO
+  file: state/mini_prop_os.log

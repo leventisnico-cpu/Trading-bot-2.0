@@ -20,9 +20,11 @@ from ib_insync import (IB, BarDataList, ContFuture, Contract, Fill as IbFill,
 from .core.config import AppConfig, ContractConfig
 from .core.connection import IBConnectionManager
 from .core.killfile import write_kill_marker
+from .core.marketdata import request_market_data_type
 from .core.types import (Bar, Fill, IntentSource, OrderIntent, OrderType,
                          utc_now)
 from .execution.oms import ManagedOrder, OrderManagementSystem, OrderState
+from .notify import TelegramConsole, TelegramNotifier, notifier_from_env
 from .risk.event_calendar import BlackoutWindow, EventCalendar
 from .risk.guardrails import PortfolioSnapshot, RiskGuardrails
 from .strategy.adaptive_ema import AdaptiveEmaCrossoverStrategy
@@ -151,6 +153,12 @@ async def run_preflight(cfg: AppConfig) -> List[Tuple[str, bool, str]]:
                         f"running with API enabled on this port?"))
         return results
     try:
+        code = request_market_data_type(ib, c.market_data_type)
+        results.append(("market data type", True,
+                        f"{c.market_data_type} (reqMarketDataType {code})"))
+    except Exception as exc:
+        results.append(("market data type", False, str(exc)))
+    try:
         contract = await qualify_tradeable_contract(
             ib, cfg.contract, build_contract(cfg.contract))
         results.append(("qualify contract", True,
@@ -171,7 +179,8 @@ async def run_preflight(cfg: AppConfig) -> List[Tuple[str, bool, str]]:
         results.append(("market data (historical bars)", ok,
                         f"{len(bars)} bars, last close "
                         f"{bars[-1].close}" if ok else
-                        "no bars returned — check CME data subscription"))
+                        "no bars returned — check data subscription, or "
+                        "set connection.market_data_type: delayed"))
     except Exception as exc:
         results.append(("market data (historical bars)", False,
                         f"{exc} — check market data subscriptions"))
@@ -295,6 +304,84 @@ class TradingApp:
         self._flattening = False
         self._setup_lock = asyncio.Lock()
         self.calendar = self._load_calendar(cfg)
+        self.notifier: Optional[TelegramNotifier] = None
+        self.console: Optional[TelegramConsole] = None
+        self._console_task: Optional[asyncio.Task[None]] = None
+        self._last_equity: Optional[float] = None
+        if cfg.notifications.enabled:
+            self.notifier = notifier_from_env(
+                cfg.notifications.bot_token_env,
+                cfg.notifications.chat_id_env)
+            if self.notifier is not None and cfg.notifications.commands_enabled:
+                self.console = TelegramConsole(
+                    self.notifier, self.notifier._transport,
+                    handlers={"/status": self.status_text,
+                              "/positions": self.positions_text,
+                              "/orders": self.orders_text})
+
+    # ------------------------------------------------------ notifications
+
+    def notify(self, text: str) -> None:
+        """Fire-and-forget operator alert; never blocks the trading loop."""
+        if self.notifier is None:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            self.notifier.send(text)
+            return
+        loop.run_in_executor(None, self.notifier.send, text)
+
+    def status_text(self) -> str:
+        """Reply for /status (also logged at each state change)."""
+        c = self.cfg.connection
+        mode = "PAPER" if c.port in (7497, 4002) else "LIVE"
+        pos = self.oms.position_quantities().get(self.cfg.contract.symbol, 0)
+        lines = [
+            f"Mini-Prop OS [{mode} :{c.port}] {self.strategy.strategy_id} "
+            f"{self.cfg.contract.symbol}",
+            f"connected: {self.conn.is_connected}  "
+            f"trading: {'enabled' if self._trading_enabled.is_set() else 'DISABLED'}",
+            f"position: {pos:+d}  last: "
+            f"{self._last_price if self._last_price is not None else '-'}  "
+            f"bar: {self._last_bar_time.isoformat() if self._last_bar_time else '-'}",
+            f"equity: {self._last_equity if self._last_equity is not None else '-'}"
+            f"  start-of-day: {self.risk.start_of_day_equity}",
+            f"kill switch: "
+            f"{'TRIPPED — ' + self.risk.kill_reason if self.risk.kill_switch_active else 'clear'}",
+            f"working orders: {len(self.oms.open_orders())}",
+        ]
+        regime = getattr(self.strategy, "regime", None)
+        if regime is not None:
+            lines.append(f"regime: {getattr(regime, 'value', regime)}")
+        return "\n".join(lines)
+
+    def positions_text(self) -> str:
+        book = self.oms.positions
+        if not book:
+            return "book flat"
+        return "\n".join(
+            f"{sym}: {p.quantity:+d} @ {p.avg_price:.4f} "
+            f"realized {p.realized_pnl:+.2f}" for sym, p in book.items())
+
+    def orders_text(self) -> str:
+        orders = self.oms.open_orders()
+        if not orders:
+            return "no working orders"
+        return "\n".join(
+            f"#{o.order_id} {o.intent.action.value} {o.intent.quantity} "
+            f"{o.intent.symbol} {o.state.value} filled {o.filled_quantity}"
+            for o in orders)
+
+    async def _console_loop(self) -> None:
+        assert self.console is not None
+        interval = self.cfg.notifications.poll_interval_s
+        while True:
+            try:
+                await asyncio.to_thread(self.console.poll_once)
+            except Exception:
+                log.exception("telegram console poll failed")
+            await asyncio.sleep(interval)
 
     @staticmethod
     def _load_calendar(cfg: AppConfig) -> Optional[EventCalendar]:
@@ -341,9 +428,13 @@ class TradingApp:
         await self.conn.start()
         self._equity_task = asyncio.create_task(
             self._equity_monitor(), name="equity-monitor")
+        if self.console is not None:
+            self._console_task = asyncio.create_task(
+                self._console_loop(), name="telegram-console")
         log.info("Mini-Prop OS running: %s %s on %s:%d",
                  self.strategy.strategy_id, self.cfg.contract.symbol,
                  self.cfg.connection.host, self.cfg.connection.port)
+        self.notify("started: " + self.status_text())
         await self._shutdown_evt.wait()
 
     def request_shutdown(self) -> None:
@@ -354,10 +445,12 @@ class TradingApp:
         """Cancel working orders, optionally flatten, then disconnect."""
         log.info("shutting down...")
         self._trading_enabled.clear()
-        if self._equity_task is not None:
-            self._equity_task.cancel()
+        for task in (self._equity_task, self._console_task):
+            if task is None:
+                continue
+            task.cancel()
             try:
-                await self._equity_task
+                await task
             except (asyncio.CancelledError, Exception):
                 pass
         try:
@@ -380,6 +473,8 @@ class TradingApp:
                         len(open_orders),
                         [(o.order_id, o.state.value) for o in open_orders])
         log.info("shutdown complete")
+        if self.notifier is not None:
+            self.notifier.send("stopped: " + self.status_text())
 
     # ------------------------------------------------- connection callbacks
 
@@ -392,6 +487,8 @@ class TradingApp:
             if self._trading_enabled.is_set() or self.risk.kill_switch_active:
                 return
             try:
+                request_market_data_type(
+                    self.conn.ib, self.cfg.connection.market_data_type)
                 await self._qualify_contract()
                 if self.risk.start_of_day_equity is None:
                     equity = await self._mark_equity(start_of_day=True)
@@ -403,10 +500,12 @@ class TradingApp:
                 await self._subscribe_bars()
                 self._trading_enabled.set()
                 log.info("trading enabled")
-            except Exception:
+                self.notify("trading enabled: " + self.status_text())
+            except Exception as exc:
                 log.exception(
                     "post-connect setup failed; trading stays disabled "
                     "(retrying on the next equity-monitor tick)")
+                self.notify(f"setup failed, trading disabled: {exc}")
 
     async def _reconcile_broker_state(self) -> None:
         """Align the OMS ledger with the broker before any order can route.
@@ -576,6 +675,8 @@ class TradingApp:
         if not decision.approved:
             log.warning("RISK REJECT [%s %d %s]: %s", intent.action.value,
                         intent.quantity, intent.symbol, decision.reason)
+            self.notify(f"RISK REJECT {intent.action.value} {intent.quantity} "
+                        f"{intent.symbol}: {decision.reason}")
             return
         try:
             await self.oms.submit(intent)
@@ -590,6 +691,11 @@ class TradingApp:
                       if order.intent.signed_quantity > 0
                       else -abs(fill.signed_quantity))
             self.strategy.on_own_fill(signed, fill.price)
+        pos = self.oms.position_quantities().get(fill.symbol, 0)
+        self.notify(f"FILL {order.intent.action.value} "
+                    f"{abs(fill.signed_quantity)} {fill.symbol} @ {fill.price} "
+                    f"(order #{order.order_id}, {order.state.value}) "
+                    f"position {pos:+d} — {order.intent.reason}")
 
     # ---------------------------------------------------- equity / killing
 
@@ -606,6 +712,7 @@ class TradingApp:
         for row in rows:
             if row.tag == "NetLiquidation":
                 equity = float(row.value)
+                self._last_equity = equity
                 if start_of_day:
                     self.risk.mark_start_of_day(equity)
                 return equity
@@ -643,6 +750,10 @@ class TradingApp:
         self._flattening = True
         log.critical("kill switch fired: cancelling all orders and "
                      "flattening all positions")
+        self.notify("KILL SWITCH: " + (self.risk.kill_reason or "fired")
+                    + " — cancelling orders"
+                    + (" and flattening" if self.cfg.risk.kill_switch_flattens
+                       else ""))
         # Persist first: even if flattening errors, a restart must not
         # resume trading until an operator clears the marker.
         write_kill_marker(kill_marker_path(self.cfg),

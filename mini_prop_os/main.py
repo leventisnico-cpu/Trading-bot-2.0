@@ -23,7 +23,7 @@ from typing import Optional
 
 from .app import TradingApp, kill_marker_path, run_preflight
 from .core.config import (AppConfig, ConfigError, default_config_path,
-                          load_config)
+                          is_live_port, load_config)
 from .core.killfile import clear_kill_marker, read_kill_marker
 
 log = logging.getLogger("mini_prop_os")
@@ -131,7 +131,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             marker.get("tripped_at", "unknown time"),
             marker.get("reason", "no reason recorded"))
         return 3
-    if cfg.connection.port in (7496, 4001):
+    if is_live_port(cfg.connection.port):
         log.warning("LIVE trading port %d configured — this is not paper. "
                     "Ensure this is intentional.", cfg.connection.port)
     app = TradingApp(cfg)

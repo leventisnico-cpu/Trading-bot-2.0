@@ -19,6 +19,27 @@ class ConfigError(ValueError):
     """Raised when config.yaml is missing, malformed, or fails validation."""
 
 
+#: IBKR ``reqMarketDataType`` codes (TWS API: 1 live, 2 frozen, 3 delayed,
+#: 4 delayed-frozen). ``delayed`` is what a paper account without a paid
+#: subscription can actually receive.
+MARKET_DATA_TYPE_CODES: Mapping[str, int] = {
+    "realtime": 1,
+    "frozen": 2,
+    "delayed": 3,
+}
+
+#: Ports on which TWS / IB Gateway serve LIVE (real-money) sessions.
+#: 7496 = TWS live, 4001 = Gateway live, 4003 = Gateway live (alternate).
+LIVE_PORTS = frozenset({7496, 4001, 4003})
+#: Ports on which TWS / IB Gateway serve PAPER sessions.
+PAPER_PORTS = frozenset({7497, 4002})
+
+
+def is_live_port(port: int) -> bool:
+    """True if ``port`` is a known live (real-money) API port."""
+    return port in LIVE_PORTS
+
+
 @dataclass(frozen=True)
 class ConnectionConfig:
     """IBKR TWS / IB Gateway socket settings.
@@ -38,10 +59,19 @@ class ConnectionConfig:
     reconnect_backoff_base_s: float = 2.0
     reconnect_backoff_max_s: float = 120.0
     reconnect_max_attempts: int = 0  # 0 = retry forever
+    #: IBKR market data type requested after connect: ``realtime`` (needs a
+    #: paid subscription), ``delayed`` (free, 15-20 min behind, fine for
+    #: paper), or ``frozen`` (last close outside market hours).
+    market_data_type: str = "realtime"
 
     def __post_init__(self) -> None:
         if not (0 < self.port < 65536):
             raise ConfigError(f"connection.port out of range: {self.port}")
+        if self.market_data_type not in MARKET_DATA_TYPE_CODES:
+            raise ConfigError(
+                "connection.market_data_type must be one of "
+                f"{sorted(MARKET_DATA_TYPE_CODES)}, got "
+                f"{self.market_data_type!r}")
         if self.client_id < 0:
             raise ConfigError("connection.client_id must be >= 0")
         for name in ("connect_timeout_s", "heartbeat_interval_s",
@@ -203,6 +233,38 @@ class ExecutionConfig:
 
 
 @dataclass(frozen=True)
+class NotificationsConfig:
+    """Operator notifications (Telegram). Credentials are never stored in
+    config: the bot token and chat id are read from the environment
+    variables named here, so a committed config.yaml can never leak them.
+    """
+
+    enabled: bool = False
+    provider: str = "telegram"
+    bot_token_env: str = "TELEGRAM_BOT_TOKEN"
+    chat_id_env: str = "TELEGRAM_CHAT_ID"
+    #: Answer /status, /positions, /orders sent from the configured chat.
+    commands_enabled: bool = True
+    poll_interval_s: float = 3.0
+
+    def __post_init__(self) -> None:
+        if self.provider != "telegram":
+            raise ConfigError(
+                f"notifications.provider must be 'telegram', got "
+                f"{self.provider!r}")
+        for name in ("bot_token_env", "chat_id_env"):
+            v = getattr(self, name)
+            if not v or not v.replace("_", "").isalnum() or v[0].isdigit():
+                # A Telegram token looks like "123456:ABC-..."; refusing
+                # anything but an env-var NAME keeps secrets out of YAML.
+                raise ConfigError(
+                    f"notifications.{name} must be an environment variable "
+                    f"NAME, never the value itself")
+        if self.poll_interval_s <= 0:
+            raise ConfigError("notifications.poll_interval_s must be > 0")
+
+
+@dataclass(frozen=True)
 class LoggingConfig:
     """Application logging."""
 
@@ -224,6 +286,8 @@ class AppConfig:
     strategy: StrategyConfig = field(default_factory=StrategyConfig)
     risk: RiskConfig = field(default_factory=RiskConfig)
     execution: ExecutionConfig = field(default_factory=ExecutionConfig)
+    notifications: NotificationsConfig = field(
+        default_factory=NotificationsConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
 
 
@@ -233,6 +297,7 @@ _SECTIONS: Mapping[str, type] = {
     "strategy": StrategyConfig,
     "risk": RiskConfig,
     "execution": ExecutionConfig,
+    "notifications": NotificationsConfig,
     "logging": LoggingConfig,
 }
 
