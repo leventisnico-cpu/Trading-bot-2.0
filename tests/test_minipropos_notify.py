@@ -72,7 +72,7 @@ def test_console_answers_status_from_own_chat_only():
         update(3, "42", "just chatting"),   # not a command: ignored
     ])
     n = TelegramNotifier("42", t)
-    c = TelegramConsole(n, t, handlers={"/status": lambda: "all good"})
+    c = TelegramConsole(n, t, handlers={"/status": lambda a: "all good"})
     assert c.poll_once() == 1
     assert t.sent() == ["all good"]
     assert c.ignored_foreign == 1
@@ -82,7 +82,7 @@ def test_console_answers_status_from_own_chat_only():
 def test_console_advances_offset_so_updates_are_not_replayed():
     t = FakeTransport(updates=[update(7, "42", "/status")])
     n = TelegramNotifier("42", t)
-    c = TelegramConsole(n, t, handlers={"/status": lambda: "ok"})
+    c = TelegramConsole(n, t, handlers={"/status": lambda a: "ok"})
     c.poll_once()
     c.poll_once()
     polls = [p for m, p in t.calls if m == "getUpdates"]
@@ -94,23 +94,34 @@ def test_console_advances_offset_so_updates_are_not_replayed():
 def test_unknown_command_and_botname_suffix_get_help():
     t = FakeTransport()
     c = TelegramConsole(TelegramNotifier("42", t), t,
-                        handlers={"/status": lambda: "ok"})
+                        handlers={"/status": lambda a: "ok"})
     assert "/status" in c.dispatch("/help")
     assert "/status" in c.dispatch("/flatten")     # no such command
     assert c.dispatch("/status@my_bot") == "ok"
 
 
-def test_console_has_no_trading_commands():
-    """The phone console is read-only by design."""
+def test_console_has_no_order_entry_commands():
+    """Nothing from a phone can buy, sell, or size."""
     t = FakeTransport()
     c = TelegramConsole(TelegramNotifier("42", t), t,
-                        handlers={"/status": lambda: "ok"})
-    for cmd in ("/buy", "/sell", "/flatten", "/kill", "/reset"):
+                        handlers={"/status": lambda a: "ok"})
+    for cmd in ("/buy 10 SPY", "/sell", "/size 50", "/reset nico"):
         assert c.dispatch(cmd) == c.help_text()
 
 
+def test_dispatch_passes_arguments_to_handlers():
+    seen = []
+    t = FakeTransport()
+    c = TelegramConsole(TelegramNotifier("42", t), t,
+                        handlers={"/halt": lambda a: seen.append(a) or "x"})
+    c.dispatch("/halt")
+    c.dispatch("/halt   CONFIRM ")
+    c.dispatch("/halt@my_bot CONFIRM")
+    assert seen == ["", "CONFIRM", "CONFIRM"]
+
+
 def test_handler_exception_is_contained():
-    def boom() -> str:
+    def boom(args: str) -> str:
         raise KeyError("x")
     t = FakeTransport()
     c = TelegramConsole(TelegramNotifier("42", t), t, handlers={"/status": boom})

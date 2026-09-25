@@ -331,9 +331,14 @@ class TradingApp:
             if self.notifier is not None and cfg.notifications.commands_enabled:
                 self.console = TelegramConsole(
                     self.notifier, self.notifier._transport,
-                    handlers={"/status": self.status_text,
-                              "/positions": self.positions_text,
-                              "/orders": self.orders_text})
+                    handlers={"/status": lambda a: self.status_text(),
+                              "/positions": lambda a: self.positions_text(),
+                              "/orders": lambda a: self.orders_text(),
+                              "/pause": lambda a: self.operator_pause(),
+                              "/resume": lambda a: self.operator_resume(),
+                              "/halt": self.operator_halt})
+        self._paused = False
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
 
     # ------------------------------------------------------ notifications
 
@@ -364,13 +369,47 @@ class TradingApp:
             f"equity: {self._last_equity if self._last_equity is not None else '-'}"
             f"  start-of-day: {self.risk.start_of_day_equity}",
             f"kill switch: "
-            f"{'TRIPPED — ' + self.risk.kill_reason if self.risk.kill_switch_active else 'clear'}",
+            f"{'TRIPPED — ' + self.risk.kill_reason if self.risk.kill_switch_active else 'clear'}"
+            f"{'  |  PAUSED (no entries)' if self._paused else ''}",
             f"working orders: {len(self.oms.open_orders())}",
         ]
         regime = getattr(self.strategy, "regime", None)
         if regime is not None:
             lines.append(f"regime: {getattr(regime, 'value', regime)}")
         return "\n".join(lines)
+
+    # Operator commands (phone): each can only reduce or stop activity.
+
+    def operator_pause(self) -> str:
+        """Stop new strategy entries; exits and risk flattening continue."""
+        self._paused = True
+        log.warning("operator PAUSE: new entries suppressed")
+        return "paused: no new entries (exits still allowed). /resume to lift."
+
+    def operator_resume(self) -> str:
+        if self.risk.kill_switch_active:
+            return ("cannot resume: kill switch is tripped — review the "
+                    "account, then --reset-kill-switch <name> at the keyboard")
+        self._paused = False
+        log.warning("operator RESUME: entries allowed again")
+        return "resumed: entries allowed"
+
+    def operator_halt(self, args: str) -> str:
+        """Trip the kill switch from the phone: cancel all, flatten (per
+        config), persist the marker. Requires the literal word CONFIRM."""
+        if args.strip().upper() != "CONFIRM":
+            return ("/halt cancels every working order, flattens the book "
+                    "if risk.kill_switch_flattens, and stops trading until "
+                    "a keyboard reset. Send: /halt CONFIRM")
+        if self._loop is None or self._loop.is_closed():
+            return "not running"
+        fut = asyncio.run_coroutine_threadsafe(
+            self._halt("operator halt via Telegram"), self._loop)
+        try:
+            fut.result(timeout=30.0)
+        except Exception as exc:  # the marker is written first; report it
+            return f"halt requested; error while flattening: {exc}"
+        return "HALTED: " + self.status_text()
 
     def positions_text(self) -> str:
         book = self.oms.positions
@@ -441,6 +480,7 @@ class TradingApp:
 
     async def run(self) -> None:
         """Connect, prime, then serve events until shutdown is requested."""
+        self._loop = asyncio.get_running_loop()
         await self.conn.start()
         self._equity_task = asyncio.create_task(
             self._equity_monitor(), name="equity-monitor")
@@ -681,6 +721,11 @@ class TradingApp:
         )
 
     async def _route_intent(self, intent: OrderIntent) -> None:
+        if (self._paused and intent.source is IntentSource.STRATEGY
+                and self._is_entry(intent)):
+            log.info("PAUSED: dropped entry %s %d %s", intent.action.value,
+                     intent.quantity, intent.symbol)
+            return
         blackout = self._blackout_block(intent)
         if blackout is not None:
             log.info("BLACKOUT [%s %d %s]: %s", intent.action.value,

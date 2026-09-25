@@ -256,9 +256,19 @@ of edge.
 Set `notifications.enabled: true` and export `TELEGRAM_BOT_TOKEN` /
 `TELEGRAM_CHAT_ID` (from a git-ignored `.env`; the config only names the
 variables). The bot then posts start/stop, "trading enabled", every fill,
-every risk reject, and kill-switch events, and answers `/status`,
-`/positions`, `/orders` from that one chat. The console is read-only by
-design — nothing sent from a phone can place, cancel, or flatten.
+every risk reject, and kill-switch events, and answers from that one
+chat:
+
+| command | effect |
+|---|---|
+| `/status` `/positions` `/orders` | read-only state |
+| `/pause` / `/resume` | suppress / allow new entries (exits and risk flattening always run) |
+| `/halt CONFIRM` | trip the kill switch: cancel all, flatten (per `risk.kill_switch_flattens`), persist the marker |
+
+Nothing sent from a phone can buy, sell, or size, and a halt is cleared
+only at the keyboard (`--reset-kill-switch <name>`) so someone looks at
+the account first. With the bot on a VPS (see RUNBOOK), the phone is the
+whole day-to-day control surface.
 
 ## Tests
 

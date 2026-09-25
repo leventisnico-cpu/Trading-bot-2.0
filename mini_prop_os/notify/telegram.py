@@ -5,10 +5,12 @@ Design rules:
 * **Credentials only from the environment.** :func:`notifier_from_env`
   reads the bot token and chat id from the env-var *names* given in
   config; the values are never logged or persisted.
-* **The console is read-only.** ``/status``, ``/positions``, ``/orders``
-  and ``/help`` answer questions; nothing sent from a phone can place,
-  cancel, or flatten anything. Trading control stays with the kill
-  switch and the operator at the keyboard.
+* **The console has no order entry.** ``/status``, ``/positions``,
+  ``/orders`` and ``/help`` answer questions; the operator commands the
+  app registers (``/pause``, ``/resume``, ``/halt CONFIRM``) can only
+  reduce or stop activity — nothing sent from a phone can buy, sell, or
+  size anything. Clearing a halt stays at the keyboard
+  (``--reset-kill-switch``) so a human looks at the account first.
 * **Only the configured chat is answered.** Messages from any other chat
   are ignored (and counted), so a leaked bot username cannot be used to
   read the book.
@@ -98,14 +100,15 @@ class TelegramNotifier:
         return True
 
 
-CommandHandler = Callable[[], str]
+#: A handler receives the text after the command ("" if none).
+CommandHandler = Callable[[str], str]
 
 
 class TelegramConsole:
     """Answers read-only slash commands from the configured chat.
 
-    Handlers are zero-argument callables returning the reply text; the
-    app registers them (``/status`` etc.). Unknown commands get the help
+    Handlers take the argument text and return the reply; the app
+    registers them (``/status`` etc.). Unknown commands get the help
     text. ``poll_once`` is synchronous and safe to run in a thread.
     """
 
@@ -135,12 +138,13 @@ class TelegramConsole:
 
     def dispatch(self, text: str) -> str:
         """Map one message to its reply (pure; no network)."""
-        cmd = text.strip().split()[0] if text.strip() else ""
-        cmd = cmd.split("@", 1)[0].lower()  # strip "@botname" suffix
+        parts = text.strip().split(None, 1)
+        cmd = parts[0].split("@", 1)[0].lower() if parts else ""
+        args = parts[1].strip() if len(parts) > 1 else ""
         if cmd == "/help" or cmd not in self._handlers:
             return self.help_text()
         try:
-            return self._handlers[cmd]()
+            return self._handlers[cmd](args)
         except Exception as exc:  # a handler bug must not kill the console
             log.exception("telegram command %s failed", cmd)
             return f"{cmd} failed: {type(exc).__name__}: {exc}"

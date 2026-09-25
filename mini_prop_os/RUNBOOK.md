@@ -67,6 +67,15 @@ Expected preflight on a fresh paper login: every line PASS, market data
    cancelled; set `execution.flatten_on_shutdown: true` if you want the
    position closed on every stop.
 
+## Running it from your phone
+
+Once the bot is on an always-on host, Telegram is the control surface:
+`/status` for the book and regime, `/pause` to stop new entries while
+exits keep working, `/resume` to lift that, and `/halt CONFIRM` to cancel
+everything and stop until you clear the marker at the keyboard. Alerts
+arrive without asking: every fill, every risk reject, trading enabled /
+disabled, kill switch. Only the configured chat id is answered.
+
 ## If the kill switch fires
 
 A daily-loss breach cancels all orders, flattens the book, and writes
