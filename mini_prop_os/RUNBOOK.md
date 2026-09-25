@@ -5,6 +5,28 @@ Gateway or TWS logged into **your** IBKR account. Nothing here runs
 server-side at IBKR, and nobody else can start it for you — treat the
 machine that runs it like a trading terminal.
 
+## Windows quick path (IBKR paper account with TFSA permissions)
+
+The account can trade stocks/ETFs only. Use IB Gateway (not TWS, not
+IBKR Desktop — only TWS and Gateway serve the API), logged into the
+**paper** username. In Gateway → Configure → Settings → API → Settings:
+*Enable ActiveX and Socket Clients* ✔ · *Read-Only API* ✘ · socket port
+`4002` · trusted IP `127.0.0.1` · master API client id blank.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy\windows\setup.ps1   # venv, deps, state\config.yaml (SPY, paper)
+.\deploy\windows\run.ps1 -Preflight                                  # read-only go/no-go
+.\deploy\windows\run.ps1                                             # adaptive_ema on SPY, paper
+.\deploy\windows\run.ps1 -Config deploy\config.tfsa-paper-dca.yaml   # weekly DCA, paper
+```
+
+`setup.ps1` creates `.env` from `deploy/.env.example`; put the Telegram
+token and chat id there (never in a config file, never in git). With no
+market-data subscription keep `connection.market_data_type: delayed`.
+Expected preflight on a fresh paper login: every line PASS, market data
+"delayed". Save the first real preflight output to
+`reports/preflight_first_socket.md`.
+
 ## First night: paper trading against the live market
 
 1. **Install IB Gateway** (lighter than TWS; either works) and log in
@@ -44,6 +66,15 @@ machine that runs it like a trading terminal.
 6. **Stop:** Ctrl-C (or `kill -TERM <pid>`). Working orders are
    cancelled; set `execution.flatten_on_shutdown: true` if you want the
    position closed on every stop.
+
+## Running it from your phone
+
+Once the bot is on an always-on host, Telegram is the control surface:
+`/status` for the book and regime, `/pause` to stop new entries while
+exits keep working, `/resume` to lift that, and `/halt CONFIRM` to cancel
+everything and stop until you clear the marker at the keyboard. Alerts
+arrive without asking: every fill, every risk reject, trading enabled /
+disabled, kill switch. Only the configured chat id is answered.
 
 ## If the kill switch fires
 
