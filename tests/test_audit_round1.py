@@ -68,6 +68,19 @@ def test_a02_decision_day_is_calendar_month_end():
     assert is_last_trading_day_of_month(date(2026, 8, 31), pd.bdate_range("2026-08-01", "2026-08-31"))
 
 
+
+def test_a02b_decision_day_uses_exchange_date_not_utc():
+    """A month-end run that GitHub starts after 00:00 UTC must still decide:
+    01:04 UTC on Oct 1 is 21:04 on Sept 30 in Toronto."""
+    from datetime import datetime, timezone
+    from daily_run import exchange_today, is_last_trading_day_of_month
+    late = datetime(2026, 10, 1, 1, 4, tzinfo=timezone.utc)
+    today = exchange_today(late)
+    assert today == date(2026, 9, 30), f"late run dated {today}, not the session date"
+    assert is_last_trading_day_of_month(today, pd.bdate_range("2026-09-01", "2026-09-30"))
+    winter = datetime(2027, 1, 30, 4, 30, tzinfo=timezone.utc)   # EST, UTC-5
+    assert exchange_today(winter) == date(2027, 1, 29)
+
 def test_a03_backtest_hard_kills_between_decision_days(cfg):
     """#3: kill switches run every bar in the backtest, exactly as live."""
     sym = cfg.universe[0]
