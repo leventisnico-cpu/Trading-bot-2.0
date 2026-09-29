@@ -93,5 +93,24 @@ Neither strategy is viable below roughly six figures. At this size the
 only approach that survives costs is buying and holding a broad index
 (lump sum plus scheduled contributions).
 
-Astral objects: A=37934, B=37936 (saved 5777), C=37935, D=37938
+## Addendum — TJR/ICT-style NY-open liquidity sweep (E)
+
+Operator asked for a copy of TJR's day-trading approach. Mechanical,
+long-only (TFSA) version on QQQ 5-minute bars, pre-registered: opening
+range = 09:30–09:45 ET; between 09:45 and 11:00, a bar that trades below
+the opening-range low and closes back above it triggers a buy; stop
+−0.3%, target +0.6% (2R); flat at 15:50. Oct 2024 → Sep 2026 (5-minute
+history cap), 324 trades:
+
+| Costs | Result | Win rate | Profit factor |
+|---|---|---|---|
+| Institutional (1 bp + 2 bp slippage), $100k | **−14%** | 38% | 0.77 |
+| Real account (~$870, 18 bp/order ≈ $1 min + 2 bp) | **−70%** | 30% | 0.12 |
+
+FAIL — the rule loses before costs, and the $1 minimum turns a slow bleed
+into a wipe-out at this account size. Discretionary traders apply
+judgement this mechanical rule does not capture; that judgement cannot be
+backtested, which is exactly why it cannot be trusted with the account.
+
+Astral objects: E=37962. A=37934, B=37936 (saved 5777), C=37935, D=37938
 (saved 5778), control=37940, SPY benchmark=37638.
