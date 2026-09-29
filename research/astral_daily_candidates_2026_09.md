@@ -126,5 +126,30 @@ statistics (Sharpe > 100). The two stock strategies were re-tested:
   reproduce it ("historical performance cannot be reproduced by the
   current engine"), so the advertised number is unverifiable.
 
-Astral objects: E=37962, AMD=37964, GOOG=37965. A=37934, B=37936 (saved 5777), C=37935, D=37938
+## Addendum — "copy the traders who turned small accounts into millions" (F)
+
+Operator asked for ≥8% per trade by copying small-account-to-millions
+traders (Kullamägi/Qullamaggie, Minervini, Zanger, O'Neil, Darvas, Ryan).
+Their shared method is the momentum breakout: strong uptrend, tight
+consolidation, breakout on volume, cut losses at 7–8%, trail winners.
+F encodes that with canonical published rules on 8 growth stocks (NVDA
+AMD TSLA META NFLX AVGO MU CRM), daily bars, 45% per position, stop −8%,
+exit on a close below the 20-day SMA. 2014-01 → 2026-09, 50 trades:
+
+| Run | Result | Win rate | Avg per trade | Profit factor |
+|---|---|---|---|---|
+| $100k, 1+2 bp | +93% (5.8%/yr), maxDD −23% | 54% | **+3.3%** | 2.27 |
+| ~$870, 25+2 bp ($1 min) | +74% (4.9%/yr), maxDD −23% | 50% | **+2.8%** | 1.99 |
+| Control: hold the same 8 stocks, equal weight | **+8,085%** (41%/yr), maxDD −51% | — | — | — |
+| SPY buy-and-hold (2014-04 →) | +314% | — | — | — |
+
+Findings: the first candidate here with positive expectancy that survives
+small-account fees (only ~4 trades a year). It does not reach 8% per
+trade, and it loses badly to simply holding the same stocks — the
+control's result is hindsight: these 8 names were chosen because they
+became the decade's winners. That is also the core problem with the
+"small account to millions" stories: the survivors are visible, the far
+larger number who ran the same method and failed are not.
+
+Astral objects: F=37979, control F=37980, E=37962, AMD=37964, GOOG=37965. A=37934, B=37936 (saved 5777), C=37935, D=37938
 (saved 5778), control=37940, SPY benchmark=37638.
