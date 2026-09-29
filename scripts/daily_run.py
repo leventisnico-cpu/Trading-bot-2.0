@@ -16,8 +16,9 @@ deliberate config change and separate credentials).
 from __future__ import annotations
 
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
@@ -36,6 +37,7 @@ from engine.strategies import DualMomentum  # noqa: E402
 WEEKLY_CONTRIBUTION = 100.0
 STATE_PATH = REPO / "state" / "paper_state.json"
 REPORTS_DIR = REPO / "reports"
+EXCHANGE_TZ = ZoneInfo("America/Toronto")
 
 
 def fetch_prices(symbols: list[str]) -> pd.DataFrame:
@@ -45,6 +47,18 @@ def fetch_prices(symbols: list[str]) -> pd.DataFrame:
     if isinstance(df, pd.Series):
         df = df.to_frame(symbols[0])
     return df[symbols]
+
+
+def exchange_today(now: datetime | None = None) -> date:
+    """The session date on the exchange (TSX), not the runner's UTC date.
+
+    GitHub starts the 21:30 UTC schedule hours late; runs have begun past
+    00:00 UTC, where date.today() already reads tomorrow. A month-end run
+    that slips past midnight UTC then sees the 1st, is_last_trading_day_of_month
+    says no, and the month's only decision never happens.
+    """
+    now = now or datetime.now(timezone.utc)
+    return now.astimezone(EXCHANGE_TZ).date()
 
 
 def is_last_trading_day_of_month(today: date, index: pd.DatetimeIndex) -> bool:
@@ -77,7 +91,7 @@ def contributions_due(state: EngineState, today: date) -> float:
 
 
 def main() -> int:
-    today = date.today()
+    today = exchange_today()
     cfg = load_config(REPO / "config" / "engine.toml")
     journal = Journal(REPO / "state" / "journal.jsonl")
     REPORTS_DIR.mkdir(exist_ok=True)
