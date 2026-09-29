@@ -78,5 +78,20 @@ Notes:
   top-5 membership changes (no drift trims) and re-measure with a
   per-order $1 minimum at the account size actually intended.
 
+## Addendum — the operator's real account size
+
+The operator's intended capital is ~$1,200 CAD (~$870 USD). At that size
+IBKR's $1 minimum per order is ~0.6% of a ~$170 position (D) and ~0.12%
+of a one-share SPY order (B). Re-run 2014-04→2026-09 with those costs:
+
+| Candidate | $870, realistic fees | SPY buy-and-hold |
+|---|---|---|
+| D 20-stock reversal (60 bp/order) | **−99.99%** (wiped out) | +314% |
+| B IBS (12 bp/order) | **−2%** | +314% |
+
+Neither strategy is viable below roughly six figures. At this size the
+only approach that survives costs is buying and holding a broad index
+(lump sum plus scheduled contributions).
+
 Astral objects: A=37934, B=37936 (saved 5777), C=37935, D=37938
 (saved 5778), control=37940, SPY benchmark=37638.
