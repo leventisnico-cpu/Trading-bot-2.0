@@ -112,5 +112,19 @@ into a wipe-out at this account size. Discretionary traders apply
 judgement this mechanical rule does not capture; that judgement cannot be
 backtested, which is exactly why it cannot be trusted with the account.
 
-Astral objects: E=37962. A=37934, B=37936 (saved 5777), C=37935, D=37938
+## Addendum — popular Astral Explore strategies, re-tested
+
+Explore's "popular" list (≥25%/yr advertised) is mostly crypto and spot
+gold, which a TFSA cannot hold, and several entries show impossible
+statistics (Sharpe > 100). The two stock strategies were re-tested:
+
+- **AMD Bollinger mean reversion** (15m; advertised +52% Dec 2025→Aug
+  2026, zero costs). Out of sample 2021-01→2025-11 at ~$870 with $1-min
+  fees: **−27%, max drawdown −70%**, vs **AMD buy-and-hold +118%**.
+  Overfit to its publication window.
+- **GOOG 15m ORB 3RR** (advertised +83%): Astral's own engine refuses to
+  reproduce it ("historical performance cannot be reproduced by the
+  current engine"), so the advertised number is unverifiable.
+
+Astral objects: E=37962, AMD=37964, GOOG=37965. A=37934, B=37936 (saved 5777), C=37935, D=37938
 (saved 5778), control=37940, SPY benchmark=37638.
