@@ -153,3 +153,74 @@ larger number who ran the same method and failed are not.
 
 Astral objects: F=37979, control F=37980, E=37962, AMD=37964, GOOG=37965. A=37934, B=37936 (saved 5777), C=37935, D=37938
 (saved 5778), control=37940, SPY benchmark=37638.
+
+## Addendum — "Wall Street Income Masterclass" 5-step system (G)
+
+Operator supplied a 10-slide deck (Andrew Antiles, "Wall Street Income
+Masterclass") described as the system hedge-fund traders use. It contains
+**no entry rule** — only sizing and exit management:
+
+1. Same size: every trade is 30% of the account.
+2. Same risk: stop −10% (so 3% of the account at risk).
+3. Sell 1/2 at +10%, move the stop to break-even.
+4. Sell 1/4 at +12–15%, move the stop to +10%.
+5. Never sell the last 1/4 manually; trail the stop up.
+
+Claims checked before testing:
+- "Lose 33 in a row to blow up": false arithmetic. 3% losses compound;
+  after 33 straight losses 37% of the account remains, and a 50% drawdown
+  takes 23 losses. More importantly, the deck's risk math assumes every
+  stop fills at −10%; gaps through stops do not.
+- "+517.6% (Jan–Aug 2026) trading SPY": SPY itself rose 13.4% over that
+  window (local data). At 30% position size with a 10% first target, a
+  trade in SPY *shares* cannot produce that: replaying the 5 exit steps
+  from every SPY entry day 1999–2026 (6,662 trades, close-only) gives a
+  median holding period of 176 trading days (~8 months), an average of
+  +5.1% per trade (vs +7.9% for simply holding SPY over the same windows),
+  and +1.5% per trade at the account level. The headline number implies
+  options/leverage or a selected sample; it is not reproducible from the
+  rules shown.
+
+Test: the deck's exits are orthogonal to our entries, so they were bolted
+onto F's entry signal (first breakout day only), pre-registered, no tuning.
+Each signal buys three tranches: 1/2 with TP +10% / SL −10%; 1/4 with TP
++13.5% and SL −10% → break-even once +10% is reached; 1/4 with SL −10% →
+break-even at +10% → +10% at +20% → trailing 10% (of entry) below the high.
+G = 30% per trade (as the deck says); G45 = 45% per trade (F's exposure,
+isolates the exit logic from the size change). 2014-01 → 2026-09.
+
+| Run | Return | CAGR | Max DD | Sharpe | Win | Avg/trade | PF |
+|---|---|---|---|---|---|---|---|
+| F (live on paper), $100k, 1+2 bp | +93% | 5.8% | −23.2% | 0.48 | 54% | +3.3% | 2.27 |
+| G 30%, $100k, 1+2 bp | +71% | 4.7% | −15.2% | 0.57 | 62% | +3.1% | 1.99 |
+| **G45, $100k, 1+2 bp** | **+121%** | **7.1%** | **−16.7%** | **0.63** | 62% | +3.7% | 2.25 |
+| F, $870, 25+2 bp | +74% | 4.9% | −23% | — | 50% | +2.8% | 1.99 |
+| G 30%, $870, 115+2 bp ($1 min on 1/4 lots) | +17% | 1.3% | −17.2% | 0.20 | 54% | +0.8% | 1.22 |
+| G45, $870, 77+2 bp | +58% | 4.0% | −19.7% | 0.39 | 57% | +2.2% | 1.60 |
+
+Walk-forward, G45 vs F ($100k, 1+2 bp; each window includes 277 bars of
+indicator warm-up so trading starts at the fold boundary):
+
+| Fold | G45 | F | Winner |
+|---|---|---|---|
+| 2014-04 → 2018-06 | +13.5% (DD −20.7%) | +9.8% (DD −12.2%) | G45 |
+| 2018-07 → 2022-08 | +34.6% (DD −8.9%) | +22.5% (DD −23.2%) | G45 |
+| 2022-09 → 2026-09 | +28.4% (DD −13.6%) | +35.3% (DD −12.3%) | F |
+| Full sample | +121% | +93% | G45 |
+
+Verdict: **PASS at institutional costs (2/3 folds + full sample)** — the
+deck's scale-out/break-even exits improve F's entries on return and
+drawdown when commissions are negligible. **FAIL at the operator's
+current $870**: splitting every trade into three exits multiplies IBKR's
+$1-minimum fees, and both G variants lose to F after realistic costs.
+(The flat-bps fee model is approximate; it overstates the cost of the
+merged entry order and understates small partial sells.) F stays the
+paper deployment at $870; G45 becomes the candidate once position slices
+are large enough that $1 per partial sell is immaterial (roughly $5k+
+account, where a 1/4 slice is ~$560 and $1 ≈ 0.2%).
+
+Astral objects: G=38695, G45=38696. Backtests: G $100k bt_e077665e44ae801f,
+G $870 bt_b0af823ad862eb2b / bt_d0d89380277cdea3, G45 $100k
+bt_c512476acbf371a5, G45 $870 bt_74a73007b76f4ef7, folds G45
+bt_ef8c70bb9705bd8d / bt_467da3f351bd3661 / bt_2bbc6110992868e5, folds F
+bt_019bed65b0fb95fa / bt_f0c52b5d859a61bb / bt_23753e2df628b7d2.
