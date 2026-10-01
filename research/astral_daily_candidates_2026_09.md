@@ -224,3 +224,43 @@ G $870 bt_b0af823ad862eb2b / bt_d0d89380277cdea3, G45 $100k
 bt_c512476acbf371a5, G45 $870 bt_74a73007b76f4ef7, folds G45
 bt_ef8c70bb9705bd8d / bt_467da3f351bd3661 / bt_2bbc6110992868e5, folds F
 bt_019bed65b0fb95fa / bt_f0c52b5d859a61bb / bt_23753e2df628b7d2.
+
+## Addendum — trading bear markets too (G45B, inverse-ETF bear leg)
+
+Operator asked for the strategy to trade bearish as well as bullish. The
+account is a TFSA: short selling is not allowed (and Astral's builder is
+long-only), so the only bearish instrument consistent with ORDERS.md
+("stocks/ETFs only") is a **long position in an inverse ETF**. PSQ
+(−1x Nasdaq-100, unleveraged, so no 3x decay) was chosen because the 8
+G45 names are Nasdaq-100 growth stocks.
+
+Pre-registered before any run (no tuning, no second variant):
+- Longs: G45 unchanged.
+- Bear regime: QQQ close < 200-day SMA AND 50-day SMA < 200-day SMA.
+- Entry: first day the regime turns on → buy PSQ with 45% of equity
+  (same exposure as one G45 trade), hard stop −8% from entry.
+- Exit: QQQ closes back above its 50-day SMA (or the stop).
+- Benchmark: G45 itself (the question is whether the bear leg adds value).
+- Same windows and costs as the G45 test ($100k, 1+2 bp); PASS only if
+  G45B beats G45 in ≥ 2 of 3 folds AND on the full sample.
+
+| Window | G45B | G45 | Winner |
+|---|---|---|---|
+| 2014-04 → 2018-06 | +2.9% (DD −21.2%) | +13.5% (DD −20.7%) | G45 |
+| 2018-07 → 2022-08 | +39.6% (DD −13.3%) | +34.6% (DD −8.9%) | G45B |
+| 2022-09 → 2026-09 | +25.5% (DD −13.6%) | +28.4% (DD −13.6%) | G45 |
+| Full 2014 → 2026-09 | +103% (DD −16.7%) | +121% (DD −16.7%) | G45 |
+
+Verdict: **FAIL (1/3 folds, full sample loses).** The bear leg added 12
+PSQ trades over 12 years; win rate fell from 62% to 54%. It paid only in
+the 2018–2022 fold (the 2022 bear), and even there it *raised* that fold's
+drawdown (−8.9% → −13.3%). Elsewhere QQQ dipped under its 200-day,
+triggered the entry, and snapped back through the 50-day: whipsaw. It did
+not lower the full-sample drawdown at all. G45 already defends in bear
+markets by holding cash — its breakout filter requires an uptrend, which
+is why its 2018–2022 drawdown was −8.9%. G45 stays on paper; G45B is not
+deployed.
+
+Astral objects: G45B=39265. Backtests: full bt_df5d0fd3ed7dbf01, folds
+bt_d71f23d492dd9469 / bt_24002dd5d18a0588 / bt_81147788a1ac2137
+(G45 baselines as in the G addendum).
