@@ -264,3 +264,41 @@ deployed.
 Astral objects: G45B=39265. Backtests: full bt_df5d0fd3ed7dbf01, folds
 bt_d71f23d492dd9469 / bt_24002dd5d18a0588 / bt_81147788a1ac2137
 (G45 baselines as in the G addendum).
+
+## Addendum — switch to tech/AI ETFs (E1 vs buy-and-hold BH5)
+
+Operator asked to trade strong tech/AI ETFs instead of single stocks, and
+to be able to short. Shorting is not possible in this setup: the IBKR
+account is a TFSA (no short sales), the connected Moomoo account is a cash
+account, and Astral's strategy builder is long-only. ETFs are fine in a
+TFSA, so the ETF switch was tested.
+
+Universe (pre-registered; liquid tech/AI ETFs with data back to 2013):
+QQQ, XLK, SMH, SOXX, IGV. AI-only ETFs (BOTZ 2016, AIQ 2018) were left out
+for lack of history across all three folds.
+- E1 (trend, long-only): 20% per ETF, held while close > 200d SMA and
+  50d SMA > 200d SMA; sold on a close below the 200d SMA. No tuning.
+- BH5 (benchmark): the same 5 ETFs equal-weight, rebalanced monthly,
+  always invested, started on E1's first eligible trading day.
+- $100k, 1+2 bp. PASS if E1 beats BH5 in ≥ 2 of 3 folds AND full sample.
+
+| Window | E1 trend | BH5 buy-and-hold | G45 (for reference) |
+|---|---|---|---|
+| 2014-01 → 2018-06 | +80% (DD −16.4%) | **+117%** (DD −17.9%) | +13.5% |
+| 2018-04 → 2022-08 | +51% (DD −24.1%) | **+104%** (DD −34.3%) | +34.6% |
+| 2022-06 → 2026-09 | +157% (DD −19.5%) | **+247%** (DD −27.6%) | +28.4% |
+| Full 2014-11 → 2026-09 | +532% (16.8%/yr, DD −24.1%) | **+1,066%** (23.0%/yr, DD −40.1%) | +121% (7.1%/yr) |
+
+Verdict: **E1 FAIL (0/3 folds, full sample loses).** The trend filter cuts
+drawdowns by roughly 40% in every window but gives up about half the
+return. Both ETF variants beat G45 by a wide margin. The strongest result
+is simply holding the five ETFs. Caveat: hindsight. Tech was the best
+sector of 2014–2026, and choosing "AI and tech" today uses that knowledge.
+BH5's −40% drawdown (−34% in the 2022 fold) is the cost.
+Practical note at ~$870: QQQ/SMH trade above $600 a share, so five equal
+slots need fractional shares or fewer ETFs.
+
+Astral objects: E1=39301, BH5=39302. Backtests: E1 full
+bt_3339945348f5ca08, folds bt_5605eb5a07c28b95 / bt_e2e4d9dd32ce5230 /
+bt_6d2a03e804896813; BH5 full bt_ec290157a2082cd0, folds
+bt_1ef789ed40fb51ab / bt_5b04daf4e8ae1810 / bt_6634536e42346a76.
