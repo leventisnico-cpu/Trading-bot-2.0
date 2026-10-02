@@ -302,3 +302,81 @@ Astral objects: E1=39301, BH5=39302. Backtests: E1 full
 bt_3339945348f5ca08, folds bt_5605eb5a07c28b95 / bt_e2e4d9dd32ce5230 /
 bt_6d2a03e804896813; BH5 full bt_ec290157a2082cd0, folds
 bt_1ef789ed40fb51ab / bt_5b04daf4e8ae1810 / bt_6634536e42346a76.
+
+## Addendum — ride the strongest AI ETF (AIR1–AIR4 on SOXX)
+
+Operator changed course: ride the AI gold rush in one ETF for as long as
+the trend lasts, exit when it ends, and aim for a win rate of 70% or more.
+
+Instrument pick (multi-period returns on 2026-10-01, Astral research):
+
+| ETF | 6M | YTD | 1Y | 3Y | Note |
+|---|---|---|---|---|---|
+| **SOXX** | +70% | +91% | **+108%** | +263% | iShares semis; strongest unleveraged |
+| SMH | +58% | +72% | +85% | +322% | VanEck semis, NVDA-heavy |
+| XSD | +61% | +67% | +68% | +174% | equal-weight semis |
+| XLK / VGT / IYW | +44–47% | +34–37% | +35–39% | +139–151% | broad tech |
+| AIQ / THNQ / CHAT | +39–64% | +29–58% | +32–49% | +143–243% | "AI" labelled, short history |
+| USD (2x semis) | +96% | +86% | +93% | +889% | leveraged; decay in chop |
+
+SOXX was chosen: strongest 6M/YTD/1Y of the unleveraged set, tradable on
+Astral, history back to 2013. At the close of 2026-10-01: 576.33, 20d SMA
+536, 50d SMA 529, 200d SMA 452 (price 27% above the 200d).
+
+Pre-registered rules (daily bars, long-only, 95% of equity, no tuning
+beyond the four variants listed; the benchmark is buy-and-hold SOXX from
+the strategy's first eligible day):
+- AIR1: buy when close > 200d SMA and 50d > 200d; sell on close < 200d.
+- AIR2: 3% band — buy when close > 1.03×200d and 50d > 200d; sell on
+  close < 0.97×200d.
+- AIR3: 5% band — buy when close > 1.05×200d and 50d > 200d; sell on
+  close < 0.95×200d.
+- AIR4: AIR2's band plus a pullback entry (close < 20d SMA).
+
+Full sample 2014-11 → 2026-09 ($100k, 1+2 bp):
+
+| Variant | Return | CAGR | Max DD | Closed trades | Win rate |
+|---|---|---|---|---|---|
+| AIR1 | +683% | 18.9% | −32.4% | 25 | 36% |
+| AIR2 | +757% | 19.8% | −33.1% | 9 | 67% |
+| **AIR3** | **+796%** | **20.3%** | **−31.7%** | 6 | **83%** (5/6) |
+| AIR4 | +714% | 19.3% | −30.0% | 8 | 63% |
+| Buy-and-hold SOXX | +1,801% | 28.2% | −46.2% | — | — |
+
+AIR3 was the best ride variant on every column, so it went through the
+folds:
+
+| Window | AIR3 | Buy-and-hold SOXX | Winner |
+|---|---|---|---|
+| 2014-01 → 2018-06 | +100% (DD −18.8%), 2 trades, 2 wins | +140% (DD −25.1%) | B&H |
+| 2018-04 → 2022-08 | +56% (DD −29.4%), 3 trades, 2 wins | +122% (DD −39.3%) | B&H |
+| 2022-06 → 2026-09 | +192% (DD −31.7%), 2 closed (1 win) + open trade +135% | +381% (DD −41.7%) | B&H |
+| Full 2014-11 → 2026-09 | +796% (20.3%/yr, DD −31.7%) | +1,801% (28.2%/yr, DD −46.2%) | B&H |
+
+Verdict against the gate: **AIR3 FAIL (0/3 folds, full sample loses)** —
+in a 12-year semiconductor bull, nothing beats holding. What the exit rule
+buys is the drawdown: −32% instead of −46%, flat through most of 2022 and
+the April-2025 crash, and a defined "trend is over" signal (a close 5%
+under the 200-day) that the operator asked for. Win rate: 5 of 6 closed
+trades, which meets the 70% target on paper but rests on six trades; one
+more loser would make it 71%, two would make it 63%. The losers are
+whipsaws when price falls through the band and recovers within weeks.
+
+Leverage check: the same rule on USD (2x semis) returned +3,365%
+(34.8%/yr) but with a −51% drawdown and a 58% win rate over 12 trades —
+it fails the win-rate target and is not proposed.
+
+Deployment note: SOXX is in regime today (27% above its 200-day), so a
+paper deployment buys on the first bar and the exit sits ~24% below the
+current price (0.95 × 452 ≈ 439). That is the entry risk of joining a
+trend late; the rule has no tighter stop by design.
+
+Astral objects: AIR1=40094, AIR2=40095, AIR3=40097 (saved 6054),
+AIR4=40098, AIR3-USD=40099, BH SOXX=40096. Backtests: AIR1 full
+bt_3fd940ca420db1c1 (F1 bt_f170d006d97bdb85); AIR2 full
+bt_5fd803e4f421247f (F1 bt_3d8ebae78b796b6a); AIR3 full
+bt_96c07739243fd562, folds bt_22088f6cc4f274c4 / bt_e58d20836e73459b /
+bt_e3fd0664de255152; AIR4 full bt_ba7d4114387ca4a0; AIR3-USD full
+bt_75114068bc1df8d5; BH SOXX full bt_f032e004010eb546 (unaligned
+bt_9c39e55a05bbd1a3), folds bt_3eb5f50997652005 / bt_8406dfe09cce1bb8 /
+bt_389b43db59037b41.
