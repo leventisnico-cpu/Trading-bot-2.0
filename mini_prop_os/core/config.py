@@ -19,6 +19,27 @@ class ConfigError(ValueError):
     """Raised when config.yaml is missing, malformed, or fails validation."""
 
 
+#: IBKR ``reqMarketDataType`` codes (TWS API: 1 live, 2 frozen, 3 delayed,
+#: 4 delayed-frozen). ``delayed`` is what a paper account without a paid
+#: subscription can actually receive.
+MARKET_DATA_TYPE_CODES: Mapping[str, int] = {
+    "realtime": 1,
+    "frozen": 2,
+    "delayed": 3,
+}
+
+#: Ports on which TWS / IB Gateway serve LIVE (real-money) sessions.
+#: 7496 = TWS live, 4001 = Gateway live, 4003 = Gateway live (alternate).
+LIVE_PORTS = frozenset({7496, 4001, 4003})
+#: Ports on which TWS / IB Gateway serve PAPER sessions.
+PAPER_PORTS = frozenset({7497, 4002})
+
+
+def is_live_port(port: int) -> bool:
+    """True if ``port`` is a known live (real-money) API port."""
+    return port in LIVE_PORTS
+
+
 @dataclass(frozen=True)
 class ConnectionConfig:
     """IBKR TWS / IB Gateway socket settings.
@@ -38,10 +59,19 @@ class ConnectionConfig:
     reconnect_backoff_base_s: float = 2.0
     reconnect_backoff_max_s: float = 120.0
     reconnect_max_attempts: int = 0  # 0 = retry forever
+    #: IBKR market data type requested after connect: ``realtime`` (needs a
+    #: paid subscription), ``delayed`` (free, 15-20 min behind, fine for
+    #: paper), or ``frozen`` (last close outside market hours).
+    market_data_type: str = "realtime"
 
     def __post_init__(self) -> None:
         if not (0 < self.port < 65536):
             raise ConfigError(f"connection.port out of range: {self.port}")
+        if self.market_data_type not in MARKET_DATA_TYPE_CODES:
+            raise ConfigError(
+                "connection.market_data_type must be one of "
+                f"{sorted(MARKET_DATA_TYPE_CODES)}, got "
+                f"{self.market_data_type!r}")
         if self.client_id < 0:
             raise ConfigError("connection.client_id must be >= 0")
         for name in ("connect_timeout_s", "heartbeat_interval_s",
@@ -98,14 +128,20 @@ class StrategyConfig:
 
     ``name`` selects the strategy: ``adaptive_ema`` (volatility-adaptive:
     regime sizing, EXTREME risk-off, confirmed entries, bounded online
-    threshold learning) or ``ema_crossover`` (the plain baseline). The
+    threshold learning), ``ema_crossover`` (the plain baseline), or
+    ``scheduled_dca`` (mechanical periodic buying, never sells). The
     ``vol_*`` / ``confirm_window`` / ``learn`` fields apply only to
     ``adaptive_ema``; for it, ``order_quantity`` is the base size in
-    LOW/NORMAL volatility (halved in HIGH, zero in EXTREME).
+    LOW/NORMAL volatility (halved in HIGH, zero in EXTREME). The ``dca_*``
+    fields apply only to ``scheduled_dca``, which buys ``order_quantity``
+    shares per period unless ``dca_amount`` > 0.
     """
 
     name: str = "adaptive_ema"
     bar_size: str = "1 min"
+    #: IBKR duration string for the historical warmup request ("2 D",
+    #: "400 D", "1 Y"). Monthly strategies need ~13 months of bars.
+    history_duration: str = "2 D"
     fast_period: int = 9
     slow_period: int = 21
     order_quantity: int = 2
@@ -123,10 +159,26 @@ class StrategyConfig:
     #: Black-Scholes volatility-target sizing (σS√T), which can only size
     #: *down* from order_quantity, never up. 0 disables it.
     risk_per_trade: float = 0.0
+    #: scheduled_dca only: currency amount per period converted to shares
+    #: at the last close (0 = buy ``order_quantity`` shares instead).
+    dca_amount: float = 0.0
+    dca_schedule: str = "weekly"          # daily | weekly
+    dca_weekday: str = "Monday"           # weekly only
+    dca_time: str = "10:00"               # HH:MM in dca_timezone
+    dca_timezone: str = "America/New_York"
+    #: Persisted last-bought slot; makes buys idempotent across restarts.
+    dca_state_path: str = "state/dca_state.json"
 
     def __post_init__(self) -> None:
-        if self.name not in ("adaptive_ema", "ema_crossover"):
+        if self.name not in ("adaptive_ema", "ema_crossover",
+                             "scheduled_dca", "tsmom_12_1"):
             raise ConfigError(f"unknown strategy.name {self.name!r}")
+        parts = self.history_duration.split()
+        if (len(parts) != 2 or not parts[0].isdigit() or int(parts[0]) < 1
+                or parts[1] not in ("S", "D", "W", "M", "Y")):
+            raise ConfigError(
+                "strategy.history_duration must be like '2 D', '400 D', "
+                f"'1 Y'; got {self.history_duration!r}")
         if self.fast_period < 1 or self.slow_period < 2:
             raise ConfigError("strategy periods must be positive")
         if self.fast_period >= self.slow_period:
@@ -146,6 +198,26 @@ class StrategyConfig:
             raise ConfigError("strategy.confirm_window must be >= 1")
         if self.risk_per_trade < 0 or not math.isfinite(self.risk_per_trade):
             raise ConfigError("strategy.risk_per_trade must be >= 0")
+        if self.dca_amount < 0 or not math.isfinite(self.dca_amount):
+            raise ConfigError("strategy.dca_amount must be >= 0")
+        if self.dca_schedule not in ("daily", "weekly"):
+            raise ConfigError("strategy.dca_schedule must be daily or weekly")
+        if self.dca_weekday.lower() not in (
+                "monday", "tuesday", "wednesday", "thursday", "friday",
+                "saturday", "sunday"):
+            raise ConfigError(f"strategy.dca_weekday invalid: {self.dca_weekday!r}")
+        parts = self.dca_time.split(":")
+        if (len(parts) != 2 or not all(p.isdigit() for p in parts)
+                or not (0 <= int(parts[0]) < 24 and 0 <= int(parts[1]) < 60)):
+            raise ConfigError("strategy.dca_time must be HH:MM")
+        try:
+            from zoneinfo import ZoneInfo
+            ZoneInfo(self.dca_timezone)
+        except Exception:
+            raise ConfigError(
+                f"strategy.dca_timezone unknown: {self.dca_timezone!r}") from None
+        if not self.dca_state_path:
+            raise ConfigError("strategy.dca_state_path must be non-empty")
 
 
 @dataclass(frozen=True)
@@ -203,6 +275,38 @@ class ExecutionConfig:
 
 
 @dataclass(frozen=True)
+class NotificationsConfig:
+    """Operator notifications (Telegram). Credentials are never stored in
+    config: the bot token and chat id are read from the environment
+    variables named here, so a committed config.yaml can never leak them.
+    """
+
+    enabled: bool = False
+    provider: str = "telegram"
+    bot_token_env: str = "TELEGRAM_BOT_TOKEN"
+    chat_id_env: str = "TELEGRAM_CHAT_ID"
+    #: Answer /status, /positions, /orders sent from the configured chat.
+    commands_enabled: bool = True
+    poll_interval_s: float = 3.0
+
+    def __post_init__(self) -> None:
+        if self.provider != "telegram":
+            raise ConfigError(
+                f"notifications.provider must be 'telegram', got "
+                f"{self.provider!r}")
+        for name in ("bot_token_env", "chat_id_env"):
+            v = getattr(self, name)
+            if not v or not v.replace("_", "").isalnum() or v[0].isdigit():
+                # A Telegram token looks like "123456:ABC-..."; refusing
+                # anything but an env-var NAME keeps secrets out of YAML.
+                raise ConfigError(
+                    f"notifications.{name} must be an environment variable "
+                    f"NAME, never the value itself")
+        if self.poll_interval_s <= 0:
+            raise ConfigError("notifications.poll_interval_s must be > 0")
+
+
+@dataclass(frozen=True)
 class LoggingConfig:
     """Application logging."""
 
@@ -224,6 +328,8 @@ class AppConfig:
     strategy: StrategyConfig = field(default_factory=StrategyConfig)
     risk: RiskConfig = field(default_factory=RiskConfig)
     execution: ExecutionConfig = field(default_factory=ExecutionConfig)
+    notifications: NotificationsConfig = field(
+        default_factory=NotificationsConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
 
 
@@ -233,6 +339,7 @@ _SECTIONS: Mapping[str, type] = {
     "strategy": StrategyConfig,
     "risk": RiskConfig,
     "execution": ExecutionConfig,
+    "notifications": NotificationsConfig,
     "logging": LoggingConfig,
 }
 

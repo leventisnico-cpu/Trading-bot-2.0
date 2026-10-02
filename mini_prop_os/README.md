@@ -12,7 +12,14 @@ defaults to the IBKR **paper trading** port.
 > and change the port deliberately. The EMA-crossover strategy shipped here
 > is a reference implementation of the architecture, not an edge.
 
-The shipped config trades **MES (Micro E-mini S&P 500) futures on CME**:
+**Deployment target (2026-09):** the IBKR account this runs against is a
+**TFSA** — stocks/ETFs only, **no futures, ever** — so the deployable
+configs live in `deploy/` and trade **SPY** on the IB Gateway paper port
+(`deploy/config.tfsa-paper.yaml`, `deploy/config.tfsa-paper-dca.yaml`).
+The MES config below is kept as the futures reference and for the
+validation scorecard; it is not what `deploy/windows/setup.ps1` installs.
+
+The packaged `config.yaml` trades **MES (Micro E-mini S&P 500) futures on CME**:
 the front-month contract is auto-resolved at connect time (or pin an expiry
 with `contract.last_trade_date`), all notional risk math uses the contract
 multiplier (`$5/point` for MES), and the configured multiplier is verified
@@ -37,12 +44,19 @@ core/
 strategy/
   base.py               BaseStrategy ABC (bars in -> OrderIntents out)
   ema_crossover.py      incremental EMA crossover, long-only, position-aware
+  scheduled_dca.py      mechanical periodic buying, never sells — the only
+                        strategy marked DEPLOYABLE: yes (see the gate below)
+  tsmom_12_1.py         12-1 month time-series momentum, monthly, long-only
+                        (research survivor that failed the gate)
+  registry.py           name -> factory, DEPLOYABLE marker, live-port refusal
   adaptive_ema.py       volatility-adaptive crossover (shipped default):
                         regime detection (LOW/NORMAL/HIGH/EXTREME), size
                         scaled down as vol rises, EXTREME = risk-off (exit,
                         no entries), whipsaw entry-confirmation filter, and
                         bounded online learning of per-regime entry
                         thresholds from its own trade outcomes
+notify/
+  telegram.py           stdlib Telegram alerts + read-only /status console
 risk/
   guardrails.py         mandatory pre-trade gate + daily-loss kill switch
 execution/
@@ -91,6 +105,41 @@ Ctrl-C / SIGTERM triggers a clean shutdown: working orders are cancelled
 
 Logs go to the console and `state/mini_prop_os.log`; every order state
 transition and fill is also appended to `state/executions.jsonl`.
+
+## The expectancy gate (no strategy ships without it)
+
+```bash
+python scripts/expectancy.py --strategy adaptive_ema --symbol SPY \
+    --data data/prices_us.csv --folds 3
+```
+
+Replays daily closes through the production pipeline with IBKR costs and
+prints, per walk-forward fold and for the full sample, final $, CAGR,
+max drawdown, round trips, win rate, and buy-and-hold of the same lot.
+The rule is hard-coded and printed: **DEPLOYABLE only if final equity
+beats buy-and-hold of the same lot in ≥ 2 of 3 folds AND on the full
+sample.** Every strategy module carries a `DEPLOYABLE: yes|no` line in
+its docstring; `.github/workflows/expectancy.yml` re-runs the gate on
+every push and goes red if a strategy marked `yes` fails it, and
+`main.py` exits 4 rather than start on a live port with a strategy
+marked `no`. Current results (`reports/minipropos_expectancy_spy.md`):
+
+| strategy | folds beaten | full sample | verdict |
+|---|---|---|---|
+| ema_crossover | 0/3 | no | NOT DEPLOYABLE |
+| adaptive_ema | 0/3 | no | NOT DEPLOYABLE |
+| scheduled_dca | 3/3 | yes | DEPLOYABLE (accumulated exposure vs one lot — see the report's note; not timing skill) |
+| tsmom_12_1 | 1/3 | no | NOT DEPLOYABLE (passed the research pass on SPY, failed the gate — `research/momentum_12_1_vs_tbills.md`) |
+
+## Strategy research (`research/`)
+
+No strategy is coded without a note written first from
+`research/TEMPLATE.md`: hypothesis, universe, data, cost model, folds,
+benchmark, and a pass/fail rule fixed *before* the numbers are seen.
+`python research/run_candidates.py` regenerates the notes; losers are
+kept. So far: 200-day SMA filter (FAIL everywhere), 12-1 momentum (PASS
+on SPY at the research level, FAIL at the gate), vol-target sizing (FAIL
+everywhere).
 
 ## Black-Scholes: what it does and does not do here
 
@@ -201,6 +250,25 @@ roughly 40% versus the plain crossover (standing aside entirely in some),
 at the measured cost of skipping some winning trades — volatility
 adaptation trades upside for exposure control, and none of it is evidence
 of edge.
+
+## Telegram
+
+Set `notifications.enabled: true` and export `TELEGRAM_BOT_TOKEN` /
+`TELEGRAM_CHAT_ID` (from a git-ignored `.env`; the config only names the
+variables). The bot then posts start/stop, "trading enabled", every fill,
+every risk reject, and kill-switch events, and answers from that one
+chat:
+
+| command | effect |
+|---|---|
+| `/status` `/positions` `/orders` | read-only state |
+| `/pause` / `/resume` | suppress / allow new entries (exits and risk flattening always run) |
+| `/halt CONFIRM` | trip the kill switch: cancel all, flatten (per `risk.kill_switch_flattens`), persist the marker |
+
+Nothing sent from a phone can buy, sell, or size, and a halt is cleared
+only at the keyboard (`--reset-kill-switch <name>`) so someone looks at
+the account first. With the bot on a VPS (see RUNBOOK), the phone is the
+whole day-to-day control surface.
 
 ## Tests
 
