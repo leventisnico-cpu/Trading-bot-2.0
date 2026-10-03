@@ -380,3 +380,39 @@ bt_e3fd0664de255152; AIR4 full bt_ba7d4114387ca4a0; AIR3-USD full
 bt_75114068bc1df8d5; BH SOXX full bt_f032e004010eb546 (unaligned
 bt_9c39e55a05bbd1a3), folds bt_3eb5f50997652005 / bt_8406dfe09cce1bb8 /
 bt_389b43db59037b41.
+
+## Addendum — a bear leg for AIR3 (AIR3B-PSQ, AIR3B-SSG) — FAIL
+
+Operator: "when the crash happens, we will short the market." Short sales
+are still off the table (TFSA, cash account, long-only builder), so the
+bear leg is an inverse ETF bought when the SOXX trend breaks. Two
+pre-registered variants, both keeping the AIR3 long leg unchanged:
+- AIR3B-PSQ: when SOXX close < 0.95×200d AND 50d < 200d, buy PSQ
+  (−1× Nasdaq-100) with 50% of equity; sell PSQ when SOXX close > 200d.
+- AIR3B-SSG: same trigger, SSG (−2× semiconductors) with 25% of equity.
+Benchmark: AIR3 alone. Same windows, $100k, 1+2 bp.
+
+| Window | AIR3 alone | + PSQ leg | + SSG leg |
+|---|---|---|---|
+| 2014-01 → 2018-06 | **+100%** (DD −18.8%) | +96% (DD −20.4%) | +85% (DD −24.3%) |
+| 2018-04 → 2022-08 | +56% (DD −29.4%) | **+66%** (DD −29.4%) | +59% (DD −29.4%) |
+| 2022-06 → 2026-09 | **+192%** (DD −31.7%) | +174% (DD −35.3%) | +128% (DD −43.0%) |
+| Full 2014-11 → 2026-09 | +796% (DD −31.7%), 6 trades, 83% win | +812% (DD −35.3%), 14 trades, 43% win | +555% (DD −43.0%), 14 trades, 29% win |
+
+Verdict: **FAIL for both** (PSQ 1/3 folds; SSG 0/3). The PSQ leg traded
+8 times in 12 years: one winner, the 2022 bear (+19.5%, +$29.9k), and
+seven whipsaw losers (2015, 2016, 2018, and four in late 2024 – spring
+2025, −$24.7k together). Net +$5k on a $100k start, bought with a deeper
+drawdown and a win rate cut from 83% to 43%. The −2× version loses on
+every window: leveraged inverse funds decay while the signal waits.
+AIR3's own exit (a close 5% under the 200-day) already takes the book to
+cash when the trend breaks; the data says cash is the better bear trade
+for this rule set. AIR3 stays on paper unchanged; neither bear variant is
+deployed.
+
+Astral objects: AIR3B-PSQ=41108, AIR3B-SSG=41109. Backtests: PSQ full
+bt_959f450bbd861cc1, folds bt_b59289ac7ab44e7b / bt_e5912a83e78d5c26 /
+bt_6ad0aeec879fbbca; SSG full bt_1c6c91753f98712a, folds
+bt_c00757a58b4e1e36 / bt_4452a5913d1e79ba / bt_31d7ece9dd643ce7.
+Paper note: AIR3 (saved 6054, deployment 1861) scheduled its first buy —
+16.137 SOXX at the 2026-10-05 open — off the 2026-10-01 close of 588.72.
