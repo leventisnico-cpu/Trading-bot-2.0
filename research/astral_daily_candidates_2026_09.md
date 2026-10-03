@@ -416,3 +416,45 @@ bt_6ad0aeec879fbbca; SSG full bt_1c6c91753f98712a, folds
 bt_c00757a58b4e1e36 / bt_4452a5913d1e79ba / bt_31d7ece9dd643ce7.
 Paper note: AIR3 (saved 6054, deployment 1861) scheduled its first buy —
 16.137 SOXX at the 2026-10-05 open — off the 2026-10-01 close of 588.72.
+
+## Addendum — which ETF carries the AIR3 rule best? (cross-ETF sweep)
+
+Operator: "find the one strong ETF that supports this claim and backtest
+our strategy on it." The AIR3 rule (buy when close > 1.05×200d and
+50d > 200d; sell on close < 0.95×200d; 95% of equity; no tuning) was run
+unchanged on six liquid tech/AI ETFs with history back to 2013.
+
+Full sample 2014-11 → 2026-09 ($100k, 1+2 bp):
+
+| ETF | Return | CAGR | Max DD | Closed trades | Win rate |
+|---|---|---|---|---|---|
+| **SMH** (VanEck semis) | **+1,098%** | **23.3%** | **−27.6%** | 5 | 80% |
+| SOXX (iShares semis; on paper now) | +796% | 20.3% | −31.7% | 6 | 83% |
+| QQQ | +293% | 12.2% | −21.7% | 7 | 71% |
+| VGT | +285% | 12.0% | −22.5% | 7 | 71% |
+| XSD (equal-weight semis) | +270% | 11.6% | −44.3% | 10 | 50% |
+| XLK | +238% | 10.8% | −27.0% | 7 | 71% |
+
+SMH vs SOXX, walk-forward:
+
+| Window | AIR3 on SMH | AIR3 on SOXX | Winner |
+|---|---|---|---|
+| 2014-01 → 2018-06 | **+121%** (DD −18.0%) | +100% (DD −18.8%) | SMH |
+| 2018-04 → 2022-08 | **+58%** (DD −27.6%) | +56% (DD −29.4%) | SMH |
+| 2022-06 → 2026-09 | **+304%** (DD −24.1%) | +192% (DD −31.7%) | SMH |
+| Full 2014-11 → 2026-09 | **+1,098%** (DD −27.6%) | +796% (DD −31.7%) | SMH |
+
+Verdict: **SMH carries the rule better than SOXX in 3/3 folds and the
+full sample, with a smaller drawdown in every window.** SOXX was picked on
+1-year momentum (+108% vs +85%); over twelve years the rule prefers SMH's
+heavier NVDA/TSMC weighting and fewer whipsaws (5 trades vs 6). Caveat:
+choosing the best of six instruments after the fact is a mild form of
+selection; the fold-by-fold consistency is what makes it credible.
+Proposal: move the paper deployment from SOXX to SMH (saved as
+"AIR3 SMH ride (5% band)") — operator approval required before any
+undeploy/deploy. SOXX, XSD, XLK, QQQ, VGT stay as research objects.
+
+Astral objects: SMH=41110, XSD=41111, XLK=41112, QQQ=41113, VGT=41114.
+Backtests (full): SMH bt_741fc186aeb5a5cb, XSD bt_95b3ecfb616b07d4, XLK
+bt_051fa6233bf9d339, QQQ bt_7120b3fb7ad6239d, VGT bt_65f5ba96f5b8d79a.
+SMH folds: bt_0037c4bb07ba03bf / bt_c791ed4759387a41 / bt_4a753cf579495275.
