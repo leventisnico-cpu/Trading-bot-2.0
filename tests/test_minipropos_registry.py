@@ -137,3 +137,131 @@ def test_gate_rule_is_printed(capsys, monkeypatch):
     out = capsys.readouterr().out
     assert expectancy.GATE_RULE in out
     assert "NOT DEPLOYABLE" in out
+
+
+# ------------------------------------------------- gate rule (2) + sizing
+
+def _risk_leg(gain: float, dd: float, bh_gain: float, bh_dd: float,
+              cash: float = 10_000.0) -> expectancy.Leg:
+    t = datetime(2020, 1, 1, tzinfo=timezone.utc)
+    return expectancy.Leg("x", t, t, 1, cash + gain, 0.0, dd, 0.0, 0, None,
+                          cash + bh_gain, 0.0, 0.0, False, cash=cash,
+                          gain=gain, bh_gain=bh_gain, bh_max_dd=bh_dd)
+
+
+def test_rule_two_needs_better_ratio_and_half_the_gain():
+    # 6k gain on 2k DD (3.0) vs 10k on 5k (2.0), keeps 60%: passes on (2)
+    assert _risk_leg(6_000, 2_000, 10_000, 5_000).verdict == "YES (2)"
+    # better ratio but keeps only 40% of the gain: fails
+    assert _risk_leg(4_000, 1_000, 10_000, 5_000).verdict == "no"
+    # keeps the gain share but a worse ratio: fails
+    assert _risk_leg(6_000, 4_000, 10_000, 5_000).verdict == "no"
+    # more final equity always passes on (1)
+    assert _risk_leg(11_000, 9_000, 10_000, 5_000).verdict == "YES (1)"
+
+
+def test_sitting_in_cash_never_passes():
+    assert _risk_leg(-5, 5, 10_000, 5_000).verdict == "no"
+
+
+def test_full_exposure_lot_and_forced_lot():
+    assert expectancy.lot_for(0, [99.99], 10_000.0) == 95   # 9,500 / 100.00
+    assert expectancy.lot_for(7, [99.99], 10_000.0) == 7
+    assert expectancy.exposure_lot(20_000.0, 99.99) == 190
+
+
+class _Flat:
+    strategy_id = "flat"
+
+    def __init__(self):
+        self.order_quantity = 1
+        self.position = 0
+        self.seen = []
+
+    def on_bar(self, bar):
+        self.seen.append(self.order_quantity)
+        return []
+
+    def on_own_fill(self, q, p):
+        self.position += q
+
+
+def test_compounding_lot_resizes_only_while_flat():
+    from mini_prop_os.core.types import Bar
+    inner = _Flat()
+    equity = {"v": 10_000.0}
+    w = expectancy.CompoundingLot(inner, lambda close: equity["v"])
+    t = datetime(2020, 1, 1, tzinfo=timezone.utc)
+    w.on_bar(Bar("SMH", t, 100, 100, 99.99, 99.99, 1))
+    assert inner.seen[-1] == 95
+    equity["v"] = 20_000.0
+    w.on_bar(Bar("SMH", t, 100, 100, 99.99, 99.99, 1))
+    assert inner.seen[-1] == 190                # flat again: re-sized
+    w.on_own_fill(190, 100.0)
+    equity["v"] = 40_000.0
+    w.on_bar(Bar("SMH", t, 100, 100, 99.99, 99.99, 1))
+    assert inner.seen[-1] == 190                # in the market: untouched
+    assert w.strategy_id == "flat" and w.position == 190
+
+
+def test_compounding_lot_rejects_strategy_without_a_lot():
+    class NoLot:
+        strategy_id = "x"
+        position = 0
+    with pytest.raises(ValueError):
+        expectancy.CompoundingLot(NoLot(), lambda c: 1.0)
+
+
+# ---------------------------------------------------- operator waivers
+
+_SIGNED = """waivers:
+  - strategy: air3_trend
+    symbol: SMH
+    gate_report: reports/minipropos_expectancy_smh.md
+    gate_result: "1/3 folds"
+    accepted_risk: "half the gain for half the drawdown"
+    signed_by: "{who}"
+    signed_on: "{when}"
+"""
+
+
+def _waivers(tmp_path, who="Operator", when="2026-10-05"):
+    p = tmp_path / "w.yaml"
+    p.write_text(_SIGNED.format(who=who, when=when))
+    return p
+
+
+def test_shipped_waiver_file_is_unsigned():
+    """The repo ships no waiver: only the operator signs one."""
+    assert registry.signed_waiver("air3_trend", "SMH") is None
+    assert refuse_live_reason("air3_trend", 4001, symbol="SMH") is not None
+
+
+def test_signed_waiver_clears_live_refusal_for_that_symbol_only(tmp_path):
+    p = _waivers(tmp_path)
+    assert refuse_live_reason("air3_trend", 4001, symbol="SMH",
+                              waivers_path=p) is None
+    assert refuse_live_reason("air3_trend", 4001, symbol="QQQ",
+                              waivers_path=p) is not None
+    assert refuse_live_reason("tsmom_12_1", 4001, symbol="SMH",
+                              waivers_path=p) is not None
+    assert refuse_live_reason("air3_trend", 4001, symbol=None,
+                              waivers_path=p) is not None
+
+
+@pytest.mark.parametrize("who,when", [("", "2026-10-05"),
+                                      ("Operator", ""),
+                                      ("Operator", "next monday")])
+def test_incomplete_waiver_does_not_count(tmp_path, who, when):
+    p = _waivers(tmp_path, who, when)
+    assert registry.signed_waiver("air3_trend", "SMH", p) is None
+    assert refuse_live_reason("air3_trend", 4001, symbol="SMH",
+                              waivers_path=p) is not None
+
+
+def test_missing_or_broken_waiver_file_refuses(tmp_path):
+    assert registry.signed_waiver("air3_trend", "SMH",
+                                  tmp_path / "absent.yaml") is None
+    bad = tmp_path / "bad.yaml"
+    bad.write_text("waivers: [ unclosed")
+    assert registry.signed_waiver("air3_trend", "SMH", bad) is None

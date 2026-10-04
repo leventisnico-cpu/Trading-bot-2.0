@@ -8,9 +8,12 @@ Replays daily closes through the *production* pipeline
 (strategy -> RiskGuardrails -> OMS -> simulated broker, see
 ``mini_prop_os/sim.py``) and compares the strategy with buy-and-hold of
 the same lot, bought at the first fillable open of the same window and
-never touched. The lot is the **full-exposure lot**: as many shares as
-95% of the starting cash buys at the window's first close (``--lot N``
-forces a fixed lot instead). Costs on both sides: IBKR Pro fixed
+never touched. Buy-and-hold's lot is the **full-exposure lot**: as many
+shares as 95% of the starting cash buys at the window's first close. The
+strategy starts with the same lot and is re-sized before every entry to
+95% of its *current* equity (``CompoundingLot``), so both sides are ~95%
+invested whenever they are in the market. ``--lot N`` forces one fixed
+lot on both sides instead. Costs on both sides: IBKR Pro fixed
 commission ($0.005/share, $1.00 minimum per order) and one tick of
 adverse slippage per fill.
 
@@ -107,6 +110,63 @@ def lot_for(lot: int, closes: Sequence[float], cash: float) -> int:
     if lot > 0:
         return lot
     return max(1, int((EXPOSURE * cash) // (closes[0] + TICK)))
+
+
+def exposure_lot(equity: float, close: float) -> int:
+    """Shares ``EXPOSURE`` of ``equity`` buys at ``close`` plus one tick."""
+    return max(1, int((EXPOSURE * equity) // (close + TICK)))
+
+
+#: Strategy attributes that hold the per-entry lot, in lookup order.
+LOT_ATTRS = ("order_quantity", "base_quantity")
+
+
+class CompoundingLot:
+    """Per-entry re-sizing for the full-exposure measurement.
+
+    Holding a lot fixed at the window's first close means a strategy that
+    is in cash for a bear market re-enters with the same share count it
+    left with, while buy-and-hold's dollar exposure has grown with the
+    price. Both sides should be ~95% invested whenever they are in the
+    market. So before every bar on which the strategy is flat, its lot is
+    set to the shares ``EXPOSURE`` of the account's *current* equity buys
+    at that bar's close. Once in, the lot is untouched until it is flat
+    again. This is how the Astral deployment sizes (95% of equity per
+    entry) and how the bot is meant to run live.
+
+    Wraps the strategy for the session only: ``on_bar``, ``on_own_fill``
+    and ``strategy_id`` are what ``HistoricalSession`` touches; everything
+    else is delegated.
+    """
+
+    def __init__(self, inner, equity_at) -> None:
+        attr = next((a for a in LOT_ATTRS if hasattr(inner, a)), None)
+        if attr is None:
+            raise ValueError(f"{type(inner).__name__} has no lot attribute "
+                             f"({', '.join(LOT_ATTRS)})")
+        self._inner = inner
+        self._attr = attr
+        self._equity_at = equity_at
+        self.lots: List[int] = []
+
+    def __getattr__(self, name):
+        return getattr(self._inner, name)
+
+    @property
+    def strategy_id(self) -> str:
+        return self._inner.strategy_id
+
+    def on_own_fill(self, signed_quantity: int, price: float) -> None:
+        self._inner.on_own_fill(signed_quantity, price)
+
+    def on_bar(self, bar):
+        if self._inner.position == 0 and bar.close > 0:
+            lot = exposure_lot(self._equity_at(bar.close), bar.close)
+            setattr(self._inner, self._attr, lot)
+        intents = self._inner.on_bar(bar)
+        if intents and self._inner.position == 0:
+            self.lots.append(getattr(self._inner, self._attr))
+        return intents
 
 
 # --------------------------------------------------------------- metrics
@@ -225,6 +285,10 @@ def funding_for(strategy_name: str, closes: Sequence[float], lot: int,
 def run_leg(label: str, strategy_name: str, symbol: str,
             dates: Sequence[datetime], closes: Sequence[float], lot: int,
             cash: float) -> Leg:
+    spec = get_spec(strategy_name)
+    # Full-exposure mode re-sizes every entry to current equity; a forced
+    # lot (--lot N) and accumulating strategies keep one fixed lot.
+    compounding = lot <= 0 and not spec.accumulates
     lot = lot_for(lot, closes, cash)
     commission = max(IBKR_PER_SHARE, IBKR_MIN_PER_ORDER / lot)
     cash = funding_for(strategy_name, closes, lot, cash)
@@ -232,14 +296,19 @@ def run_leg(label: str, strategy_name: str, symbol: str,
                         commission_per_unit=commission, initial_cash=cash,
                         split_fills=False)
     # Measurement, not production: caps wide enough never to bind, so
-    # the number reflects the strategy, not a risk setting. The per-order
-    # cap still equals the lot (the strategy must not size above it).
+    # the number reflects the strategy, not a risk setting. With a fixed
+    # lot the per-order cap equals the lot (the strategy must not size
+    # above it); when compounding the lot changes per entry, so the cap is
+    # as wide as the position cap and the strategy's own sizing governs.
+    order_cap = 10_000_000 if compounding else lot
     risk = RiskGuardrails(RiskConfig(
         max_position_shares=10_000_000, max_position_notional=1e12,
-        max_order_quantity=lot, max_gross_notional=1e12,
+        max_order_quantity=order_cap, max_gross_notional=1e12,
         max_daily_loss=1e12, max_daily_loss_pct=0.999))
-    strategy = get_spec(strategy_name).factory(symbol, lot, 1.0)
+    strategy = spec.factory(symbol, lot, 1.0)
     session = HistoricalSession(strategy, risk, sim_cfg)
+    if compounding:
+        session.strategy = CompoundingLot(strategy, session._equity)
     bars = bars_from_closes(list(closes), symbol, timestamps=list(dates))
     res = run_session(session, bars)
     curve = [eq for _, eq in res.equity_curve]
@@ -334,8 +403,9 @@ def exposure_note(v: Verdict) -> List[str]:
 def render(v: Verdict, symbol: str, lot: int, cash: float,
            data: Path, marked: Optional[bool]) -> str:
     n_folds = len(v.legs) - 1
-    lot_note = (f"full-exposure lot ({EXPOSURE:.0%} of ${cash:,.0f} at each "
-                f"window's first close)" if lot <= 0 else f"fixed lot {lot}")
+    lot_note = (f"{EXPOSURE:.0%} of equity per entry; lot column = B&H's "
+                f"lot at the window's first close" if lot <= 0
+                else f"fixed lot {lot}")
     out = [
         f"## {v.strategy} on {symbol} ({lot_note})",
         "",

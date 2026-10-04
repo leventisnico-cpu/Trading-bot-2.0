@@ -115,21 +115,44 @@ python scripts/expectancy.py --strategy adaptive_ema --symbol SPY \
 
 Replays daily closes through the production pipeline with IBKR costs and
 prints, per walk-forward fold and for the full sample, final $, CAGR,
-max drawdown, round trips, win rate, and buy-and-hold of the same lot.
-The rule is hard-coded and printed: **DEPLOYABLE only if final equity
-beats buy-and-hold of the same lot in ≥ 2 of 3 folds AND on the full
-sample.** Every strategy module carries a `DEPLOYABLE: yes|no` line in
-its docstring; `.github/workflows/expectancy.yml` re-runs the gate on
-every push and goes red if a strategy marked `yes` fails it, and
-`main.py` exits 4 rather than start on a live port with a strategy
-marked `no`. Current results (`reports/minipropos_expectancy_spy.md`):
+max drawdown, gain per dollar of drawdown, round trips, win rate, and
+buy-and-hold of the same starting lot. Both sides start 95% invested:
+buy-and-hold buys once and holds, and the strategy's lot is re-sized to
+95% of its current equity before every entry (`--lot N` forces a fixed
+lot instead). The rule is hard-coded and printed:
 
-| strategy | folds beaten | full sample | verdict |
+> **DEPLOYABLE only if, in ≥ 2 of 3 walk-forward folds AND on the full
+> sample, the strategy either (1) ends with more equity than
+> buy-and-hold, or (2) earns more per dollar of maximum drawdown than
+> buy-and-hold while keeping at least half of buy-and-hold's gain.**
+
+Rule (2) lets a rule that is in cash through bear markets pass if it
+pays for the missed upside with a clearly smaller drawdown. Sitting in
+cash earns nothing and fails both rules.
+
+Every strategy module carries a `DEPLOYABLE: yes|no` line in its
+docstring; `.github/workflows/expectancy.yml` re-runs the gate on every
+push and goes red if a strategy marked `yes` fails it. `main.py` exits 4
+rather than start on a live port unless the strategy is marked `yes` or
+the operator has signed a waiver for that strategy on that symbol in
+`deploy/waivers/operator_waivers.yaml`. The repo ships with no waiver;
+only the operator signs one. A waiver never flips the marker, so the
+gate's verdict stays on record.
+
+Current results on SPY (`reports/minipropos_expectancy_spy.md`):
+
+| strategy | folds passed | full sample | verdict |
 |---|---|---|---|
 | ema_crossover | 0/3 | no | NOT DEPLOYABLE |
 | adaptive_ema | 0/3 | no | NOT DEPLOYABLE |
-| scheduled_dca | 3/3 | yes | DEPLOYABLE (accumulated exposure vs one lot — see the report's note; not timing skill) |
-| tsmom_12_1 | 1/3 | no | NOT DEPLOYABLE (passed the research pass on SPY, failed the gate — `research/momentum_12_1_vs_tbills.md`) |
+| scheduled_dca | 3/3 | YES (1) | DEPLOYABLE (accumulated exposure vs one lot — see the report's note; not timing skill) |
+| tsmom_12_1 | 2/3 | no | NOT DEPLOYABLE (`research/momentum_12_1_vs_tbills.md`) |
+| air3_trend | 2/3 | YES (2) | passes on SPY; marked `no` because the bot runs it on SMH |
+
+AIR3 on SMH (`reports/minipropos_expectancy_smh.md`) passes 1/3 folds
+and fails the full sample: it keeps under half of SMH's gain in
+2013–2020 and 2020–2026, and its gain per dollar of drawdown is 3.71
+against 3.72. NOT DEPLOYABLE on SMH. See `docs/LIVE_READINESS.md`.
 
 ## Strategy research (`research/`)
 

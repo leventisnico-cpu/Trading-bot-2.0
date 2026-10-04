@@ -136,7 +136,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             marker.get("tripped_at", "unknown time"),
             marker.get("reason", "no reason recorded"))
         return 3
-    refusal = refuse_live_reason(cfg.strategy.name, cfg.connection.port)
+    refusal = refuse_live_reason(cfg.strategy.name, cfg.connection.port,
+                                 symbol=cfg.contract.symbol)
     if refusal is not None:
         log.critical("REFUSING TO START: %s", refusal)
         return 4

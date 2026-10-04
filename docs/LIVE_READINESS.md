@@ -11,7 +11,7 @@ operator signs off per the orders below.
 |---|---|---|---|
 | Astral paper | saved strategy 6422 "AIR3 SMH ride (5% band)", deployment 1924, $870, fractional shares | **running** since 2026-10-04 04:08 UTC; first signal evaluated at the Monday close | — |
 | IBKR paper via this repo | `mini_prop_os` with `deploy/config.tfsa-paper-air3.yaml` (SMH, daily bars, one share, port 4002) | **ready**; needs IB Gateway on the operator's machine | operator (see Monday checklist) |
-| IBKR live | either rail pointed at the live account | **blocked** twice: `main.py` exits 4 because `air3_trend` is `DEPLOYABLE: no`, and no live port may appear in a config until the live-readiness order is signed | operator, by order |
+| IBKR live | the bot pointed at the live account | **blocked** twice: `main.py` exits 4 because `air3_trend` fails the gate on SMH and no waiver is signed, and no live port may appear in a config until the live-readiness order is signed | operator, by order (route 1 or 2 below) |
 
 ## Monday checklist (operator actions, in order)
 
@@ -48,69 +48,74 @@ operator signs off per the orders below.
 7. **Compare the two paper rails** after the first fill: Astral's fill
    price and quantity versus `state/executions.jsonl`. They should differ
    only by fractional-versus-whole-share sizing.
-8. **Decide the gate question below.** Nothing goes live before that.
+8. **Pick route 1 or route 2 below.** Nothing goes live before that.
 
 ## The gate question (operator decision)
 
-`scripts/expectancy.py` is the repo's law for live trading: a strategy is
-deployable only if its final equity beats buy-and-hold of the same lot in
-at least 2 of 3 walk-forward folds and on the full sample. AIR3 was run
-through it on SMH (`reports/minipropos_expectancy_smh.md`):
+**Brokerage answer (2026-10-04):** trade through Interactive Brokers,
+using this repo's bot. The TFSA is tax-free, IB Gateway connects to the
+bot directly, and Astral cannot reach IBKR at all. Its broker list has no
+Interactive Brokers. Moomoo only makes sense if money is moved there.
 
-| window | AIR3 final | B&H final | AIR3 maxDD | B&H maxDD | beats B&H |
-|---|---|---|---|---|---|
-| fold 1 (2007-04 to 2013-10) | 10,020 | 10,026 | 0.6% | 1.3% | no |
-| fold 2 (2013-10 to 2020-04) | 10,216 | 10,354 | 2.1% | 2.4% | no |
-| fold 3 (2020-04 to 2026-10) | 14,734 | 15,733 | 10.9% | 10.2% | no |
-| full sample | 15,453 | 16,132 | 10.4% | 10.0% | no |
+**The law was amended (order C, 2026-10-04).** `scripts/expectancy.py`
+now passes a window if the strategy either (1) ends with more equity
+than buy-and-hold, or (2) earns more per dollar of maximum drawdown
+than buy-and-hold while keeping at least half of its gain. Both sides
+start 95% invested, and the strategy re-sizes each entry to 95% of its
+current equity, the way Astral sizes it. Deployable still means 2 of 3
+folds plus the full sample.
 
-Result: 0 of 3 folds, full sample no, **NOT DEPLOYABLE**, and the module
-is honestly marked `DEPLOYABLE: no`. This is not a bug. AIR3 was chosen
-for its drawdown, and a rule that is in cash through every bear market
-loses to holding on final equity by construction. Two caveats on the
-table above:
+AIR3 under the amended law (`reports/minipropos_expectancy_smh.md`,
+`reports/minipropos_expectancy_spy.md`), $10,000 start:
 
-- The gate holds a constant 10-share lot against $10,000 of cash, so
-  percentages are diluted; the Astral backtests size 95% of equity and
-  show the real shape (full sample +1,144% vs +2,212% buy-and-hold, max
-  drawdown −27.6% vs −44.9%, drawdown lower in all three folds).
-- In the gate's fold 3 the drawdown advantage disappears: both the rule
-  and buy-and-hold have their worst loss in the June-to-July 2026 dip,
-  which AIR3 held through because the price never reached 0.95 × SMA200.
+| symbol | window | AIR3 gain/DD | B&H gain/DD | AIR3 keeps of B&H gain | AIR3 maxDD | B&H maxDD | passes |
+|---|---|---|---|---|---|---|---|
+| SMH | fold 1 (2007–2013) | 0.53 | 0.21 | more than B&H | 26.8% | 61.4% | YES (1) |
+| SMH | fold 2 (2013–2020) | 1.14 | 1.39 | 46% | 27.7% | 33.2% | no |
+| SMH | fold 3 (2020–2026) | 3.06 | 3.48 | 37% | 24.2% | 44.4% | no |
+| SMH | full sample | 3.71 | 3.72 | 53% | 30.1% | 61.4% | no |
+| SPY | fold 1 (1999–2008) | 3.08 | 0.44 | more than B&H | 12.4% | 45.5% | YES (1) |
+| SPY | fold 2 (2008–2017) | 3.81 | 2.19 | 96% | 14.4% | 48.8% | YES (2) |
+| SPY | fold 3 (2017–2026) | 4.02 | 4.94 | 40% | 19.0% | 32.5% | no |
+| SPY | full sample | 6.95 | 6.13 | 77% | 18.9% | 53.1% | YES (2) |
 
-The operator has three ways forward. Pick one by order; the repo will
-not pick for you.
+**AIR3 passes the law on SPY and fails it on SMH.** SMH's run since
+2013 has been so strong that being in cash for any of it costs more
+than half the gain. The module stays marked `DEPLOYABLE: no`, because
+the bot is configured for SMH. The law was not loosened a third time to
+force a pass. A gate that moves until the answer is yes protects
+nothing.
 
-**A. Keep the gate as the law.** AIR3 never runs live through this bot.
-Live exposure, if any, goes through Astral with the IBKR account
-connected (option B below) or is manual.
+**Two ways for AIR3 to trade live through the bot. Both are the
+operator's choice, and neither is made by the assistant:**
 
-**B. Execute the signals by hand.** Checked 2026-10-04: Astral's broker
-portal lists Kraken, Webull, Moomoo, E*TRADE, Public, Coinbase,
-Tastytrade and Alpaca Paper, not Interactive Brokers, so the Astral
-deployment cannot be pointed at the TFSA. What Astral can do is keep
-producing the signal. The daily watch routine reports each order the
-paper deployment schedules (after the 16:00 ET close) and the operator
-places the same order in IBKR before the next open. One share, a handful
-of orders a year, and the gate is untouched because the gate governs the
-bot, not the human. This is the only way the TFSA trades AIR3 live
-without changing the repo's rules.
+1. **AIR3 on SPY, gate-approved.** Order it, and the assistant adds a
+   symbol-scoped approval (AIR3 deployable on SPY only) and a SPY AIR3
+   config. The Astral paper deployment would be re-pointed to SPY for
+   the rehearsal (preview first, then your approval). SPY closed at
+   about $770 on 2026-08-28, so $870 buys one share (about 88% of
+   equity).
+2. **AIR3 on SMH, operator waiver.** Copy the template in
+   `deploy/waivers/operator_waivers.yaml` into the `waivers:` list. Fill
+   in every field, write your own name in `signed_by` and the date in
+   `signed_on`, and commit. `main.py` then accepts a live port for
+   `air3_trend` on SMH only. The gate keeps reporting NOT DEPLOYABLE
+   on SMH, and CI keeps running it. The repo ships with the list empty.
 
-**C. Amend the gate (an order, not a code change I make alone).** Proposed
-wording, to be measured before adoption: *DEPLOYABLE if, in at least 2 of
-3 folds and on the full sample, final equity is at least 60% of
-buy-and-hold's and max drawdown is at most 75% of buy-and-hold's.* On the
-SMH numbers above AIR3 would pass folds 1 and 2 on drawdown and fail fold
-3, so even this gate would not pass it today. The operator should know
-that before choosing C.
+Either way the last rail is unchanged. The live port (4001) goes into a
+copy of the config under `state/`, which is git-ignored, by the
+operator, after the paper rehearsal. The checked-in configs stay paper.
 
-**Recommendation:** stay on both paper rails until the first full
-signal has been observed (entry on Monday's close if in regime, the
-fill, and at least two weeks of daily evaluations), then decide A/B/C
-with a real fill in hand. If the operator wants the TFSA in the trade
-sooner, B is available from the first signal: one share, placed by hand
-before the open, after the daily watch reports the order. Monday's
-funding does not need to be at risk on Monday.
+**Sizing on the live bot:** with $870 the bot buys one whole share
+(about 72% of equity) because the config's lot is fixed at 1. The gate
+measures 95% sizing. Fractional shares in IBKR, if enabled on the TFSA,
+would close that gap. Until then the live position is a little smaller
+than the backtests.
+
+**Recommendation:** keep both paper rails running through the first
+signal and fill. Then pick route 1 or route 2. Route 1 keeps every rule
+of the repo intact. Route 2 keeps the asset you chose and studied, with
+your signature on the trade-off.
 
 ## Hard rules that do not change with the decision
 

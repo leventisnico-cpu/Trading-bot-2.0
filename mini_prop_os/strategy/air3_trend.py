@@ -2,13 +2,15 @@
 
 DEPLOYABLE: no
     Pre-registered on Astral (research/astral_daily_candidates_2026_09.md)
-    and chosen for its drawdown, not its return: on SMH 2014-2026 it
-    made about half of buy-and-hold with a worst drawdown of -28%
-    against -45%. Order 3's gate (scripts/expectancy.py) measures final
-    equity against holding the same lot, which a rule that is in cash
-    through every bear market loses by construction. See
-    reports/minipropos_expectancy_smh.md for the measured numbers and
-    docs/LIVE_READINESS.md for the decision this leaves the operator.
+    and chosen for its drawdown, not its return. Under the expectancy
+    gate (scripts/expectancy.py: beat buy-and-hold, or earn more per
+    dollar of drawdown while keeping half its gain, with entries sized to
+    95% of current equity) it PASSES on SPY (2/3 folds + full sample) and
+    FAILS on SMH (1/3 folds; full-sample gain/DD 3.71 vs 3.72, and under
+    half of SMH's gain in 2013-2020 and 2020-2026). The bot runs it on
+    SMH, so it stays marked no. A live start on SMH needs the operator's
+    signed waiver in deploy/waivers/operator_waivers.yaml; see
+    reports/minipropos_expectancy_smh.md and docs/LIVE_READINESS.md.
 
 Rules (daily bars; the same rule that runs on Astral paper as saved
 strategy 6422, deployment 1924)

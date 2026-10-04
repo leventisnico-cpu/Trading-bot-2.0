@@ -7,9 +7,12 @@ Every concrete strategy module declares, in its module docstring, a line::
 
 ``yes`` may only be written after ``scripts/expectancy.py`` passes for the
 strategy; ``.github/workflows/expectancy.yml`` re-runs the gate on every
-push and fails the build if a strategy marked ``yes`` no longer beats
-buy-and-hold. ``main.py`` refuses to start on a live port unless the
-configured strategy is marked ``yes`` (see :func:`refuse_live_reason`).
+push and fails the build if a strategy marked ``yes`` no longer passes.
+``main.py`` refuses to start on a live port unless the configured strategy
+is marked ``yes`` or the operator has signed a waiver for that strategy on
+that symbol in ``deploy/waivers/operator_waivers.yaml`` (see
+:func:`refuse_live_reason`). A waiver never changes the marker: the gate's
+verdict stays on record and the operator's decision sits beside it.
 
 A missing marker counts as **not** deployable.
 """
@@ -19,6 +22,7 @@ from __future__ import annotations
 import importlib
 import re
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from typing import Callable, Dict, Optional, Tuple
 
@@ -133,18 +137,63 @@ def unregistered_strategy_modules() -> Tuple[str, ...]:
         if p.stem not in NON_STRATEGY_MODULES and p.stem not in known))
 
 
-def refuse_live_reason(strategy_name: str, port: int) -> Optional[str]:
+#: Operator-signed waivers for strategies that fail the gate.
+WAIVERS_PATH = (Path(__file__).resolve().parents[2] / "deploy" / "waivers"
+                / "operator_waivers.yaml")
+WAIVER_FIELDS = ("strategy", "symbol", "gate_report", "gate_result",
+                 "accepted_risk", "signed_by", "signed_on")
+
+
+def signed_waiver(strategy_name: str, symbol: Optional[str],
+                  path: Optional[Path] = None) -> Optional[dict]:
+    """The operator's signed waiver for ``strategy_name`` on ``symbol``,
+    or None. Every field must be non-empty, ``signed_on`` a real date,
+    and strategy and symbol must match exactly. No symbol, no waiver."""
+    if not symbol:
+        return None
+    path = WAIVERS_PATH if path is None else path
+    try:
+        import yaml
+    except ImportError:
+        return None
+    try:
+        data = yaml.safe_load(path.read_text()) or {}
+    except (OSError, ValueError, yaml.YAMLError):
+        return None
+    entries = data.get("waivers") if isinstance(data, dict) else None
+    for w in entries or []:
+        if not isinstance(w, dict):
+            continue
+        if any(not str(w.get(f) or "").strip() for f in WAIVER_FIELDS):
+            continue
+        if (str(w["strategy"]) != strategy_name
+                or str(w["symbol"]).upper() != symbol.upper()):
+            continue
+        try:
+            date.fromisoformat(str(w["signed_on"]))
+        except ValueError:
+            continue
+        return w
+    return None
+
+
+def refuse_live_reason(strategy_name: str, port: int,
+                       symbol: Optional[str] = None,
+                       waivers_path: Optional[Path] = None) -> Optional[str]:
     """Why the bot must not start with ``strategy_name`` on ``port``, or
-    None if starting is allowed. Paper ports are always allowed."""
+    None if starting is allowed. Paper ports are always allowed. A live
+    port needs the strategy marked ``DEPLOYABLE: yes`` (it passed the
+    gate) or an operator-signed waiver for this strategy on ``symbol``."""
     if not is_live_port(port):
         return None
     try:
         ok = is_deployable(strategy_name)
     except KeyError as exc:
         return str(exc)
-    if not ok:
-        return (f"strategy {strategy_name!r} is not marked DEPLOYABLE: yes "
-                f"(it has not beaten buy-and-hold under "
-                f"scripts/expectancy.py); refusing to start on LIVE port "
-                f"{port}. Use a paper port (7497/4002).")
-    return None
+    if ok or signed_waiver(strategy_name, symbol, waivers_path) is not None:
+        return None
+    return (f"strategy {strategy_name!r} is not marked DEPLOYABLE: yes "
+            f"(it has not passed scripts/expectancy.py) and has no "
+            f"operator-signed waiver for {symbol or 'this symbol'} in "
+            f"deploy/waivers/operator_waivers.yaml; refusing to start on LIVE port "
+            f"{port}. Use a paper port (7497/4002).")

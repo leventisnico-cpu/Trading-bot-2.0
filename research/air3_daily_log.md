@@ -102,3 +102,21 @@ laid out in `docs/LIVE_READINESS.md` with a Monday checklist. 12 new
 tests; suite green; CI's `--all` gate on SPY stays consistent.
 
 ## Daily entries
+
+## Gate amendment, step 2: per-entry sizing (2026-10-04)
+
+The gate now re-sizes each strategy entry to 95% of current equity
+(`CompoundingLot` in `scripts/expectancy.py`), as Astral does. Results:
+
+| symbol | folds passed | full sample | verdict |
+|---|---|---|---|
+| SMH | 1/3 | no (gain/DD 3.71 vs 3.72) | NOT DEPLOYABLE |
+| SPY | 2/3 | YES (2) (6.95 vs 6.13, 77% of B&H gain, DD 18.9% vs 53.1%) | DEPLOYABLE |
+
+The rule was not loosened further. On SMH AIR3 keeps under half of
+buy-and-hold's gain in 2013–2020 and 2020–2026. The module stays
+`DEPLOYABLE: no`. Two operator routes are in `docs/LIVE_READINESS.md`:
+run AIR3 on SPY with a gate-backed approval, or sign a waiver for SMH in
+`deploy/waivers/operator_waivers.yaml`. `main.py` now accepts a live port
+only for a passing strategy or a signed waiver matching the strategy and
+symbol. The repo ships no waiver.
