@@ -2,9 +2,10 @@ name: expectancy-gate
 # No strategy ships without passing the gate against buy-and-hold, out of
 # sample, across walk-forward folds: more final equity, or more gain per
 # dollar of drawdown while keeping half of buy-and-hold's gain. This job
-# runs scripts/expectancy.py for every registered strategy and fails the build if a strategy whose
-# module docstring says "DEPLOYABLE: yes" does not pass the gate, or if a
-# strategy module exists that is not registered (and so never faced it).
+# runs scripts/expectancy.py for every registered strategy and fails the
+# build if a strategy whose module docstring says "DEPLOYABLE: yes" does
+# not pass the gate, or if a strategy module exists that is not
+# registered (and so never faced it).
 on:
   push:
   pull_request:

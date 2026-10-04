@@ -101,9 +101,10 @@ operator's decision:**
    of `refuse_live_reason` or `main.py`'s exit code 4 as a blocker. A
    waiver path was built and then withdrawn on 2026-10-04 for that
    reason. To take this route the operator amends that rule in their own
-   commit, saying SMH may run live with a signed waiver. The assistant
-   then adds a hardened waiver: no future or placeholder signatures, a
-   real gate report, and owner-only review of the waiver folder. The
+   commit, saying SMH may run live with a signed waiver. Only after that
+   can a waiver be built, and it would need to refuse future or
+   placeholder signatures, cite a real gate report, and put the waiver
+   folder under owner-only review. No such code exists today. The
    other route is to place the signals by hand, as option B above
    describes.
 
