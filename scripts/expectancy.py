@@ -1,26 +1,37 @@
 #!/usr/bin/env python3
-"""Expectancy gate: does a strategy beat holding the same lot?
+"""Expectancy gate: does a strategy earn its deployment against buy-and-hold?
 
-    python scripts/expectancy.py --strategy adaptive_ema --symbol SPY \\
+    python scripts/expectancy.py --strategy air3_trend --symbol SMH \\
         --data data/prices_us.csv --folds 3
 
-Replays daily adjusted closes through the *production* pipeline
+Replays daily closes through the *production* pipeline
 (strategy -> RiskGuardrails -> OMS -> simulated broker, see
-``mini_prop_os/sim.py``) and compares the strategy's final equity with
-buy-and-hold of the same lot, bought at the first fillable open of the
-same window and never touched. Costs on both sides: IBKR Pro fixed
+``mini_prop_os/sim.py``) and compares the strategy with buy-and-hold of
+the same lot, bought at the first fillable open of the same window and
+never touched. The lot is the **full-exposure lot**: as many shares as
+95% of the starting cash buys at the window's first close (``--lot N``
+forces a fixed lot instead). Costs on both sides: IBKR Pro fixed
 commission ($0.005/share, $1.00 minimum per order) and one tick of
 adverse slippage per fill.
 
 GATE RULE (hard-coded, printed on every run):
 
-    DEPLOYABLE only if the strategy's final equity beats buy-and-hold of
-    the same lot in >= 2 of 3 walk-forward folds AND on the full sample.
+    DEPLOYABLE only if, in >= 2 of 3 walk-forward folds AND on the full
+    sample, the strategy either (1) ends with more equity than buy-and-hold
+    of the same lot, or (2) earns more per dollar of maximum drawdown than
+    buy-and-hold while keeping at least half of buy-and-hold's gain.
+
+Rule (1) is the original law: beat the market. Rule (2) admits a rule
+that deliberately gives up part of a bull market to be in cash through
+bear markets, which can never pass (1) by construction; it must still
+pay for that with a better return per unit of drawdown and must not
+dilute the gain below half. A strategy that merely sits in cash earns a
+negative ratio (costs, no gain) and fails both.
 
 Exit code 0 = deployable, 1 = not. ``--all`` runs every registered
-strategy and exits 1 if any strategy whose module docstring says
-``DEPLOYABLE: yes`` fails the gate (this is what CI runs), or if a
-strategy module exists that the registry does not know.
+strategy on ``--symbol`` and exits 1 if any strategy whose module
+docstring says ``DEPLOYABLE: yes`` fails the gate (this is what CI runs),
+or if a strategy module exists that the registry does not know.
 """
 
 from __future__ import annotations
@@ -44,13 +55,23 @@ from mini_prop_os.sim import (HistoricalSession, SimConfig,  # noqa: E402
 from mini_prop_os.strategy.registry import (  # noqa: E402
     get_spec, is_deployable, strategy_names, unregistered_strategy_modules)
 
-GATE_RULE = ("DEPLOYABLE only if final equity beats buy-and-hold of the "
-             "same lot in >= 2 of 3 walk-forward folds AND on the full "
-             "sample.")
+GATE_RULE = ("DEPLOYABLE only if, in >= 2 of 3 walk-forward folds AND on the "
+             "full sample, the strategy either (1) ends with more equity "
+             "than buy-and-hold of the same lot, or (2) earns more per "
+             "dollar of maximum drawdown than buy-and-hold while keeping at "
+             "least half of buy-and-hold's gain.")
 MIN_FOLD_WINS = 2
 IBKR_PER_SHARE = 0.005
 IBKR_MIN_PER_ORDER = 1.00
 TICK = 0.01
+#: Fraction of starting cash the full-exposure lot commits.
+EXPOSURE = 0.95
+#: Rule (2): the strategy must keep at least this share of B&H's gain
+#: (only binds in windows where buy-and-hold gained).
+RISK_SHARE = 0.5
+#: Rule (2): drawdown floor (fraction of cash) so a tiny drawdown cannot
+#: turn a tiny gain into an infinite ratio.
+DD_FLOOR = 0.001
 
 
 # ------------------------------------------------------------------ data
@@ -80,6 +101,14 @@ def fold_slices(n: int, folds: int) -> List[Tuple[int, int]]:
     return [(edges[i], edges[i + 1]) for i in range(folds)]
 
 
+def lot_for(lot: int, closes: Sequence[float], cash: float) -> int:
+    """``lot`` if forced (> 0), else the full-exposure lot: the shares
+    ``EXPOSURE * cash`` buys at the window's first fillable price."""
+    if lot > 0:
+        return lot
+    return max(1, int((EXPOSURE * cash) // (closes[0] + TICK)))
+
+
 # --------------------------------------------------------------- metrics
 
 @dataclass
@@ -100,10 +129,51 @@ class Leg:
     kill_tripped: bool
     cash: float = 0.0
     final_shares: int = 0
+    lot: int = 0
+    #: Rule (2) inputs: gain and max drawdown in currency, both sides.
+    gain: Optional[float] = None
+    bh_gain: Optional[float] = None
+    bh_max_dd: Optional[float] = None
 
     @property
     def beats(self) -> bool:
+        """Rule (1): more final equity than buy-and-hold."""
         return self.final > self.bh_final
+
+    @property
+    def ratio(self) -> Optional[float]:
+        if self.gain is None:
+            return None
+        return self.gain / max(self.max_dd, DD_FLOOR * self.cash)
+
+    @property
+    def bh_ratio(self) -> Optional[float]:
+        if self.bh_gain is None or self.bh_max_dd is None:
+            return None
+        return self.bh_gain / max(self.bh_max_dd, DD_FLOOR * self.cash)
+
+    @property
+    def beats_risk_adjusted(self) -> bool:
+        """Rule (2): better gain per dollar of drawdown than buy-and-hold,
+        keeping at least ``RISK_SHARE`` of buy-and-hold's gain when it
+        gained."""
+        if self.ratio is None or self.bh_ratio is None:
+            return False
+        assert self.gain is not None and self.bh_gain is not None
+        keeps_share = self.bh_gain <= 0 or self.gain >= RISK_SHARE * self.bh_gain
+        return self.ratio > self.bh_ratio and keeps_share
+
+    @property
+    def passes(self) -> bool:
+        return self.beats or self.beats_risk_adjusted
+
+    @property
+    def verdict(self) -> str:
+        if self.beats:
+            return "YES (1)"
+        if self.beats_risk_adjusted:
+            return "YES (2)"
+        return "no"
 
 
 def cagr(initial: float, final: float, start: datetime, end: datetime) -> float:
@@ -119,6 +189,14 @@ def drawdown_pct(curve: Sequence[float]) -> float:
         peak = max(peak, eq)
         if peak > 0:
             dd = max(dd, (peak - eq) / peak)
+    return dd
+
+
+def drawdown_abs(curve: Sequence[float]) -> float:
+    peak, dd = -math.inf, 0.0
+    for eq in curve:
+        peak = max(peak, eq)
+        dd = max(dd, peak - eq)
     return dd
 
 
@@ -147,6 +225,7 @@ def funding_for(strategy_name: str, closes: Sequence[float], lot: int,
 def run_leg(label: str, strategy_name: str, symbol: str,
             dates: Sequence[datetime], closes: Sequence[float], lot: int,
             cash: float) -> Leg:
+    lot = lot_for(lot, closes, cash)
     commission = max(IBKR_PER_SHARE, IBKR_MIN_PER_ORDER / lot)
     cash = funding_for(strategy_name, closes, lot, cash)
     sim_cfg = SimConfig(multiplier=1.0, tick_size=TICK, slippage_ticks=1,
@@ -174,7 +253,9 @@ def run_leg(label: str, strategy_name: str, symbol: str,
         bh_final=bh_final, bh_cagr=cagr(cash, bh_final, dates[0], dates[-1]),
         bh_max_dd_pct=drawdown_pct(bh_curve),
         kill_tripped=res.kill_switch_tripped, cash=cash,
-        final_shares=res.final_position)
+        final_shares=res.final_position, lot=lot,
+        gain=res.final_equity - cash, bh_gain=bh_final - cash,
+        bh_max_dd=drawdown_abs(bh_curve))
 
 
 @dataclass
@@ -195,11 +276,11 @@ def evaluate(strategy_name: str, symbol: str, dates: Sequence[datetime],
                             dates[a:b], closes[a:b], lot, cash))
     full = run_leg("full sample", strategy_name, symbol, dates, closes,
                    lot, cash)
-    fold_wins = sum(1 for leg in legs if leg.beats)
+    fold_wins = sum(1 for leg in legs if leg.passes)
     legs.append(full)
     needed = MIN_FOLD_WINS if folds == 3 else math.ceil(2 * folds / 3)
-    return Verdict(strategy_name, legs, fold_wins >= needed and full.beats,
-                   fold_wins, full.beats)
+    return Verdict(strategy_name, legs, fold_wins >= needed and full.passes,
+                   fold_wins, full.passes)
 
 
 # -------------------------------------------------------------- reporting
@@ -209,20 +290,26 @@ def fmt_pct(x: Optional[float]) -> str:
         else f"{x:.1%}"
 
 
+def fmt_ratio(x: Optional[float]) -> str:
+    return "-" if x is None else f"{x:.2f}"
+
+
 def table(v: Verdict) -> List[str]:
     lines = [
-        "| window | dates | bars | final $ | CAGR | maxDD | trips | win% "
-        "| B&H final $ | B&H CAGR | B&H maxDD | beats B&H |",
-        "|---|---|---|---|---|---|---|---|---|---|---|---|",
+        "| window | dates | lot | final $ | CAGR | maxDD | gain/DD | trips "
+        "| win% | B&H final $ | B&H CAGR | B&H maxDD | B&H gain/DD | passes |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for leg in v.legs:
         lines.append(
             f"| {leg.label} | {leg.start:%Y-%m-%d}–{leg.end:%Y-%m-%d} | "
-            f"{leg.bars} | {leg.final:,.0f} | {fmt_pct(leg.cagr)} | "
-            f"{leg.max_dd:,.0f} ({fmt_pct(leg.max_dd_pct)}) | {leg.trips} | "
+            f"{leg.lot} | {leg.final:,.0f} | {fmt_pct(leg.cagr)} | "
+            f"{leg.max_dd:,.0f} ({fmt_pct(leg.max_dd_pct)}) | "
+            f"{fmt_ratio(leg.ratio)} | {leg.trips} | "
             f"{fmt_pct(leg.win_rate)} | {leg.bh_final:,.0f} | "
-            f"{fmt_pct(leg.bh_cagr)} | {fmt_pct(leg.bh_max_dd_pct)} | "
-            f"{'YES' if leg.beats else 'no'}"
+            f"{fmt_pct(leg.bh_cagr)} | "
+            f"{leg.bh_max_dd or 0:,.0f} ({fmt_pct(leg.bh_max_dd_pct)}) | "
+            f"{fmt_ratio(leg.bh_ratio)} | {leg.verdict}"
             f"{' (kill switch)' if leg.kill_tripped else ''} |")
     return lines
 
@@ -247,21 +334,25 @@ def exposure_note(v: Verdict) -> List[str]:
 def render(v: Verdict, symbol: str, lot: int, cash: float,
            data: Path, marked: Optional[bool]) -> str:
     n_folds = len(v.legs) - 1
+    lot_note = (f"full-exposure lot ({EXPOSURE:.0%} of ${cash:,.0f} at each "
+                f"window's first close)" if lot <= 0 else f"fixed lot {lot}")
     out = [
-        f"## {v.strategy} on {symbol} (lot {lot}, ${cash:,.0f} start)",
+        f"## {v.strategy} on {symbol} ({lot_note})",
         "",
         f"Data: `{data.relative_to(REPO) if data.is_relative_to(REPO) else data}`"
         f" · {v.legs[-1].start:%Y-%m-%d} → {v.legs[-1].end:%Y-%m-%d} · "
         f"{n_folds} walk-forward folds · costs: IBKR ${IBKR_PER_SHARE}/share "
         f"(min ${IBKR_MIN_PER_ORDER:.2f}/order) + {TICK} adverse slippage "
-        "per fill, both sides.",
+        "per fill, both sides. gain/DD = (final − start) / max drawdown in "
+        "dollars; passes = YES (1) more equity than B&H, YES (2) better "
+        f"gain/DD than B&H while keeping ≥ {RISK_SHARE:.0%} of B&H's gain.",
         "",
         *table(v),
         *exposure_note(v),
         "",
         f"Gate: {GATE_RULE}",
-        f"Result: beats B&H in {v.fold_wins}/{n_folds} folds, full sample "
-        f"{'YES' if v.full_beats else 'no'} → "
+        f"Result: passes in {v.fold_wins}/{n_folds} folds, full sample "
+        f"{v.legs[-1].verdict} → "
         f"**{'DEPLOYABLE' if v.deployable else 'NOT DEPLOYABLE'}**"
         + ("" if marked is None else
            f" (docstring marks it DEPLOYABLE: {'yes' if marked else 'no'}"
@@ -277,10 +368,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--all", action="store_true",
                     help="run every registered strategy; fail if one marked "
                          "DEPLOYABLE: yes does not pass (CI mode)")
-    ap.add_argument("--symbol", default="SPY")
+    ap.add_argument("--symbol", default="SPY",
+                    help="instrument column in --data")
     ap.add_argument("--data", type=Path, default=REPO / "data/prices_us.csv")
     ap.add_argument("--folds", type=int, default=3)
-    ap.add_argument("--lot", type=int, default=10, help="shares per lot")
+    ap.add_argument("--lot", type=int, default=0,
+                    help="shares per lot; 0 = full-exposure lot (default)")
     ap.add_argument("--cash", type=float, default=10_000.0)
     ap.add_argument("--report", type=Path, default=None,
                     help="write a markdown report here")
@@ -290,17 +383,20 @@ def main(argv: Optional[List[str]] = None) -> int:
     if not args.all and not args.strategy:
         ap.error("--strategy NAME or --all")
 
-    dates, closes = load_closes(args.data, args.symbol)
     names = list(strategy_names()) if args.all else [args.strategy]
     print(f"GATE: {GATE_RULE}\n")
     sections: List[str] = []
     rc = 0
+    loaded: dict = {}
     for name in names:
+        symbol = args.symbol
+        if symbol not in loaded:
+            loaded[symbol] = load_closes(args.data, symbol)
+        dates, closes = loaded[symbol]
         marked = is_deployable(name)
-        v = evaluate(name, args.symbol, dates, closes, args.folds, args.lot,
+        v = evaluate(name, symbol, dates, closes, args.folds, args.lot,
                      args.cash)
-        section = render(v, args.symbol, args.lot, args.cash, args.data,
-                         marked)
+        section = render(v, symbol, args.lot, args.cash, args.data, marked)
         sections.append(section)
         print(section, "\n")
         if args.all:
@@ -318,11 +414,13 @@ def main(argv: Optional[List[str]] = None) -> int:
             rc = 1
     if args.report:
         args.report.parent.mkdir(parents=True, exist_ok=True)
+        symbols = " / ".join(sorted(loaded))
         args.report.write_text(
-            f"# Expectancy gate — {args.symbol}\n\n"
+            f"# Expectancy gate — {symbols}\n\n"
             f"Generated by `python scripts/expectancy.py "
-            f"{'--all' if args.all else '--strategy ' + names[0]} "
-            f"--symbol {args.symbol} --folds {args.folds} --lot {args.lot}` "
+            f"{'--all' if args.all else '--strategy ' + names[0]}"
+            f"{' --symbol ' + args.symbol if args.symbol else ''} "
+            f"--folds {args.folds} --lot {args.lot}` "
             f"on {datetime.now(timezone.utc):%Y-%m-%d}.\n\n"
             f"**Gate:** {GATE_RULE}\n\n"
             + "\n\n".join(sections) + "\n")

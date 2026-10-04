@@ -28,8 +28,20 @@ jobs:
           if grep -q "MISMATCH" reports/minipropos_expectancy_spy.md; then
             echo "a strategy marked DEPLOYABLE: yes fails the gate"; exit 1
           fi
+      - name: air3_trend is deployed on SMH, so it is gated on SMH too
+        run: >-
+          python scripts/expectancy.py --strategy air3_trend --symbol SMH
+          --data data/prices_us.csv --folds 3
+          --report reports/minipropos_expectancy_smh.md || true
+      - name: a strategy marked deployable may not fail on its own instrument
+        run: |
+          if grep -q "MISMATCH" reports/minipropos_expectancy_smh.md; then
+            echo "air3_trend is marked DEPLOYABLE: yes but fails the gate on SMH"; exit 1
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: expectancy-report
-          path: reports/minipropos_expectancy_spy.md
+          path: |
+            reports/minipropos_expectancy_spy.md
+            reports/minipropos_expectancy_smh.md
