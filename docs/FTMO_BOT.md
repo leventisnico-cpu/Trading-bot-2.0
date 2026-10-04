@@ -15,18 +15,22 @@ The research verdict for FAST-4 is **NO-GO** for a fast pass. On
 | both phases passed within 18 months | 18% of start dates |
 | median time to pass, when it passes | about 13 months |
 | funded account survives 12 months | 37% |
-| main failure | two stops on the same day breach the 5% daily limit |
+| main failure | two stops on the same day breach the 5% daily limit (now capped, see below) |
 
 Each evaluation fee buys roughly a one-in-five chance. The bot does not
 change those odds; it only executes the rule faithfully.
 
-**Why two positions can fail the account in one day.** Two open
-positions at 3% each put 6% at risk, more than FTMO's 5% daily limit. The
-guard closes everything just before the daily line, but if both stops are
-hit by one gap (overnight or at the open) the loss can pass the line
-before the guard can act. That is the main failure in the research, and
-it stays with `risk_per_trade: 0.03` and `max_positions: 2`. Setting
-`max_positions: 1` removes it at the cost of fewer trades (not tested).
+**Why two positions could fail the account in one day, and the cap.**
+FTMO's daily line is day-start *balance* minus 5%, and balance ignores
+floating P&L, so open risk counts in full against every day's 5%. Two
+positions at 3% each (6%) cross it if both stops are hit. That was the
+main failure in the research. With `cap_combined_risk: true` (the
+default) each entry is sized so that all open stops together stay above
+both loss lines: the first position risks 3%, a second one gets what is
+left (about 1.8%). On the 2025-2026 replay this widened the closest
+approach to the daily line from 43 to 177 and delayed Phase 1 from 204
+to 236 weekdays. What it cannot stop: a gap that opens beyond the stops.
+The research odds above were computed without the cap.
 
 ## What it does
 
@@ -62,6 +66,43 @@ it stays with `risk_per_trade: 0.03` and `max_positions: 2`. Setting
 It never sees your password. You log the terminal in; the bot attaches
 to it.
 
+## Paper validation (2026-10-04 to 2026-10-18)
+
+Two runs check the bot before any money goes to FTMO:
+
+1. **Astral paper deployment 1949** (saved strategy 6489, "FAST-4 FTMO
+   shadow (index ETFs)"): the same rule on QQQ/SPY/DIA/IWM, $15,000 of
+   paper capital. It fills real paper orders at Astral, but sizes 49% of
+   equity per position (Astral cannot size by risk), so its P&L is not
+   the FTMO bot's. Its 2019-2026 backtest: 221 trades, 70.6% win rate,
+   profit factor 1.77, which agrees with the research.
+2. **The bot itself, shadow-run** (`scripts/ftmo_shadow.py`, state and
+   journal in `research/ftmo_shadow/`): the unchanged `ftmo_bot.Runner`
+   trades a simulated CAD 15,000 FTMO account (`ftmo_bot/broker_sim.py`)
+   on live Astral 30-minute bars, every 30 minutes of each session, with
+   3% risk, the guard, the loss lines, the target and the keep-alive.
+   The daily check after the close updates it and compares its plan
+   with Astral's signals.
+
+Before the live run, the same harness replayed 2025-02-10 to 2026-10-02
+(`reports/ftmo_shadow_replay.md`): 0 errors in 236 trading weekdays,
+all 21 entries matching an independent signal computation, Phase 1
+reached on 2026-01-05, no limit breached (closest approach to the daily
+line 177, positions marked at each 30-minute bar's low). The shadow
+polls every 30 minutes, so its entries fill at 10:05 instead of ~09:31,
+and ETF proxies stand in for the CFDs.
+
+The replay also caught a bug before any money was at risk: the bot
+fetched 5,000 half-hour bars, which is 380 sessions of US cash hours but
+only ~108 sessions of a CFD trading 23 hours a day, so on FTMO it would
+never have had a 200-session average and never traded. It now fetches
+15,000 bars (~320 sessions) and refuses to plan, loudly, with fewer
+than 205.
+
+What paper cannot test: FTMO's symbol names, contract sizes, server
+clock and order filling. Those are covered only by the preflight and the
+dry-run week on FTMO's own MT5 terminal.
+
 ## Setup (Windows PC or Windows VPS outside the US)
 
 1. Buy the FTMO 2-Step challenge yourself (CAD 15,000 is the account the
@@ -94,7 +135,8 @@ to it.
    py -m ftmo_bot preflight --config state\ftmo_config.yaml
    ```
 
-   Every symbol must print PASS with 205+ sessions. Compare the printed
+   Every symbol must print PASS with 205+ sessions (if not, raise
+   Tools → Options → Charts → Max bars in chart and restart the terminal). Compare the printed
    last close with the index on a chart: if the session date or close is
    off, the server-time offset (New York + 7 h, `broker_mt5.py`) does not
    match your server and must be fixed before anything else.

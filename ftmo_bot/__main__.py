@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 
 from . import fast4, sessions
+from .runner import BAR_COUNT, MIN_SESSIONS
 from .config import load
 
 
@@ -68,18 +69,24 @@ def main(argv=None) -> int:
                 print(f"FAIL {s}: symbol {sym} not found in Market Watch")
                 ok = False
                 continue
-            ss = [x for x in sessions.build(b.bars(sym, 30, 5000), 30, now)
+            ss = [x for x in sessions.build(b.bars(sym, 30, BAR_COUNT), 30, now)
                   if x.complete]
+            if len(ss) < 2:
+                print(f"FAIL {s}: {len(ss)} completed sessions in the terminal's history")
+                ok = False
+                continue
             ind = fast4.indicators(ss)
-            print(f"PASS {s} ({sym}): lots {spec.volume_min}-{spec.volume_max} "
+            verdict = "PASS" if len(ss) >= MIN_SESSIONS else "FAIL"
+            print(f"{verdict} {s} ({sym}): lots {spec.volume_min}-{spec.volume_max} "
                   f"step {spec.volume_step}; {len(ss)} sessions, last "
                   f"{ss[-1].day} close {ind.close:.2f}, SMA200 "
                   f"{ind.sma200 if ind.sma200 is None else round(ind.sma200, 2)}, "
                   f"RSI2 {ind.rsi2:.1f}, ATR {ind.atr14:.2f}"
                   + ("  <- ENTRY SIGNAL" if ind.sma200 and ind.close > ind.sma200
                      and ind.rsi2 < 10 else ""))
-            if len(ss) < 205:
-                print(f"FAIL {s}: only {len(ss)} sessions; need 205+")
+            if len(ss) < MIN_SESSIONS:
+                print(f"FAIL {s}: only {len(ss)} sessions; need {MIN_SESSIONS}+ "
+                      "(raise Tools > Options > Charts > Max bars in chart)")
                 ok = False
         if not acct.trade_allowed:
             print("WARN: enable Algo Trading in the terminal before `run --execute`")

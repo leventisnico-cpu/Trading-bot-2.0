@@ -22,6 +22,7 @@ min_trading_days: 4
 max_loss: 0.10
 daily_loss: 0.05
 guard_buffer: 0.002      # flatten 0.2% of initial before a loss line
+cap_combined_risk: true  # size each entry so all open stops together stay above both loss lines
 keepalive_days: 25       # evaluation only (ignored when profit_target is null)
 keepalive_symbol: US500
 magic: 404040

@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import time as _time
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime, time, timedelta
@@ -47,7 +48,11 @@ OPEN_AT = time(9, 31)
 ENTRY_DEADLINE = time(10, 30)   # entries only near the open, as tested
 SESSION_END = time(16, 0)
 BAR_MINUTES = 30
-BAR_COUNT = 5000                # ~380 sessions of 30-minute bars
+# FTMO's index CFDs trade ~23 h a day: ~46 half-hour bars per session.
+# 15,000 bars is ~320 sessions, enough for the 200-session average plus
+# holidays. (5,000 bars would hold only ~108 sessions: no SMA200, no trades.)
+BAR_COUNT = 15000
+MIN_SESSIONS = 205
 log = logging.getLogger("ftmo_bot")
 
 
@@ -216,6 +221,11 @@ class Runner:
             if not done or (day is not None and done[-1].day != day):
                 log.info("no completed %s session for %s; no plan", s, day)
                 return None
+            if len(done) < MIN_SESSIONS:
+                log.error("%s: only %d completed sessions in the terminal's "
+                          "history, need %d for the 200-session average; no plan",
+                          s, len(done), MIN_SESSIONS)
+                return None
             days.add(done[-1].day)
             ind[s] = fast4.indicators(done)
             if s in self.st.held:
@@ -303,6 +313,21 @@ class Runner:
             if vol <= 0:
                 log.info("entry %s skipped: size below the minimum volume", s)
                 continue
+            if self.cfg.cap_combined_risk:
+                lpl = self.b.loss_per_lot(sym, ask, stop)
+                committed = sum(self.b.loss_per_lot(p.symbol, p.price_open, p.sl)
+                                * p.volume for p in current if p.sl)
+                room = rules.risk_room(a.balance, self.st.day_start_balance,
+                                       committed, self.limits)
+                fit = math.floor(room / lpl / spec.volume_step + 1e-9) * spec.volume_step
+                if fit < vol:
+                    log.info("entry %s cut from %.2f to %.2f lots: open stops "
+                             "already risk %.2f, room %.2f", s, vol, fit,
+                             committed, room)
+                    vol = round(fit, 8)
+                if vol < spec.volume_min:
+                    log.info("entry %s skipped: no risk room left", s)
+                    continue
             if self.cfg.dry_run:
                 log.info("DRY-RUN buy %s %.2f lots at ~%.2f, stop %.2f", sym,
                          vol, ask, stop)

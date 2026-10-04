@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+import json
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -561,3 +562,153 @@ def test_keepalive_buy_exception_counts_as_activity(tmp_path):
     b.fail_buy = True
     r.keepalive(b.clock, [])
     assert r.st.last_fill == b.clock.isoformat()
+
+
+# ---------------------------------------------------- simulated broker
+
+def sim_bars(start, closes):
+    from datetime import timezone
+    out, t = [], start.astimezone(timezone.utc)
+    for o, h, l, c in closes:
+        out.append((t, o, h, l, c))
+        t += timedelta(minutes=30)
+    return out
+
+
+def test_sim_broker_no_lookahead_and_stop_fills():
+    from ftmo_bot.broker_sim import SimBroker
+    d = date(2026, 10, 5)
+    bars = sim_bars(ny(d, 9, 30), [(100, 101, 99, 100), (100, 100, 94, 95),
+                                   (90, 91, 88, 89)])
+    b = SimBroker({"QQQ": bars}, balance=15000, half_spread=0)
+    b.advance_to(ny(d, 9, 59))
+    with pytest.raises(RuntimeError):
+        b.quote("QQQ")                        # first bar not finished yet
+    b.advance_to(ny(d, 10, 5))
+    assert b.quote("QQQ") == (100, 100)
+    f = b.buy("QQQ", 2.0, 96.0, 1, "t")
+    assert f.ok and b.account().equity == 15000
+    b.advance_to(ny(d, 10, 35))               # bar 2 trades through 96
+    assert b.pos == [] and b.balance == 15000 - 8.0
+    b.buy("QQQ", 1.0, 92.0, 1, "t")           # entry 95, stop 92
+    b.advance_to(ny(d, 11, 5))                # bar 3 opens at 90: gap fill
+    assert b.balance == 15000 - 8.0 - 5.0
+    assert [x["why"] for x in b.deals if x["side"] == "sell"] == ["stop", "stop"]
+    with pytest.raises(ValueError):
+        b.advance_to(ny(d, 10, 0))            # time never goes back
+
+
+def test_sim_broker_state_round_trip():
+    from ftmo_bot.broker_sim import SimBroker
+    d = date(2026, 10, 5)
+    bars = {"SPY": sim_bars(ny(d, 9, 30), [(10, 11, 9, 10)] * 3)}
+    b = SimBroker(bars, half_spread=0)
+    b.advance_to(ny(d, 10, 5))
+    b.buy("SPY", 1.5, 8.0, 1, "x")
+    b2 = SimBroker(bars, b.state())
+    assert b2.positions(1) == b.positions(1) and b2.clock == b.clock
+    assert b2.next_ticket == 2 and b2.balance == b.balance
+
+
+def test_shadow_tick_times_sessions_only():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("ftmo_shadow", "scripts/ftmo_shadow.py")
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    fri, mon = date(2026, 10, 2), date(2026, 10, 5)
+    ts = list(m.tick_times(ny(fri, 16, 5), ny(mon, 10, 5)))
+    assert ts == [ny(mon, 9, 35), ny(mon, 10, 5)]        # strict after, weekend skipped
+    day = list(m.tick_times(ny(mon, 0, 0), ny(mon, 23, 0)))
+    assert len(day) == 14 and day[0] == ny(mon, 9, 35) and day[-1] == ny(mon, 16, 5)
+
+
+def test_sim_stop_across_reload_and_overnight():
+    from ftmo_bot.broker_sim import SimBroker
+    d1, d2 = date(2026, 10, 5), date(2026, 10, 6)
+    bars = {"QQQ": sim_bars(ny(d1, 15, 0), [(100, 100, 50, 100), (100, 100, 99, 100)])
+            + sim_bars(ny(d2, 9, 30), [(97, 98, 96, 97), (96, 96, 90, 91)])}
+    a = SimBroker(bars, half_spread=0)
+    a.advance_to(ny(d1, 16, 5))                # the 50 low ended before the entry
+    a.buy("QQQ", 1.0, 95.0, 1, "t")
+    b = SimBroker(bars, a.state())             # reload, then overnight advance
+    b.advance_to(ny(d2, 10, 5))
+    assert b.pos and b.low_equity(ny(d1, 16, 5)) == b.balance - 4.0
+    b.advance_to(ny(d2, 10, 35))               # second bar trades through 95
+    assert b.pos == [] and b.balance == 15000 - 5.0
+    assert [x["why"] for x in b.deals].count("stop") == 1
+    with pytest.raises(ValueError):
+        b.bars("QQQ", 60, 10)
+
+
+def test_shadow_run_caps_at_data_and_resumes(tmp_path):
+    import csv
+    from ftmo_bot.broker_sim import load_csv
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("ftmo_shadow", "scripts/ftmo_shadow.py")
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    d = date(2026, 10, 5)
+    for sym in ("qqq", "spy", "dia", "iwm"):
+        with open(tmp_path / f"{sym}_30m.csv", "w", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(["timestamp", "open", "high", "low", "close", "volume"])
+            for t, o, h, l, c in sim_bars(ny(d, 9, 30), [(100, 101, 99, 100)] * 13):
+                w.writerow([t.strftime("%Y-%m-%dT%H:%M:%S+0000"), o, h, l, c, 1])
+    assert load_csv(tmp_path / "qqq_30m.csv")[-1][0].astimezone(NY) == ny(d, 15, 30)
+    out = tmp_path / "out"
+    args = ["--bars-dir", str(tmp_path), "--dir", str(out),
+            "--start", ny(d, 9, 0).isoformat(), "--until", ny(d, 20, 0).isoformat()]
+    assert m.main(args) == 0
+    sim = json.loads((out / "sim.json").read_text())
+    assert datetime.fromisoformat(sim["clock"]) == ny(d, 16, 6)   # last bar end + 6 min
+    days = json.loads((out / "days.json").read_text())
+    assert [x["day"] for x in days] == [d.isoformat()]
+    assert m.main(args[:4] + ["--until", ny(d, 21, 0).isoformat()]) == 0
+    assert json.loads((out / "days.json").read_text()) == days   # nothing new, nothing lost
+
+
+def test_bar_history_covers_200_sessions_of_23h_cfds():
+    from ftmo_bot import runner
+    bars_per_session = 46                      # ~23 h of half-hour bars
+    assert runner.BAR_COUNT // bars_per_session >= runner.MIN_SESSIONS * 1.25
+
+
+def test_short_history_means_no_plan_not_a_crash(tmp_path):
+    bars, ds = history(days=60)                # far fewer than 205 sessions
+    b = FakeBroker(bars)
+    b.clock = ny(ds[-1], 16, 10)
+    r = Runner(cfg(tmp_path), b)
+    r.tick()
+    assert r.st.pending_entries == [] and r.st.plan_checked == ds[-1].isoformat()
+
+
+def test_risk_room_keeps_all_stops_above_the_lines():
+    lim = rules.Limits(15000)
+    # flat, no loss today: 5% of 15,000 = 750 minus the 30 buffer
+    assert rules.risk_room(15000, 15000, 0, lim) == pytest.approx(720)
+    # one 3% (450) stop already open: 270 left for the second position
+    assert rules.risk_room(15000, 15000, 450, lim) == pytest.approx(270)
+    # a 300 loss realised today shrinks the room the same way
+    assert rules.risk_room(14700, 15000, 0, lim) == pytest.approx(420)
+    # near the max-loss line it binds instead
+    assert rules.risk_room(13800, 13800, 0, lim) == pytest.approx(270)
+    assert rules.risk_room(15000, 15000, 900, lim) == 0.0
+
+
+def test_second_entry_is_cut_to_the_remaining_room(tmp_path):
+    bars, ds = history()
+    b = FakeBroker(bars)
+    b.clock = ny(ds[-1], 16, 10)
+    r = Runner(cfg(tmp_path, dry_run=False), b)
+    r.tick()
+    assert r.st.pending_entries == ["US100"]
+    b.pos = [Position(77, "US30.cash", 30.0, 120.0, 105.0)]   # risks 450 to its stop
+    r.st.held["US30"] = {"ticket": 77, "entry_day": ds[-1].isoformat()}
+    nxt = next_day(ds[-1])
+    open_session(bars, nxt)
+    b.clock = ny(nxt, 9, 35)
+    r.tick()
+    buy = [x for x in b.sent if x[0] == "buy"][0]
+    _, ask = b.quote("US100.cash")
+    risk = buy[2] * (ask - buy[3])
+    assert risk <= 270 + 1e-6 and risk > 260               # 720 - 450, not 450

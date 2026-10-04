@@ -9,7 +9,7 @@ operator signs off per the orders below.
 
 | rail | what runs | state | who can switch it on |
 |---|---|---|---|
-| Astral paper | saved strategy 6422 "AIR3 SMH ride (5% band)", deployment 1924, $870, fractional shares | **running** since 2026-10-04 04:08 UTC; first signal evaluated at the Monday close | — |
+| Astral paper | saved strategy 6422 "AIR3 SMH ride (5% band)", deployment 1924, $870, fractional shares | **stopped 2026-10-04 ~23:10 UTC** (flat, no orders) on the operator's choice: Astral allows one strategy per paper account and the operator gave it to the FTMO bot's FAST-4 test (deployment 1949, `docs/FTMO_BOT.md`). AIR3's SMH levels now come from the daily check (rules computed from Astral daily bars) | — |
 | IBKR paper via this repo | `mini_prop_os` with `deploy/config.tfsa-paper-air3.yaml` (SMH, daily bars, one share, port 4002) | **ready**; needs IB Gateway on the operator's machine | operator (see Monday checklist) |
 | IBKR live | the bot pointed at the live account | **blocked** twice: `main.py` exits 4 because `air3_trend` is `DEPLOYABLE: no` (it fails the gate on SMH), and no live port may appear in a config until the live-readiness order is signed | operator, by order (route 1 or 2 below) |
 
@@ -129,9 +129,11 @@ The operator chose **SMH** (route 2). Until the operator commits the
 review-rule amendment below, the bot cannot start AIR3 on a live port,
 so the TFSA runs **route B: signals executed by hand**.
 
-* **Signal source:** the Astral paper deployment 1924 (AIR3 on SMH) and
-  the daily watch routine, which reports each scheduled order after the
-  16:00 ET close.
+* **Signal source:** the daily check after the 16:00 ET close, which
+  computes AIR3 on SMH from Astral daily bars and reports any order for
+  the next open. (Astral paper deployment 1924 was the source until
+  2026-10-04, when the operator moved the paper account to the FTMO
+  bot test.)
 * **Where SMH stood on 2026-10-02:** close 630.60; buy level 1.05 ×
   SMA200 = 524.47; sell level 0.95 × SMA200 = 474.52; SMA50 569.85 above
   SMA200 499.50. AIR3 is in its buy regime, so unless SMH closes below

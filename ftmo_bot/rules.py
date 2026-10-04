@@ -59,6 +59,21 @@ def lots(balance: float, risk: float, entry: float, stop: float,
     return round(v, 8) if v >= volume_min else 0.0
 
 
+def risk_room(balance: float, day_start_balance: float, committed: float,
+              limits: Limits) -> float:
+    """Most a new position may risk (entry to stop, account currency) so
+    that every open stop hit together, today or on any later day, stays
+    ``buffer`` above both loss lines. ``committed``: summed entry-to-stop
+    risk of the open positions. FTMO's day-start balance ignores floating
+    P&L, so open risk counts in full against each day's 5%: two 3% stops
+    (6%) would cross it; this caps the second one at what is left."""
+    pad = limits.buffer * limits.initial
+    worst = balance - committed                      # all open stops filled
+    daily = worst - (limits.daily_floor(day_start_balance) + pad)
+    total = worst - (limits.total_floor() + pad)
+    return max(0.0, min(daily, total))
+
+
 def check_entry(equity: float, day_start_balance: float, limits: Limits,
                 open_positions: int, max_positions: int,
                 blocked: bool) -> Optional[str]:

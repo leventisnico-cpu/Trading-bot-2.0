@@ -35,6 +35,7 @@ class FtmoConfig:
     max_loss: float = 0.10
     daily_loss: float = 0.05
     guard_buffer: float = 0.002           # flatten this close to a limit
+    cap_combined_risk: bool = True        # all open stops together never cross a loss line
     keepalive_days: int = 25              # evaluation only; null-equivalent: 0
     keepalive_symbol: str = "US500"
     magic: int = 404040

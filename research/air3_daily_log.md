@@ -153,3 +153,12 @@ Paper deployment 1924 ($870): flat, no orders yet. SMH closed 630.60
 on Friday, 21% above the 524.47 entry level with SMA50 above SMA200, so
 the first evaluation at Monday's close is expected to schedule a BUY for
 Tuesday's open. No exit distance applies until a position is open.
+
+## 2026-10-04 23:10 UTC: paper deployment 1924 stopped
+
+On the operator's choice, AIR3's Astral paper deployment 1924 was
+undeployed (flat, no orders, nothing to close) so the single Astral
+paper slot can run the FTMO bot's FAST-4 test (deployment 1949). AIR3
+stays the TFSA plan (route B): the daily check computes SMH's levels
+from Astral daily bars and reports the order. Monday 2026-10-05: if SMH
+closes at or above 524.47 with SMA50 above SMA200, BUY at Tuesday's open.
