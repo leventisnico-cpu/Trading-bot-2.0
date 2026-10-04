@@ -539,3 +539,25 @@ def test_mt5_adapter_positions_rounding_and_clock(monkeypatch):
     epoch = int(datetime(2026, 10, 5, 16, 30, tzinfo=ZoneInfo("UTC")).timestamp())
     got = b._to_utc(epoch)
     assert got.astimezone(NY) == datetime(2026, 10, 5, 9, 30, tzinfo=NY)
+
+
+def test_stopless_bot_position_is_closed_not_adopted(tmp_path):
+    bars, ds = history()
+    b = FakeBroker(bars)
+    b.clock = ny(ds[-1], 12, 0)
+    b.pos = [Position(8, "US500.cash", 0.01, 100, 0.0)]     # stray keep-alive
+    r = Runner(cfg(tmp_path, dry_run=False), b)
+    r.tick()
+    assert b.pos == [] and r.st.held == {} and r.st.to_close == []
+
+
+def test_keepalive_buy_exception_counts_as_activity(tmp_path):
+    bars, ds = history()
+    b = FakeBroker(bars)
+    b.clock = ny(ds[-1], 11, 0)
+    r = Runner(cfg(tmp_path, dry_run=False), b)
+    r.roll_day(b.clock)
+    r.st.last_fill = (b.clock - timedelta(days=26)).isoformat()
+    b.fail_buy = True
+    r.keepalive(b.clock, [])
+    assert r.st.last_fill == b.clock.isoformat()

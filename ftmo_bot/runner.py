@@ -159,7 +159,13 @@ class Runner:
                 self._note_fill(now)
         for p in live:                               # unknown -> adopt
             s = self.by_broker.get(p.symbol)
-            if s is not None and s not in self.st.held and p.ticket not in self.st.to_close:
+            if p.ticket in self.st.to_close or s is None or s in self.st.held:
+                continue
+            if not p.sl:                             # FAST-4 entries always have a stop;
+                log.warning("closing stop-less bot position %s (ticket %d)",
+                            p.symbol, p.ticket)    # e.g. a stray keep-alive
+                self.st.to_close.append(p.ticket)
+            else:
                 log.warning("adopting open %s position (ticket %d) into state",
                             s, p.ticket)
                 self.st.held[s] = {"ticket": p.ticket,
@@ -337,14 +343,19 @@ class Runner:
             log.info("DRY-RUN keep-alive: buy+close %s %.2f", sym, spec.volume_min)
             self.st.last_fill = now.isoformat()
             return
-        f = self.b.buy(sym, spec.volume_min, None, self.cfg.magic, "FAST4 keepalive")
+        try:
+            f = self.b.buy(sym, spec.volume_min, None, self.cfg.magic, "FAST4 keepalive")
+        except Exception:                          # may have filled: reconcile closes it
+            log.exception("keep-alive buy %s failed", sym)
+            self._note_fill(now)
+            return
         log.info("keep-alive buy %s: %s", sym, f)
         if not f.ok:
             return
         self._note_fill(now)                       # never a second keep-alive
         opened = [p for p in self.b.positions(self.cfg.magic) if p.ticket == f.ticket]
         if not opened:
-            log.error("keep-alive ticket %d not found; reconcile will adopt it", f.ticket)
+            log.error("keep-alive ticket %d not found; reconcile will close it", f.ticket)
             return
         self._close(opened[0], "keepalive", now)   # failure is queued for retry
 
