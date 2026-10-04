@@ -54,3 +54,32 @@ of the bar.
 ## Result
 (filled in after the run, below this line, without editing anything
 above)
+
+Run 2026-10-04, `python research/prop_native.py --data-dir <dir>`; full
+table in `reports/prop_native.md`.
+
+| symbol | strategy | trades | win rate | profit factor | pass ≤18 mo | funded 1y survival | median funded 1y | verdict |
+|---|---|---|---|---|---|---|---|---|
+| QQQ | PROP-A | 154 | 65% | 1.30 | 0% | 100% | +1.2% | **NO-GO** |
+| QQQ | PROP-B | 81 | 41% | 1.21 | 0% | 100% | +0.4% | **NO-GO** |
+| SMH | PROP-A | 174 | 67% | 1.57 | 0% | 100% | +1.2% | info only |
+| SMH | PROP-B | 101 | 40% | 1.18 | 3% | 100% | +0.0% | info only |
+
+What was learned:
+
+1. **The stop fixed survival completely.** No funded account breached in
+   any 12-month window; FTMO's loss rules stop being the problem once
+   every trade risks 1.5% behind a hard stop.
+2. **But the edge is far too small to pass in time.** A median trade
+   earns about 0.1–0.2% of the account, so +10% then +5% takes a median
+   of 5–12 years (1,688–4,404 days). Nothing passes within 18 months.
+3. **The trade-off across all three notes is now clear.** Strategies
+   that earn fast enough to pass (AIR3 at full size) breach the loss
+   rules; strategies that respect the loss rules earn too slowly to
+   pass. On daily data, none of the five rules tested sits in between.
+4. **PROP-A wins 65–67%**, the closest to the operator's 70%, with a
+   profit factor of 1.30–1.57, but it earns about +1% a year on a funded
+   account at this risk (about CAD 150 of reward a year on CAD 15,000).
+5. Raising risk per trade would speed it up and bring back breaches;
+   any such change is a new hypothesis and a new note, and a fourth
+   attempt on this history would need a stricter bar still.
