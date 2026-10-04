@@ -10,3 +10,9 @@ state/kill_switch.json
 .venv/
 state/config.yaml
 state/dca_state.json
+
+# FTMO bot runtime (never commit)
+state/ftmo_config.yaml
+state/ftmo_state.json
+state/ftmo_state.tmp
+state/ftmo_bot.log
