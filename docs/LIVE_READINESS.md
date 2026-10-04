@@ -11,7 +11,7 @@ operator signs off per the orders below.
 |---|---|---|---|
 | Astral paper | saved strategy 6422 "AIR3 SMH ride (5% band)", deployment 1924, $870, fractional shares | **running** since 2026-10-04 04:08 UTC; first signal evaluated at the Monday close | — |
 | IBKR paper via this repo | `mini_prop_os` with `deploy/config.tfsa-paper-air3.yaml` (SMH, daily bars, one share, port 4002) | **ready**; needs IB Gateway on the operator's machine | operator (see Monday checklist) |
-| IBKR live | the bot pointed at the live account | **blocked** twice: `main.py` exits 4 because `air3_trend` fails the gate on SMH and no waiver is signed, and no live port may appear in a config until the live-readiness order is signed | operator, by order (route 1 or 2 below) |
+| IBKR live | the bot pointed at the live account | **blocked** twice: `main.py` exits 4 because `air3_trend` is `DEPLOYABLE: no` (it fails the gate on SMH), and no live port may appear in a config until the live-readiness order is signed | operator, by order (route 1 or 2 below) |
 
 ## Monday checklist (operator actions, in order)
 
@@ -77,7 +77,7 @@ AIR3 under the amended law (`reports/minipropos_expectancy_smh.md`,
 | SPY | fold 1 (1999–2008) | 3.08 | 0.44 | more than B&H | 12.4% | 45.5% | YES (1) |
 | SPY | fold 2 (2008–2017) | 3.81 | 2.19 | 96% | 14.4% | 48.8% | YES (2) |
 | SPY | fold 3 (2017–2026) | 4.02 | 4.94 | 40% | 19.0% | 32.5% | no |
-| SPY | full sample | 6.95 | 6.13 | 77% | 18.9% | 53.1% | YES (2) |
+| SPY | full sample | 6.95 | 6.13 | 76% | 18.9% | 53.1% | YES (2) |
 
 **AIR3 passes the law on SPY and fails it on SMH.** SMH's run since
 2013 has been so strong that being in cash for any of it costs more
@@ -87,7 +87,7 @@ force a pass. A gate that moves until the answer is yes protects
 nothing.
 
 **Two ways for AIR3 to trade live through the bot. Both are the
-operator's choice, and neither is made by the assistant:**
+operator's decision:**
 
 1. **AIR3 on SPY, gate-approved.** Order it, and the assistant adds a
    symbol-scoped approval (AIR3 deployable on SPY only) and a SPY AIR3
@@ -95,12 +95,17 @@ operator's choice, and neither is made by the assistant:**
    the rehearsal (preview first, then your approval). SPY closed at
    about $770 on 2026-08-28, so $870 buys one share (about 88% of
    equity).
-2. **AIR3 on SMH, operator waiver.** Copy the template in
-   `deploy/waivers/operator_waivers.yaml` into the `waivers:` list. Fill
-   in every field, write your own name in `signed_by` and the date in
-   `signed_on`, and commit. `main.py` then accepts a live port for
-   `air3_trend` on SMH only. The gate keeps reporting NOT DEPLOYABLE
-   on SMH, and CI keeps running it. The repo ships with the list empty.
+2. **AIR3 on SMH, against the gate's verdict.** The bot's live-start
+   refusal cannot be loosened by the assistant: the repo's review rule
+   (`.claude/agents/code-reviewer.md`, hard rule 1) treats any weakening
+   of `refuse_live_reason` or `main.py`'s exit code 4 as a blocker. A
+   waiver path was built and then withdrawn on 2026-10-04 for that
+   reason. To take this route the operator amends that rule in their own
+   commit, saying SMH may run live with a signed waiver. The assistant
+   then adds a hardened waiver: no future or placeholder signatures, a
+   real gate report, and owner-only review of the waiver folder. The
+   other route is to place the signals by hand, as option B above
+   describes.
 
 Either way the last rail is unchanged. The live port (4001) goes into a
 copy of the config under `state/`, which is git-ignored, by the
@@ -114,8 +119,8 @@ than the backtests.
 
 **Recommendation:** keep both paper rails running through the first
 signal and fill. Then pick route 1 or route 2. Route 1 keeps every rule
-of the repo intact. Route 2 keeps the asset you chose and studied, with
-your signature on the trade-off.
+of the repo intact. Route 2 keeps the asset you chose and studied, and
+needs your own change to the review rule first.
 
 ## Hard rules that do not change with the decision
 

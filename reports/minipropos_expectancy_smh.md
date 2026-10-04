@@ -12,7 +12,7 @@ Data: `data/prices_us.csv` · 2007-04-12 → 2026-10-02 · 3 walk-forward folds 
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | fold 1/3 | 2007-04-12–2013-10-03 | 548 | 11,968 | 2.8% | 3,738 (26.8%) | 0.53 | 3 | 33.3% | 11,499 | 2.2% | 7,206 (61.4%) | 0.21 | YES (1) |
 | fold 2/3 | 2013-10-04–2020-04-01 | 470 | 17,704 | 9.2% | 6,767 (27.7%) | 1.14 | 3 | 100.0% | 26,669 | 16.3% | 12,030 (33.2%) | 1.39 | no |
-| fold 3/3 | 2020-04-02–2026-10-02 | 166 | 44,811 | 26.0% | 11,364 (24.2%) | 3.06 | 2 | 100.0% | 105,188 | 43.6% | 27,339 (44.4%) | 3.48 | no |
+| fold 3/3 | 2020-04-02–2026-10-02 | 166 | 44,808 | 26.0% | 11,364 (24.2%) | 3.06 | 2 | 100.0% | 105,188 | 43.6% | 27,339 (44.4%) | 3.48 | no |
 | full sample | 2007-04-12–2026-10-02 | 548 | 187,363 | 16.2% | 47,760 (30.1%) | 3.71 | 8 | 75.0% | 346,069 | 20.0% | 90,250 (61.4%) | 3.72 | no |
 
 Gate: DEPLOYABLE only if, in >= 2 of 3 walk-forward folds AND on the full sample, the strategy either (1) ends with more equity than buy-and-hold of the same lot, or (2) earns more per dollar of maximum drawdown than buy-and-hold while keeping at least half of buy-and-hold's gain.

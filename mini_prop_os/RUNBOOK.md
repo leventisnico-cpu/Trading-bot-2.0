@@ -117,9 +117,11 @@ supervisor or reboot — **refuses to trade** while that file exists.
 ## Going live (real money) — deliberate, not default
 
 - Read `docs/LIVE_READINESS.md` first: it holds the Monday checklist and
-  the one decision only the operator can make (the expectancy gate marks
-  `air3_trend` not deployable, so `main.py` exits 4 on a live port with
-  it until that is resolved by order).
+  the one decision only the operator can make. The expectancy gate passes
+  `air3_trend` on SPY and fails it on SMH, so it is marked not deployable
+  and `main.py` exits 4 on a live port with it. The two routes (AIR3 on
+  SPY, or SMH after the operator amends the review rule) are in that
+  doc.
 - Log Gateway/TWS into the **live** account; set `port: 4001` (Gateway)
   or `7496` (TWS). The bot logs a loud warning on live ports.
 - Re-run `--preflight` against the live setup.

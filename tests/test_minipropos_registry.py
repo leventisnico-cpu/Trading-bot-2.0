@@ -212,56 +212,28 @@ def test_compounding_lot_rejects_strategy_without_a_lot():
         expectancy.CompoundingLot(NoLot(), lambda c: 1.0)
 
 
-# ---------------------------------------------------- operator waivers
 
-_SIGNED = """waivers:
-  - strategy: air3_trend
-    symbol: SMH
-    gate_report: reports/minipropos_expectancy_smh.md
-    gate_result: "1/3 folds"
-    accepted_risk: "half the gain for half the drawdown"
-    signed_by: "{who}"
-    signed_on: "{when}"
-"""
+def test_gate_charges_the_ibkr_minimum_per_order():
+    """$0.005/share with a $1.00 floor, per order, at the order's size."""
+    import asyncio
+    from mini_prop_os.core.types import Action, Bar, OrderIntent, OrderType
+    from mini_prop_os.sim import SimConfig, SimulatedBroker
 
+    class _Oms:
+        def on_fill(self, fill):
+            pass
 
-def _waivers(tmp_path, who="Operator", when="2026-10-05"):
-    p = tmp_path / "w.yaml"
-    p.write_text(_SIGNED.format(who=who, when=when))
-    return p
-
-
-def test_shipped_waiver_file_is_unsigned():
-    """The repo ships no waiver: only the operator signs one."""
-    assert registry.signed_waiver("air3_trend", "SMH") is None
-    assert refuse_live_reason("air3_trend", 4001, symbol="SMH") is not None
-
-
-def test_signed_waiver_clears_live_refusal_for_that_symbol_only(tmp_path):
-    p = _waivers(tmp_path)
-    assert refuse_live_reason("air3_trend", 4001, symbol="SMH",
-                              waivers_path=p) is None
-    assert refuse_live_reason("air3_trend", 4001, symbol="QQQ",
-                              waivers_path=p) is not None
-    assert refuse_live_reason("tsmom_12_1", 4001, symbol="SMH",
-                              waivers_path=p) is not None
-    assert refuse_live_reason("air3_trend", 4001, symbol=None,
-                              waivers_path=p) is not None
-
-
-@pytest.mark.parametrize("who,when", [("", "2026-10-05"),
-                                      ("Operator", ""),
-                                      ("Operator", "next monday")])
-def test_incomplete_waiver_does_not_count(tmp_path, who, when):
-    p = _waivers(tmp_path, who, when)
-    assert registry.signed_waiver("air3_trend", "SMH", p) is None
-    assert refuse_live_reason("air3_trend", 4001, symbol="SMH",
-                              waivers_path=p) is not None
-
-
-def test_missing_or_broken_waiver_file_refuses(tmp_path):
-    assert registry.signed_waiver("air3_trend", "SMH",
-                                  tmp_path / "absent.yaml") is None
-    bad = tmp_path / "bad.yaml"
-    bad.write_text("waivers: [ unclosed")
-    assert registry.signed_waiver("air3_trend", "SMH", bad) is None
+    cfg = SimConfig(multiplier=1.0, tick_size=0.01, commission_per_unit=0.005,
+                    commission_min_per_order=1.0, split_fills=True)
+    b = SimulatedBroker(cfg)
+    b.oms = _Oms()
+    t = datetime(2020, 1, 1, tzinfo=timezone.utc)
+    bar = Bar("SMH", t, 100, 100, 100, 100, 1)
+    for qty in (10, 1_000):
+        asyncio.run(b.place_order(OrderIntent(symbol="SMH", action=Action.BUY,
+                                              quantity=qty,
+                                              order_type=OrderType.MARKET)))
+    b.process_bar_open(bar)
+    # 10 shares -> $1.00 minimum (once, though split in two fills);
+    # 1,000 shares -> $5.00
+    assert b.commissions_paid == pytest.approx(1.0 + 5.0)

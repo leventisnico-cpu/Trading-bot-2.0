@@ -136,15 +136,12 @@ def test_config_fields_and_validation():
 
 def test_registered_and_not_marked_deployable():
     """It faces the gate like every other strategy and fails it on SMH,
-    so a live start needs the operator's signed waiver, which the repo
-    does not ship."""
+    so main.py refuses a live port with it."""
     assert "air3_trend" in registry.strategy_names()
     s = registry.get_spec("air3_trend").factory("SMH", 1, 1.0)
     assert isinstance(s, Air3TrendStrategy) and s.order_quantity == 1
     assert registry.is_deployable("air3_trend") is False
     assert registry.refuse_live_reason("air3_trend", 4001) is not None
-    assert registry.refuse_live_reason("air3_trend", 4001,
-                                       symbol="SMH") is not None
     assert registry.refuse_live_reason("air3_trend", 4002) is None
 
 

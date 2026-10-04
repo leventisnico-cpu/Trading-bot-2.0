@@ -10,10 +10,10 @@ Data: `data/prices_us.csv` · 1999-01-04 → 2026-08-28 · 3 walk-forward folds 
 
 | window | dates | lot | final $ | CAGR | maxDD | gain/DD | trips | win% | B&H final $ | B&H CAGR | B&H maxDD | B&H gain/DD | passes |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| fold 1/3 | 1999-01-04–2008-03-25 | 124 | 8,944 | -1.2% | 3,411 (32.4%) | -0.31 | 48 | 39.6% | 12,509 | 2.5% | 5,684 (45.5%) | 0.44 | no |
-| fold 2/3 | 2008-03-26–2017-06-07 | 99 | 15,139 | 4.6% | 2,648 (18.3%) | 1.94 | 50 | 42.0% | 21,423 | 8.6% | 5,219 (48.8%) | 2.19 | no |
-| fold 3/3 | 2017-06-08–2026-08-28 | 45 | 21,258 | 8.5% | 1,860 (12.6%) | 6.05 | 36 | 47.2% | 35,131 | 14.6% | 5,086 (32.5%) | 4.94 | no |
-| full sample | 1999-01-04–2026-08-28 | 124 | 31,954 | 4.3% | 3,411 (32.4%) | 6.44 | 138 | 43.5% | 95,939 | 8.5% | 14,015 (53.1%) | 6.13 | no |
+| fold 1/3 | 1999-01-04–2008-03-25 | 124 | 8,929 | -1.2% | 3,417 (32.4%) | -0.31 | 48 | 39.6% | 12,509 | 2.5% | 5,684 (45.5%) | 0.44 | no |
+| fold 2/3 | 2008-03-26–2017-06-07 | 99 | 15,136 | 4.6% | 2,653 (18.3%) | 1.94 | 50 | 42.0% | 21,423 | 8.6% | 5,219 (48.8%) | 2.19 | no |
+| fold 3/3 | 2017-06-08–2026-08-28 | 45 | 21,237 | 8.5% | 1,863 (12.6%) | 6.03 | 36 | 47.2% | 35,131 | 14.6% | 5,086 (32.5%) | 4.94 | no |
+| full sample | 1999-01-04–2026-08-28 | 124 | 31,687 | 4.3% | 3,417 (32.4%) | 6.35 | 138 | 43.5% | 95,939 | 8.5% | 14,015 (53.1%) | 6.13 | no |
 
 Gate: DEPLOYABLE only if, in >= 2 of 3 walk-forward folds AND on the full sample, the strategy either (1) ends with more equity than buy-and-hold of the same lot, or (2) earns more per dollar of maximum drawdown than buy-and-hold while keeping at least half of buy-and-hold's gain.
 Result: passes in 0/3 folds, full sample no → **NOT DEPLOYABLE** (docstring marks it DEPLOYABLE: no)
@@ -24,15 +24,15 @@ Data: `data/prices_us.csv` · 1999-01-04 → 2026-08-28 · 3 walk-forward folds 
 
 | window | dates | lot | final $ | CAGR | maxDD | gain/DD | trips | win% | B&H final $ | B&H CAGR | B&H maxDD | B&H gain/DD | passes |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| fold 1/3 | 1999-01-04–2008-03-25 | 124 | 8,543 | -1.7% | 3,809 (36.2%) | -0.38 | 38 | 34.2% | 12,509 | 2.5% | 5,684 (45.5%) | 0.44 | no |
-| fold 2/3 | 2008-03-26–2017-06-07 | 99 | 15,075 | 4.6% | 2,692 (17.3%) | 1.89 | 41 | 48.8% | 21,423 | 8.6% | 5,219 (48.8%) | 2.19 | no |
-| fold 3/3 | 2017-06-08–2026-08-28 | 45 | 21,186 | 8.5% | 1,737 (12.1%) | 6.44 | 31 | 48.4% | 35,131 | 14.6% | 5,086 (32.5%) | 4.94 | no |
-| full sample | 1999-01-04–2026-08-28 | 124 | 28,812 | 3.9% | 3,809 (36.2%) | 4.94 | 102 | 45.1% | 95,939 | 8.5% | 14,015 (53.1%) | 6.13 | no |
+| fold 1/3 | 1999-01-04–2008-03-25 | 124 | 8,527 | -1.7% | 3,815 (36.2%) | -0.39 | 38 | 34.2% | 12,509 | 2.5% | 5,684 (45.5%) | 0.44 | no |
+| fold 2/3 | 2008-03-26–2017-06-07 | 99 | 15,081 | 4.6% | 2,703 (17.3%) | 1.88 | 41 | 48.8% | 21,423 | 8.6% | 5,219 (48.8%) | 2.19 | no |
+| fold 3/3 | 2017-06-08–2026-08-28 | 45 | 21,164 | 8.5% | 1,732 (12.0%) | 6.45 | 31 | 48.4% | 35,131 | 14.6% | 5,086 (32.5%) | 4.94 | no |
+| full sample | 1999-01-04–2026-08-28 | 124 | 28,641 | 3.9% | 3,815 (36.2%) | 4.89 | 102 | 45.1% | 95,939 | 8.5% | 14,015 (53.1%) | 6.13 | no |
 
 Gate: DEPLOYABLE only if, in >= 2 of 3 walk-forward folds AND on the full sample, the strategy either (1) ends with more equity than buy-and-hold of the same lot, or (2) earns more per dollar of maximum drawdown than buy-and-hold while keeping at least half of buy-and-hold's gain.
 Result: passes in 0/3 folds, full sample no → **NOT DEPLOYABLE** (docstring marks it DEPLOYABLE: no)
 
-## scheduled_dca on SPY (95% of equity per entry; lot column = B&H's lot at the window's first close)
+## scheduled_dca on SPY (fixed lot = 95% of $10,000 at each window's first close; accumulates, not re-sized)
 
 Data: `data/prices_us.csv` · 1999-01-04 → 2026-08-28 · 3 walk-forward folds · costs: IBKR $0.005/share (min $1.00/order) + 0.01 adverse slippage per fill, both sides. gain/DD = (final − start) / max drawdown in dollars; passes = YES (1) more equity than B&H, YES (2) better gain/DD than B&H while keeping ≥ 50% of B&H's gain.
 
@@ -54,9 +54,9 @@ Data: `data/prices_us.csv` · 1999-01-04 → 2026-08-28 · 3 walk-forward folds 
 
 | window | dates | lot | final $ | CAGR | maxDD | gain/DD | trips | win% | B&H final $ | B&H CAGR | B&H maxDD | B&H gain/DD | passes |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| fold 1/3 | 1999-01-04–2008-03-25 | 124 | 12,359 | 2.3% | 2,526 (23.2%) | 0.93 | 3 | 33.3% | 12,509 | 2.5% | 5,684 (45.5%) | 0.44 | YES (2) |
-| fold 2/3 | 2008-03-26–2017-06-07 | 99 | 23,119 | 9.5% | 2,573 (17.8%) | 5.10 | 5 | 80.0% | 21,423 | 8.6% | 5,219 (48.8%) | 2.19 | YES (1) |
-| fold 3/3 | 2017-06-08–2026-08-28 | 45 | 26,291 | 11.1% | 3,847 (31.6%) | 4.23 | 3 | 100.0% | 35,131 | 14.6% | 5,086 (32.5%) | 4.94 | no |
+| fold 1/3 | 1999-01-04–2008-03-25 | 124 | 12,358 | 2.3% | 2,526 (23.2%) | 0.93 | 3 | 33.3% | 12,509 | 2.5% | 5,684 (45.5%) | 0.44 | YES (2) |
+| fold 2/3 | 2008-03-26–2017-06-07 | 99 | 23,120 | 9.5% | 2,572 (17.8%) | 5.10 | 5 | 80.0% | 21,423 | 8.6% | 5,219 (48.8%) | 2.19 | YES (1) |
+| fold 3/3 | 2017-06-08–2026-08-28 | 45 | 26,290 | 11.1% | 3,847 (31.6%) | 4.23 | 3 | 100.0% | 35,131 | 14.6% | 5,086 (32.5%) | 4.94 | no |
 | full sample | 1999-01-04–2026-08-28 | 124 | 85,617 | 8.1% | 12,790 (32.3%) | 5.91 | 11 | 72.7% | 95,939 | 8.5% | 14,015 (53.1%) | 6.13 | no |
 
 Gate: DEPLOYABLE only if, in >= 2 of 3 walk-forward folds AND on the full sample, the strategy either (1) ends with more equity than buy-and-hold of the same lot, or (2) earns more per dollar of maximum drawdown than buy-and-hold while keeping at least half of buy-and-hold's gain.
@@ -69,9 +69,9 @@ Data: `data/prices_us.csv` · 1999-01-04 → 2026-08-28 · 3 walk-forward folds 
 | window | dates | lot | final $ | CAGR | maxDD | gain/DD | trips | win% | B&H final $ | B&H CAGR | B&H maxDD | B&H gain/DD | passes |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | fold 1/3 | 1999-01-04–2008-03-25 | 124 | 15,634 | 5.0% | 1,828 (12.4%) | 3.08 | 2 | 50.0% | 12,509 | 2.5% | 5,684 (45.5%) | 0.44 | YES (1) |
-| fold 2/3 | 2008-03-26–2017-06-07 | 99 | 20,915 | 8.4% | 2,864 (14.4%) | 3.81 | 3 | 100.0% | 21,423 | 8.6% | 5,219 (48.8%) | 2.19 | YES (2) |
-| fold 3/3 | 2017-06-08–2026-08-28 | 45 | 20,121 | 7.9% | 2,518 (19.0%) | 4.02 | 4 | 50.0% | 35,131 | 14.6% | 5,086 (32.5%) | 4.94 | no |
-| full sample | 1999-01-04–2026-08-28 | 124 | 75,720 | 7.6% | 9,451 (18.9%) | 6.95 | 9 | 77.8% | 95,939 | 8.5% | 14,015 (53.1%) | 6.13 | YES (2) |
+| fold 2/3 | 2008-03-26–2017-06-07 | 99 | 20,919 | 8.4% | 2,864 (14.4%) | 3.81 | 3 | 100.0% | 21,423 | 8.6% | 5,219 (48.8%) | 2.19 | YES (2) |
+| fold 3/3 | 2017-06-08–2026-08-28 | 45 | 20,118 | 7.9% | 2,519 (19.0%) | 4.02 | 4 | 50.0% | 35,131 | 14.6% | 5,086 (32.5%) | 4.94 | no |
+| full sample | 1999-01-04–2026-08-28 | 124 | 75,723 | 7.6% | 9,451 (18.9%) | 6.95 | 9 | 77.8% | 95,939 | 8.5% | 14,015 (53.1%) | 6.13 | YES (2) |
 
 Gate: DEPLOYABLE only if, in >= 2 of 3 walk-forward folds AND on the full sample, the strategy either (1) ends with more equity than buy-and-hold of the same lot, or (2) earns more per dollar of maximum drawdown than buy-and-hold while keeping at least half of buy-and-hold's gain.
 Result: passes in 2/3 folds, full sample YES (2) → **DEPLOYABLE** (docstring marks it DEPLOYABLE: no)

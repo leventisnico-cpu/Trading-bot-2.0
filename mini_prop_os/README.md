@@ -133,11 +133,7 @@ cash earns nothing and fails both rules.
 Every strategy module carries a `DEPLOYABLE: yes|no` line in its
 docstring; `.github/workflows/expectancy.yml` re-runs the gate on every
 push and goes red if a strategy marked `yes` fails it. `main.py` exits 4
-rather than start on a live port unless the strategy is marked `yes` or
-the operator has signed a waiver for that strategy on that symbol in
-`deploy/waivers/operator_waivers.yaml`. The repo ships with no waiver;
-only the operator signs one. A waiver never flips the marker, so the
-gate's verdict stays on record.
+rather than start on a live port with a strategy marked `no`.
 
 Current results on SPY (`reports/minipropos_expectancy_spy.md`):
 

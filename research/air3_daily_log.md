@@ -111,12 +111,13 @@ The gate now re-sizes each strategy entry to 95% of current equity
 | symbol | folds passed | full sample | verdict |
 |---|---|---|---|
 | SMH | 1/3 | no (gain/DD 3.71 vs 3.72) | NOT DEPLOYABLE |
-| SPY | 2/3 | YES (2) (6.95 vs 6.13, 77% of B&H gain, DD 18.9% vs 53.1%) | DEPLOYABLE |
+| SPY | 2/3 | YES (2) (6.95 vs 6.13, 76% of B&H gain, DD 18.9% vs 53.1%) | DEPLOYABLE |
 
 The rule was not loosened further. On SMH AIR3 keeps under half of
 buy-and-hold's gain in 2013–2020 and 2020–2026. The module stays
 `DEPLOYABLE: no`. Two operator routes are in `docs/LIVE_READINESS.md`:
-run AIR3 on SPY with a gate-backed approval, or sign a waiver for SMH in
-`deploy/waivers/operator_waivers.yaml`. `main.py` now accepts a live port
-only for a passing strategy or a signed waiver matching the strategy and
-symbol. The repo ships no waiver.
+run AIR3 on SPY with a gate-backed approval, or keep SMH, which needs the
+operator's own amendment to the review rule first. A waiver path for SMH
+was built, blocked by the repo's safety reviewer (it weakens the live-
+start refusal), and withdrawn. The gate now also charges IBKR's $1.00
+per-order minimum at each order's actual size.

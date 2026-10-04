@@ -8,9 +8,8 @@ DEPLOYABLE: no
     95% of current equity) it PASSES on SPY (2/3 folds + full sample) and
     FAILS on SMH (1/3 folds; full-sample gain/DD 3.71 vs 3.72, and under
     half of SMH's gain in 2013-2020 and 2020-2026). The bot runs it on
-    SMH, so it stays marked no. A live start on SMH needs the operator's
-    signed waiver in deploy/waivers/operator_waivers.yaml; see
-    reports/minipropos_expectancy_smh.md and docs/LIVE_READINESS.md.
+    SMH, so it stays marked no and main.py refuses a live port with it.
+    See reports/minipropos_expectancy_smh.md and docs/LIVE_READINESS.md.
 
 Rules (daily bars; the same rule that runs on Astral paper as saved
 strategy 6422, deployment 1924)

@@ -132,7 +132,9 @@ class CompoundingLot:
     set to the shares ``EXPOSURE`` of the account's *current* equity buys
     at that bar's close. Once in, the lot is untouched until it is flat
     again. This is how the Astral deployment sizes (95% of equity per
-    entry) and how the bot is meant to run live.
+    entry). The bot's shipped configs trade a fixed lot instead (one
+    share on $870, about 72% of equity on SMH), so live exposure is
+    smaller than what the gate measures.
 
     Wraps the strategy for the session only: ``on_bar``, ``on_own_fill``
     and ``strategy_id`` are what ``HistoricalSession`` touches; everything
@@ -292,9 +294,13 @@ def run_leg(label: str, strategy_name: str, symbol: str,
     lot = lot_for(lot, closes, cash)
     commission = max(IBKR_PER_SHARE, IBKR_MIN_PER_ORDER / lot)
     cash = funding_for(strategy_name, closes, lot, cash)
+    # The strategy pays IBKR's schedule on every order at its actual size
+    # ($0.005/share, $1.00 minimum); ``commission`` is the per-share rate
+    # of buy-and-hold's single order of ``lot`` shares.
     sim_cfg = SimConfig(multiplier=1.0, tick_size=TICK, slippage_ticks=1,
-                        commission_per_unit=commission, initial_cash=cash,
-                        split_fills=False)
+                        commission_per_unit=IBKR_PER_SHARE,
+                        commission_min_per_order=IBKR_MIN_PER_ORDER,
+                        initial_cash=cash, split_fills=False)
     # Measurement, not production: caps wide enough never to bind, so
     # the number reflects the strategy, not a risk setting. With a fixed
     # lot the per-order cap equals the lot (the strategy must not size
@@ -403,9 +409,14 @@ def exposure_note(v: Verdict) -> List[str]:
 def render(v: Verdict, symbol: str, lot: int, cash: float,
            data: Path, marked: Optional[bool]) -> str:
     n_folds = len(v.legs) - 1
-    lot_note = (f"{EXPOSURE:.0%} of equity per entry; lot column = B&H's "
-                f"lot at the window's first close" if lot <= 0
-                else f"fixed lot {lot}")
+    if lot > 0:
+        lot_note = f"fixed lot {lot}"
+    elif get_spec(v.strategy).accumulates:
+        lot_note = (f"fixed lot = {EXPOSURE:.0%} of ${cash:,.0f} at each "
+                    f"window's first close; accumulates, not re-sized")
+    else:
+        lot_note = (f"{EXPOSURE:.0%} of equity per entry; lot column = "
+                    f"B&H's lot at the window's first close")
     out = [
         f"## {v.strategy} on {symbol} ({lot_note})",
         "",
