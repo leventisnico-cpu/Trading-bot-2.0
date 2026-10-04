@@ -27,6 +27,30 @@ Expected preflight on a fresh paper login: every line PASS, market data
 "delayed". Save the first real preflight output to
 `reports/preflight_first_socket.md`.
 
+## AIR3 on SMH (the rule on Astral paper, rehearsed on IBKR paper)
+
+The same trend rule that runs on Astral paper (saved strategy 6422) is
+registered here as `air3_trend` with its own paper config. It trades one
+share of SMH on daily bars and is marked `DEPLOYABLE: no` under the
+expectancy gate (see `docs/LIVE_READINESS.md` for why and for the
+decision that leaves you).
+
+```powershell
+.\deploy\windows\run.ps1 -Preflight -Config deploy\config.tfsa-paper-air3.yaml
+.\deploy\windows\run.ps1 -Config deploy\config.tfsa-paper-air3.yaml
+```
+
+Expected startup: connect → qualify SMH → load about two years of daily
+bars → warm up on 200 → "Mini-Prop OS running". It then does nothing
+until the 16:00 ET daily bar completes. A BUY of one share is emitted
+when the close is more than 5% above the 200-day average with the 50-day
+above the 200-day; a SELL of the whole position when the close is more
+than 5% below the 200-day. A market order sent after the close rests at
+IBKR until the next 09:30 ET open, which is the fill the backtests
+assume. The daily-loss breaker in that config is deliberately loose
+($130 / 15%): the rule has no stop by design, and SMH moves 3-5% on an
+ordinary day.
+
 ## First night: paper trading against the live market
 
 1. **Install IB Gateway** (lighter than TWS; either works) and log in
@@ -92,6 +116,10 @@ supervisor or reboot — **refuses to trade** while that file exists.
 
 ## Going live (real money) — deliberate, not default
 
+- Read `docs/LIVE_READINESS.md` first: it holds the Monday checklist and
+  the one decision only the operator can make (the expectancy gate marks
+  `air3_trend` not deployable, so `main.py` exits 4 on a live port with
+  it until that is resolved by order).
 - Log Gateway/TWS into the **live** account; set `port: 4001` (Gateway)
   or `7496` (TWS). The bot logs a loud warning on live ports.
 - Re-run `--preflight` against the live setup.

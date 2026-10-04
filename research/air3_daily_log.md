@@ -83,4 +83,22 @@ Drawbacks found and handled:
   still small, but every whipsaw costs ≈ $2 in commissions plus the
   price move.
 
+## Live-readiness build — 2026-10-04 (funds reach the TFSA 2026-10-05)
+
+The AIR3 rule now exists in this repo as `mini_prop_os/strategy/air3_trend.py`
+(registered as `air3_trend`, same 50/200-day averages and 5% bands as
+Astral saved strategy 6422) with `deploy/config.tfsa-paper-air3.yaml`
+(SMH, daily bars, one share, IB Gateway paper port 4002, loose $130/15%
+daily-loss breaker because the rule has no stop). SMH daily closes
+2007-04-12 → 2026-10-02 were added to `data/prices_us.csv` (Astral
+canonical OHLCV, unadjusted). Expectancy gate on SMH
+(`reports/minipropos_expectancy_smh.md`): 0/3 folds, full sample no →
+NOT DEPLOYABLE, marker `DEPLOYABLE: no`; the gate measures final equity
+against buy-and-hold and a cash-in-bear-markets rule loses that by
+construction. Astral's broker portal does not list Interactive Brokers,
+so the Astral deployment cannot execute in the TFSA; the live options
+(keep the gate / execute signals by hand / amend the gate by order) are
+laid out in `docs/LIVE_READINESS.md` with a Monday checklist. 12 new
+tests; suite green; CI's `--all` gate on SPY stays consistent.
+
 ## Daily entries

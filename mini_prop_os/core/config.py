@@ -168,11 +168,26 @@ class StrategyConfig:
     dca_timezone: str = "America/New_York"
     #: Persisted last-bought slot; makes buys idempotent across restarts.
     dca_state_path: str = "state/dca_state.json"
+    #: air3_trend only: slow/fast simple-moving-average periods in bars and
+    #: the entry/exit bands around the slow average (0.05 = 5%). Buy when
+    #: close > (1+entry) x SMA_slow and SMA_fast > SMA_slow; sell when
+    #: close < (1-exit) x SMA_slow. ``order_quantity`` is the one lot.
+    trend_fast_period: int = 50
+    trend_slow_period: int = 200
+    trend_entry_band: float = 0.05
+    trend_exit_band: float = 0.05
 
     def __post_init__(self) -> None:
         if self.name not in ("adaptive_ema", "ema_crossover",
-                             "scheduled_dca", "tsmom_12_1"):
+                             "scheduled_dca", "tsmom_12_1", "air3_trend"):
             raise ConfigError(f"unknown strategy.name {self.name!r}")
+        if not (1 <= self.trend_fast_period < self.trend_slow_period):
+            raise ConfigError(
+                "need 1 <= strategy.trend_fast_period < trend_slow_period")
+        for name in ("trend_entry_band", "trend_exit_band"):
+            v = getattr(self, name)
+            if not (0.0 <= v < 1.0) or not math.isfinite(v):
+                raise ConfigError(f"strategy.{name} must be in [0, 1)")
         parts = self.history_duration.split()
         if (len(parts) != 2 or not parts[0].isdigit() or int(parts[0]) < 1
                 or parts[1] not in ("S", "D", "W", "M", "Y")):

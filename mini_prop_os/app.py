@@ -28,6 +28,7 @@ from .notify import TelegramConsole, TelegramNotifier, notifier_from_env
 from .risk.event_calendar import BlackoutWindow, EventCalendar
 from .risk.guardrails import PortfolioSnapshot, RiskGuardrails
 from .strategy.adaptive_ema import AdaptiveEmaCrossoverStrategy
+from .strategy.air3_trend import Air3TrendStrategy
 from .strategy.base import BaseStrategy
 from .strategy.ema_crossover import EmaCrossoverStrategy
 from .strategy.scheduled_dca import ScheduledDcaStrategy
@@ -288,6 +289,12 @@ def build_strategy(cfg: AppConfig) -> BaseStrategy:
     if s.name == "tsmom_12_1":
         return TimeSeriesMomentumStrategy(
             symbol=cfg.contract.symbol, order_quantity=s.order_quantity)
+    if s.name == "air3_trend":
+        return Air3TrendStrategy(
+            symbol=cfg.contract.symbol, order_quantity=s.order_quantity,
+            fast_period=s.trend_fast_period,
+            slow_period=s.trend_slow_period,
+            entry_band=s.trend_entry_band, exit_band=s.trend_exit_band)
     raise ValueError(f"unknown strategy {s.name!r}")
 
 

@@ -73,6 +73,11 @@ def _tsmom(symbol: str, lot: int, multiplier: float) -> BaseStrategy:
     return TimeSeriesMomentumStrategy(symbol, order_quantity=lot)
 
 
+def _air3(symbol: str, lot: int, multiplier: float) -> BaseStrategy:
+    from .air3_trend import Air3TrendStrategy
+    return Air3TrendStrategy(symbol, order_quantity=lot)
+
+
 STRATEGIES: Dict[str, StrategySpec] = {
     "ema_crossover": StrategySpec("ema_crossover",
                                   "mini_prop_os.strategy.ema_crossover", _ema),
@@ -84,6 +89,8 @@ STRATEGIES: Dict[str, StrategySpec] = {
                                   accumulates=True),
     "tsmom_12_1": StrategySpec("tsmom_12_1",
                                "mini_prop_os.strategy.tsmom_12_1", _tsmom),
+    "air3_trend": StrategySpec("air3_trend",
+                               "mini_prop_os.strategy.air3_trend", _air3),
 }
 
 
