@@ -1,7 +1,10 @@
 # AIR3 on SMH — daily watch log
 
-Paper deployment: AIR3 SMH ride (5% band), Astral paper, $10,000,
-saved 6422, deployment 1922, run 6456096e, account a0d10371….
+Paper deployment: AIR3 SMH ride (5% band), Astral paper, $870 (the
+size of our real starting capital), saved 6422, deployment 1924, run
+01096684, account a0d10371…. Operator redeployed it at $870 on
+2026-10-04 04:08 UTC, replacing deployment 1922 ($10,000, run 6456096e,
+no fills).
 Rule: buy SMH (95% of equity) when close > 1.05×200d SMA and 50d > 200d;
 sell on close < 0.95×200d. Daily bars, signal at the close, fill at the
 next open. No other stop.
@@ -48,5 +51,36 @@ https://claude.ai/code/artifact/2e9ffdd9-8286-4d90-8476-85de18cc4a6a
 Switch history: AIR3-SOXX (saved 6054, deployment 1861) ran 2026-10-02
 → 2026-10-04 with no fills; its scheduled 10-05 entry was cancelled
 before dispatch and the deployment replaced by AIR3-SMH.
+
+## Redeployment at $870 — 2026-10-04
+
+Operator redeployed saved 6422 at $870 (deployment 1924, run 01096684).
+Rule, account and bar size unchanged (verified against the saved
+strategy). Scale check: the same rule at $870 reproduces the $10k numbers
+exactly — full 2014-11 → 2026-10 +1,144%, 23.6%/yr, DD −27.6%, 5 closed
++ 1 open, 80% win (bt_e7987dd3922f6737); recent 2023-11 → 2026-10
++206%, 47.6%/yr, DD −24.0% (bt_e1b69f5310b7bf80). Astral paper sizes
+fractional shares, so the 95% allocation ($826.50 ≈ 1.31 SMH at the
+2026-10-02 close of 630.60) is exact; a whole-share broker would hold 1
+share = 72.5% of equity.
+
+State at the 2026-10-02 close: SMA200 499.50, SMA50 569.85, buy level
+524.47, sell level 474.52, close 26.2% above the 200-day, 24.8% above
+the exit. In dollars: max historical DD −27.6% ≈ −$240; a full trend
+break from here would cost ≈ −$205 on the ≈ $826 position before the
+rule sells. First signal is evaluated at the 2026-10-05 close.
+
+Drawbacks found and handled:
+- Routines (daily watch, morning fill check, weekly re-validation,
+  hourly check-in) referenced deployment 1922/run 6456096e/$10k —
+  updated to 1924/01096684/$870.
+- Deployment 1924's Astral notification channels are email + toast only
+  (1922 also had app push). Cannot be changed from here without a
+  redeploy; operator can enable push on the deployment in the Astral
+  dashboard.
+- Costs at this size are negligible on paper (3 bp/side ≈ $0.25); a
+  live IBKR Pro order carries a $1 minimum, ≈ 12 bp/side on $826 —
+  still small, but every whipsaw costs ≈ $2 in commissions plus the
+  price move.
 
 ## Daily entries
