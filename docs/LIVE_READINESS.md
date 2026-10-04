@@ -166,5 +166,10 @@ so the TFSA runs **route B: signals executed by hand**.
   config is a bug until the live-readiness order is signed.
 - Credentials are typed by the operator, never stored in the repo, never
   pasted to the assistant.
-- Every Astral deploy, undeploy, cancel or manual order needs the
-  operator's explicit approval of that exact preview.
+- **Astral paper and signals-only:** standing authority from the
+  operator (2026-10-04, "Stop asking for permission just get it done").
+  The assistant deploys, undeploys, cancels and places paper orders on
+  its own judgement and reports what it did.
+- **Real money** (Astral `user_approved` or `full_broker`, any live
+  broker order, IBKR live ports): still needs the operator's explicit
+  approval of that exact preview.
