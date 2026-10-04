@@ -5,7 +5,8 @@ Run 2026-10-04: `python scripts/ftmo_shadow.py --bars-dir <dir> --dir <out>
 Input: Astral 30-minute bars of QQQ/SPY/DIA/IWM (2024-04-15 to 2026-10-02),
 sha256 QQQ `0d403269...`, SPY `7f989221...`, DIA `96d65107...`, IWM `9e27330a...`.
 
-The unchanged bot code (`ftmo_bot.Runner`) traded a simulated CAD 15,000
+The bot code (the same `ftmo_bot.Runner` the MT5 bot runs, with no
+shadow-specific hooks) traded a simulated CAD 15,000
 FTMO account at 3% risk, ticked every 30 minutes of each US session
 (09:35 to 16:05 New York), seeing only bars that had ended. Stops rest in
 the simulated broker (`ftmo_bot/broker_sim.py`) and fill at the stop or

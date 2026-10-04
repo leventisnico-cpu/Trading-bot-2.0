@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 import json
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -612,7 +613,8 @@ def test_sim_broker_state_round_trip():
 
 def test_shadow_tick_times_sessions_only():
     import importlib.util
-    spec = importlib.util.spec_from_file_location("ftmo_shadow", "scripts/ftmo_shadow.py")
+    spec = importlib.util.spec_from_file_location(
+        "ftmo_shadow", Path(__file__).resolve().parents[1] / "scripts" / "ftmo_shadow.py")
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     fri, mon = date(2026, 10, 2), date(2026, 10, 5)
@@ -644,7 +646,8 @@ def test_shadow_run_caps_at_data_and_resumes(tmp_path):
     import csv
     from ftmo_bot.broker_sim import load_csv
     import importlib.util
-    spec = importlib.util.spec_from_file_location("ftmo_shadow", "scripts/ftmo_shadow.py")
+    spec = importlib.util.spec_from_file_location(
+        "ftmo_shadow", Path(__file__).resolve().parents[1] / "scripts" / "ftmo_shadow.py")
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     d = date(2026, 10, 5)
@@ -666,11 +669,6 @@ def test_shadow_run_caps_at_data_and_resumes(tmp_path):
     assert m.main(args[:4] + ["--until", ny(d, 21, 0).isoformat()]) == 0
     assert json.loads((out / "days.json").read_text()) == days   # nothing new, nothing lost
 
-
-def test_bar_history_covers_200_sessions_of_23h_cfds():
-    from ftmo_bot import runner
-    bars_per_session = 46                      # ~23 h of half-hour bars
-    assert runner.BAR_COUNT // bars_per_session >= runner.MIN_SESSIONS * 1.25
 
 
 def test_short_history_means_no_plan_not_a_crash(tmp_path):

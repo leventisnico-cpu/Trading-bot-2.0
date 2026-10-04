@@ -156,7 +156,11 @@ dry-run week on FTMO's own MT5 terminal.
    ```
 
    Read `state\ftmo_bot.log` each day: the plan after 16:05 New York, the
-   "DRY-RUN buy" lines at the next open, lot sizes and stops.
+   "DRY-RUN buy" lines at the next open, lot sizes and stops. A second
+   entry while one position is open is cut by `cap_combined_risk` (the
+   log says "cut from X to Y lots"): that is intended, so both stops
+   together stay above FTMO's loss lines. Set it to `false` only if you
+   accept that two stops in one day can fail the account.
 8. Go live on the evaluation only after the dry-run week looks right:
    set `dry_run: false` in `state\ftmo_config.yaml`, then
 
