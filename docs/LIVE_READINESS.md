@@ -123,6 +123,40 @@ signal and fill. Then pick route 1 or route 2. Route 1 keeps every rule
 of the repo intact. Route 2 keeps the asset you chose and studied, and
 needs your own change to the review rule first.
 
+## Operator decision (2026-10-04): AIR3 on SMH
+
+The operator chose **SMH** (route 2). Until the operator commits the
+review-rule amendment below, the bot cannot start AIR3 on a live port,
+so the TFSA runs **route B: signals executed by hand**.
+
+* **Signal source:** the Astral paper deployment 1924 (AIR3 on SMH) and
+  the daily watch routine, which reports each scheduled order after the
+  16:00 ET close.
+* **Where SMH stood on 2026-10-02:** close 630.60; buy level 1.05 ×
+  SMA200 = 524.47; sell level 0.95 × SMA200 = 474.52; SMA50 569.85 above
+  SMA200 499.50. AIR3 is in its buy regime, so unless SMH closes below
+  524.47 on Monday 2026-10-05 the first order is a BUY at Tuesday's
+  open.
+* **Operator's order in IBKR (TFSA):** buy SMH at Tuesday's open (a
+  market-on-open or a limit near the open), as many whole shares as the
+  USD cash allows (about one share at ~$630 with ~$870 USD). Hold until
+  the watch reports a SELL (a close below 0.95 × SMA200), then sell at
+  the next open. No stop, no adding, no shorting. A handful of orders a
+  year.
+* **To let the bot trade it by itself instead:** the operator commits
+  this change to hard rule 1 in `.claude/agents/code-reviewer.md` (the
+  assistant does not make it):
+
+  > Exception: a live start for `air3_trend` on SMH is allowed when
+  > `deploy/waivers/operator_waivers.yaml` holds a waiver signed by the
+  > operator; the waiver check must reject future dates, placeholders
+  > and the assistant as signer, and `deploy/waivers/` must be
+  > owner-reviewed (CODEOWNERS).
+
+  After that commit the assistant builds the hardened waiver, the
+  reviewer re-checks it, and the operator signs the waiver and switches
+  the port to 4001 in a private `state/` copy of the config.
+
 ## Hard rules that do not change with the decision
 
 - The TFSA trades stocks and ETFs only. No futures, no shorts, no margin.

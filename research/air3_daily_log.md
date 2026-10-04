@@ -121,3 +121,12 @@ operator's own amendment to the review rule first. A waiver path for SMH
 was built, blocked by the repo's safety reviewer (it weakens the live-
 start refusal), and withdrawn. The gate now also charges IBKR's $1.00
 per-order minimum at each order's actual size.
+
+## Operator decision: SMH (2026-10-04)
+
+The operator chose AIR3 on SMH. The gate still marks it NOT DEPLOYABLE on
+SMH, so the TFSA runs it by hand from the Astral signal (route B in
+`docs/LIVE_READINESS.md`) until the operator commits the review-rule
+amendment that allows a signed waiver. SMH closed 630.60 on 2026-10-02,
+21% above the 524.47 buy level: the first signal on Monday's close is
+expected to be a BUY for Tuesday's open.
