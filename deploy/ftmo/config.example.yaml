@@ -16,7 +16,7 @@ max_positions: 2
 notional_cap: 5.0
 atr_stop_mult: 3.0
 max_hold_sessions: 10
-initial_balance: null    # null = the account balance when the bot first starts
+initial_balance: 15000   # the FTMO account size; the loss lines are % of this
 profit_target: 0.10      # Phase 1: 0.10, Phase 2: 0.05, funded account: null
 min_trading_days: 4
 max_loss: 0.10

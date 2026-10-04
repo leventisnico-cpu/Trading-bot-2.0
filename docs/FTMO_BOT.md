@@ -20,6 +20,14 @@ The research verdict for FAST-4 is **NO-GO** for a fast pass. On
 Each evaluation fee buys roughly a one-in-five chance. The bot does not
 change those odds; it only executes the rule faithfully.
 
+**Why two positions can fail the account in one day.** Two open
+positions at 3% each put 6% at risk, more than FTMO's 5% daily limit. The
+guard closes everything just before the daily line, but if both stops are
+hit by one gap (overnight or at the open) the loss can pass the line
+before the guard can act. That is the main failure in the research, and
+it stays with `risk_per_trade: 0.03` and `max_positions: 2`. Setting
+`max_positions: 1` removes it at the cost of fewer trades (not tested).
+
 ## What it does
 
 * Trades the four FTMO US index CFDs (`US100.cash`, `US500.cash`,
@@ -30,7 +38,14 @@ change those odds; it only executes the rule faithfully.
   5-day average or after 10 sessions.
 * At the next US open (09:31–10:30 New York) it sends exits first, then
   entries: 3% of balance at risk, stop at entry − 3 × ATR(14) resting in
-  MT5, at most two positions, notional at most 5× balance.
+  MT5, at most two positions, notional at most 5× balance. Each plan is
+  executed at most once: it is marked done and saved before any order
+  is sent, so a crash or restart can miss a trade but never double it.
+  A plan older than the previous session is thrown away.
+* Exits are never blocked. A close that fails is retried every minute
+  until it succeeds; positions the bot finds open but does not know are
+  adopted, never forgotten. If MT5 cannot report positions, the bot does
+  nothing that minute.
 * **Guard:** if equity comes within 0.2% of the account of FTMO's daily
   line (day-start balance − 5%) or the max-loss line (90% of initial),
   it closes everything and blocks entries until the next FTMO day (for
@@ -69,7 +84,9 @@ to it.
    copy deploy\ftmo\config.example.yaml state\ftmo_config.yaml
    ```
 
-   Set `profit_target` to `0.10` for Phase 1. Set `mt5_path` if the
+   Set `initial_balance` to the account size you bought (15000 for the
+   CAD 15,000 account): FTMO's loss lines are percentages of it. Set
+   `profit_target` to `0.10` for Phase 1. Set `mt5_path` if the
    terminal is not found automatically.
 6. Preflight (read-only):
 
@@ -81,6 +98,15 @@ to it.
    last close with the index on a chart: if the session date or close is
    off, the server-time offset (New York + 7 h, `broker_mt5.py`) does not
    match your server and must be fixed before anything else.
+
+   Any time, to see what the bot will do at the next open (read-only):
+
+   ```powershell
+   py -m ftmo_bot plan --config state\ftmo_config.yaml
+   ```
+
+   It prints the exits and entries from the last completed session, with
+   the approximate entry price and stop.
 7. **Dry-run for at least one full week:**
 
    ```powershell
@@ -98,7 +124,8 @@ to it.
 
    Keep the PC (or VPS) and the terminal running on weekdays.
 9. When the bot halts with "profit target reached", check FTMO's
-   dashboard. For Phase 2 set `profit_target: 0.05`, delete
+   dashboard. For Phase 2 set `profit_target: 0.05` (and
+   `initial_balance` to the new account's size), delete
    `state\ftmo_state.json`, and restart on the new account. On the funded
    account set `profit_target: null` (keep-alive is then off).
 

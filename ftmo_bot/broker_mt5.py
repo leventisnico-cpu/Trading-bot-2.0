@@ -40,8 +40,8 @@ class MT5Broker:
         return datetime.now(timezone.utc)
 
     def _to_utc(self, server_epoch: int) -> datetime:
-        naive_ny = datetime.utcfromtimestamp(server_epoch) - self.offset
-        return naive_ny.replace(tzinfo=NY).astimezone(timezone.utc)
+        server = datetime.fromtimestamp(server_epoch, timezone.utc).replace(tzinfo=None)
+        return (server - self.offset).replace(tzinfo=NY).astimezone(timezone.utc)
 
     def bars(self, symbol: str, minutes: int, count: int) -> List[Bar]:
         tf = {30: self.mt5.TIMEFRAME_M30, 15: self.mt5.TIMEFRAME_M15,
@@ -73,7 +73,12 @@ class MT5Broker:
         return -float(p)
 
     def positions(self, magic: int) -> List[Position]:
-        ps = self.mt5.positions_get() or ()
+        ps = self.mt5.positions_get()
+        if ps is None:                      # an error, not "no positions"
+            code = self.mt5.last_error()
+            if code and code[0] != 1:       # 1 = RES_S_OK
+                raise RuntimeError(f"positions_get failed: {code}")
+            ps = ()
         return [Position(p.ticket, p.symbol, p.volume, p.price_open, p.sl)
                 for p in ps if p.magic == magic]
 
@@ -93,6 +98,11 @@ class MT5Broker:
         ok = r.retcode == self.mt5.TRADE_RETCODE_DONE
         return Fill(ok, r.price, r.order, f"{r.retcode} {r.comment}")
 
+    def _round(self, symbol: str, price: float) -> float:
+        i = self.mt5.symbol_info(symbol)
+        tick = i.trade_tick_size or 10 ** -i.digits
+        return round(round(price / tick) * tick, i.digits)
+
     def buy(self, symbol: str, volume: float, sl: Optional[float],
             magic: int, comment: str) -> Fill:
         _, ask = self.quote(symbol)
@@ -102,7 +112,7 @@ class MT5Broker:
                    type_time=self.mt5.ORDER_TIME_GTC,
                    type_filling=self._filling(symbol))
         if sl:
-            req["sl"] = sl
+            req["sl"] = self._round(symbol, sl)
         return self._send(req)
 
     def close(self, position: Position, magic: int, comment: str) -> Fill:

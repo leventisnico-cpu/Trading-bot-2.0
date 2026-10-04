@@ -151,6 +151,9 @@ class FakeBroker:
         self.sent = []
         self.clock = None
         self.next_ticket = 1
+        self.fail_close = False
+        self.fail_positions = False
+        self.fail_buy = False
 
     def account(self):
         return Account(1, "FTMO-Demo", "CAD", self.balance, self.equity, True)
@@ -172,9 +175,13 @@ class FakeBroker:
         return entry - stop            # 1 lot = 1 unit, account ccy = quote ccy
 
     def positions(self, magic):
+        if self.fail_positions:
+            raise RuntimeError("positions_get failed")
         return list(self.pos)
 
     def buy(self, symbol, volume, sl, magic, comment):
+        if self.fail_buy:
+            raise ConnectionError("terminal went away")
         t = self.next_ticket
         self.next_ticket += 1
         _, ask = self.quote(symbol)
@@ -183,6 +190,11 @@ class FakeBroker:
         return Fill(True, ask, t, "done")
 
     def close(self, position, magic, comment):
+        if self.fail_close == "raise":
+            raise RuntimeError("no quote")
+        if self.fail_close:
+            self.sent.append(("close-failed", position.symbol))
+            return Fill(False, message="10004 requote")
         self.pos = [p for p in self.pos if p.ticket != position.ticket]
         self.sent.append(("close", position.symbol, position.volume, comment))
         return Fill(True, 0, position.ticket, "done")
@@ -208,6 +220,30 @@ def history(dip_symbol="US100.cash", days=260):
     return out, ds
 
 
+def next_day(d: date) -> date:
+    return d + timedelta(days=3 if d.weekday() == 4 else 1)
+
+
+def open_session(bars, d: date, n: int = 3):
+    """Append the first bars of session ``d`` (pre-market + 09:30 + ...)
+    for every symbol, priced near each symbol's last close."""
+    for sym in bars:
+        last = bars[sym][-2][4]
+        bars[sym] += session_bars(d, last * 0.99, last, last * 0.98,
+                                  last * 1.01)[:n]
+
+
+def planned(tmp_path, **kw):
+    """A runner that planned after the last close (US100 entry pending)."""
+    bars, ds = history()
+    b = FakeBroker(bars)
+    b.clock = ny(ds[-1], 16, 10)
+    r = Runner(cfg(tmp_path, **kw), b)
+    r.tick()
+    assert r.st.pending_entries == ["US100"]
+    return r, b, bars, ds
+
+
 def cfg(tmp_path, **kw):
     c = FtmoConfig(state_path=str(tmp_path / "st.json"),
                    log_path=str(tmp_path / "log"), **kw)
@@ -216,35 +252,92 @@ def cfg(tmp_path, **kw):
 
 
 def test_runner_plans_after_close_and_buys_at_next_open(tmp_path):
-    bars, ds = history()
-    b = FakeBroker(bars)
-    last = ds[-1]
-    b.clock = ny(last, 16, 10)
-    r = Runner(cfg(tmp_path, dry_run=False), b)
-    r.tick()
-    assert r.st.pending_entries == ["US100"] and r.st.plan_day == last.isoformat()
-    # next morning: a 09:30 bar appears, the bot buys at 09:35
-    nxt = last + timedelta(days=3 if last.weekday() == 4 else 1)
-    bars["US100.cash"] += session_bars(nxt, 90, 91, 89, 92)[:3]
+    r, b, bars, ds = planned(tmp_path, dry_run=False)
+    assert r.st.plan_day == ds[-1].isoformat()
+    atr = r.st.pending_atr["US100"]
+    nxt = next_day(ds[-1])
+    open_session(bars, nxt)
     b.clock = ny(nxt, 9, 35)
     r.tick()
     buys = [x for x in b.sent if x[0] == "buy"]
     assert len(buys) == 1 and buys[0][1] == "US100.cash"
     vol, sl = buys[0][2], buys[0][3]
     _, ask = b.quote("US100.cash")
-    assert sl == pytest.approx(ask - 3 * r.st.pending_atr["US100"])
-    assert vol * (ask - sl) <= 0.03 * 15000 + 1e-6          # risk ≤ 3%
+    assert sl == pytest.approx(ask - 3 * atr)
+    assert vol * (ask - sl) <= 0.03 * 15000 + 1e-6          # risk <= 3%
     assert "US100" in r.st.held and r.st.trading_days
+    assert r.st.pending_entries == [] and r.st.executed_day == nxt.isoformat()
+
+
+def test_plan_executes_once_even_after_a_crash(tmp_path):
+    r, b, bars, ds = planned(tmp_path, dry_run=False)
+    nxt = next_day(ds[-1])
+    open_session(bars, nxt)
+    b.clock = ny(nxt, 9, 35)
+    b.fail_buy = True
+    r.tick()                                       # buy raises mid-execution
+    b.fail_buy = False
+    r2 = Runner(r.cfg, b)                          # restart from saved state
+    for m in (36, 40, 50):
+        b.clock = ny(nxt, 9, m)
+        r2.tick()
+        r.tick()
+    assert [x for x in b.sent if x[0] == "buy"] == []    # never sent twice
+
+
+def test_ticking_twice_buys_once(tmp_path):
+    r, b, bars, ds = planned(tmp_path, dry_run=False)
+    nxt = next_day(ds[-1])
+    open_session(bars, nxt)
+    for m in (35, 36, 37):
+        b.clock = ny(nxt, 9, m)
+        r.tick()
+    assert len([x for x in b.sent if x[0] == "buy"]) == 1
+
+
+def test_stale_plan_is_discarded(tmp_path):
+    r, b, bars, ds = planned(tmp_path, dry_run=False)
+    d1 = next_day(ds[-1])
+    open_session(bars, d1, n=15)                   # a whole session the bot missed
+    d2 = next_day(d1)
+    open_session(bars, d2)
+    b.clock = ny(d2, 9, 35)
+    r.tick()
+    assert b.sent == [] and r.st.pending_entries == []
+
+
+@pytest.mark.parametrize("hh,mm,bought", [(9, 30, 0), (9, 31, 1), (10, 30, 1),
+                                          (10, 31, 0)])
+def test_entry_window(tmp_path, hh, mm, bought):
+    r, b, bars, ds = planned(tmp_path, dry_run=False)
+    nxt = next_day(ds[-1])
+    open_session(bars, nxt)
+    b.clock = ny(nxt, hh, mm)
+    r.tick()
+    assert len([x for x in b.sent if x[0] == "buy"]) == bought
+    if (hh, mm) == (9, 30):
+        assert r.st.pending_entries == ["US100"]   # not yet; still pending
+
+
+def test_exits_run_while_entries_are_blocked(tmp_path):
+    bars, ds = history()
+    b = FakeBroker(bars)
+    b.clock = ny(ds[-1], 9, 40)
+    b.pos = [Position(7, "US30.cash", 1.0, 100, 90)]
+    r = Runner(cfg(tmp_path, dry_run=False), b)
+    r.st.held["US30"] = {"ticket": 7, "entry_day": ds[-3].isoformat()}
+    r.st.blocked_until = "2999-01-01"
+    r.st.pending_exits, r.st.pending_entries = ["US30"], ["US100"]
+    r.st.pending_atr = {"US100": 1.0}
+    r.execute(b.clock, b.positions(0))
+    assert b.sent == [("close", "US30.cash", 1.0, "FAST4 exit")]
+    assert r.st.held == {}
 
 
 def test_dry_run_sends_nothing(tmp_path):
-    bars, ds = history()
-    b = FakeBroker(bars)
-    b.clock = ny(ds[-1], 16, 10)
-    r = Runner(cfg(tmp_path), b)                       # dry_run default True
-    r.tick()
-    nxt = ds[-1] + timedelta(days=3 if ds[-1].weekday() == 4 else 1)
-    bars["US100.cash"] += session_bars(nxt, 90, 91, 89, 92)[:3]
+    r, b, bars, ds = planned(tmp_path)                 # dry_run default True
+    nxt = next_day(ds[-1])
+    open_session(bars, nxt)
     b.clock = ny(nxt, 9, 35)
     r.tick()
     assert b.sent == []
@@ -273,6 +366,78 @@ def test_guard_flattens_and_blocks_entries(tmp_path):
     assert r.st.blocked_until is not None and r.st.halted is None
 
 
+def test_failed_close_is_kept_and_retried(tmp_path):
+    bars, ds = history()
+    b = FakeBroker(bars)
+    b.clock = ny(ds[-1], 12, 0)
+    b.pos = [Position(5, "US100.cash", 1.0, 100, 90)]
+    r = Runner(cfg(tmp_path, dry_run=False), b)
+    r.tick()
+    assert r.st.held["US100"]["ticket"] == 5          # adopted
+    b.equity, b.fail_close = 14260, True
+    r.tick()                                           # guard close fails
+    assert r.st.to_close == [5] and "US100" in r.st.held and b.pos
+    b.fail_close = False
+    b.clock = ny(ds[-1], 12, 1)
+    r.tick()                                           # retried
+    assert b.pos == [] and r.st.to_close == [] and r.st.held == {}
+
+
+def test_close_exception_is_queued_like_a_failure(tmp_path):
+    bars, ds = history()
+    b = FakeBroker(bars)
+    b.clock = ny(ds[-1], 12, 0)
+    b.pos = [Position(5, "US100.cash", 1.0, 100, 90),
+             Position(6, "US30.cash", 1.0, 100, 90)]
+    r = Runner(cfg(tmp_path, dry_run=False), b)
+    r.tick()
+    b.equity, b.fail_close = 14260, "raise"
+    r.tick()                                           # no exception escapes
+    assert sorted(r.st.to_close) == [5, 6] and len(r.st.held) == 2
+
+
+def test_holiday_keeps_the_plan_until_the_next_session(tmp_path):
+    r, b, bars, ds = planned(tmp_path, dry_run=False)
+    holiday = next_day(ds[-1])                         # no bars that day
+    b.clock = ny(holiday, 9, 45)
+    r.tick()
+    b.clock = ny(holiday, 16, 10)
+    r.tick()
+    assert r.st.pending_entries == ["US100"] and b.sent == []
+    nxt = next_day(holiday)
+    open_session(bars, nxt)
+    b.clock = ny(nxt, 9, 35)
+    r.tick()
+    assert [x[1] for x in b.sent if x[0] == "buy"] == ["US100.cash"]
+
+
+def test_bars_error_at_the_close_retries_planning(tmp_path):
+    bars, ds = history()
+    b = FakeBroker(bars)
+    b.clock = ny(ds[-1], 16, 6)
+    r = Runner(cfg(tmp_path), b)
+    good = b.bars
+    b.bars = lambda *a: (_ for _ in ()).throw(RuntimeError("no bars"))
+    with pytest.raises(RuntimeError):
+        r.tick()
+    b.bars = good
+    b.clock = ny(ds[-1], 16, 7)
+    r.tick()
+    assert r.st.pending_entries == ["US100"]
+
+
+def test_positions_error_aborts_tick_and_keeps_state(tmp_path):
+    bars, ds = history()
+    b = FakeBroker(bars)
+    b.clock = ny(ds[-1], 12, 0)
+    r = Runner(cfg(tmp_path, dry_run=False), b)
+    r.st.held["US100"] = {"ticket": 99, "entry_day": ds[-2].isoformat()}
+    b.fail_positions = True
+    with pytest.raises(RuntimeError):
+        r.tick()
+    assert "US100" in r.st.held                        # not read as "stopped out"
+
+
 def test_target_flattens_and_halts(tmp_path):
     bars, ds = history()
     b = FakeBroker(bars)
@@ -290,14 +455,38 @@ def test_keepalive_after_25_days_in_evaluation_only(tmp_path):
     b = FakeBroker(bars)
     b.clock = ny(ds[-1], 11, 0)
     r = Runner(cfg(tmp_path, dry_run=False), b)
+    r.roll_day(b.clock)
     r.st.last_fill = (b.clock - timedelta(days=26)).isoformat()
-    r.keepalive(b.clock)
+    r.keepalive(b.clock, [])
     assert [x[0] for x in b.sent] == ["buy", "close"] and b.pos == []
     b.sent.clear()
     r2 = Runner(cfg(tmp_path / "f", dry_run=False, profit_target=None), b)
+    r2.roll_day(b.clock)
     r2.st.last_fill = (b.clock - timedelta(days=60)).isoformat()
-    r2.keepalive(b.clock)
+    r2.keepalive(b.clock, [])
     assert b.sent == []
+
+
+def test_keepalive_refused_while_blocked(tmp_path):
+    bars, ds = history()
+    b = FakeBroker(bars)
+    b.clock = ny(ds[-1], 11, 0)
+    r = Runner(cfg(tmp_path, dry_run=False), b)
+    r.roll_day(b.clock)
+    r.st.blocked_until = "2999-01-01"
+    r.st.last_fill = (b.clock - timedelta(days=26)).isoformat()
+    r.keepalive(b.clock, [])
+    assert b.sent == []
+
+
+def test_compute_plan_is_read_only(tmp_path):
+    bars, ds = history()
+    b = FakeBroker(bars)
+    b.clock = ny(ds[-1], 20, 0)
+    r = Runner(cfg(tmp_path), b)
+    day, p = r.compute_plan(b.clock)
+    assert day == ds[-1] and p.entries == ["US100"]
+    assert r.st.pending_entries == [] and not (tmp_path / "st.json").exists()
 
 
 def test_mt5_adapter_is_the_only_metatrader_import():
@@ -305,3 +494,48 @@ def test_mt5_adapter_is_the_only_metatrader_import():
     hits = [p.name for p in pathlib.Path("ftmo_bot").glob("*.py")
             if "import MetaTrader5" in p.read_text()]
     assert hits == ["broker_mt5.py"]
+
+
+# ------------------------------------------------------- MT5 adapter
+
+class FakeMT5:
+    RES_S_OK = 1
+
+    def __init__(self):
+        self.ps, self.err = (), (1, "Success")
+
+    def initialize(self, *a):
+        return True
+
+    def last_error(self):
+        return self.err
+
+    def positions_get(self):
+        return self.ps
+
+    def symbol_info(self, symbol):
+        from types import SimpleNamespace
+        return SimpleNamespace(trade_tick_size=0.25, digits=2)
+
+
+def test_mt5_adapter_positions_rounding_and_clock(monkeypatch):
+    import sys
+    from types import SimpleNamespace
+    fake = FakeMT5()
+    monkeypatch.setitem(sys.modules, "MetaTrader5", fake)
+    from ftmo_bot.broker_mt5 import MT5Broker
+    b = MT5Broker()
+    P = lambda t, m: SimpleNamespace(ticket=t, symbol="US100.cash", volume=1.0,
+                                     price_open=1.0, sl=0.0, magic=m)
+    fake.ps = (P(1, 404040), P(2, 7))
+    assert [p.ticket for p in b.positions(404040)] == [1]     # other magic ignored
+    fake.ps = None                                            # no positions, no error
+    assert b.positions(404040) == []
+    fake.err = (-10004, "No IPC connection")                  # an error is not "none"
+    with pytest.raises(RuntimeError):
+        b.positions(404040)
+    assert b._round("US100.cash", 19876.137) == 19876.25
+    # server 2026-10-05 16:30 (= NY 09:30, EDT) -> 13:30 UTC
+    epoch = int(datetime(2026, 10, 5, 16, 30, tzinfo=ZoneInfo("UTC")).timestamp())
+    got = b._to_utc(epoch)
+    assert got.astimezone(NY) == datetime(2026, 10, 5, 9, 30, tzinfo=NY)
