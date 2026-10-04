@@ -458,3 +458,10 @@ Astral objects: SMH=41110, XSD=41111, XLK=41112, QQQ=41113, VGT=41114.
 Backtests (full): SMH bt_741fc186aeb5a5cb, XSD bt_95b3ecfb616b07d4, XLK
 bt_051fa6233bf9d339, QQQ bt_7120b3fb7ad6239d, VGT bt_65f5ba96f5b8d79a.
 SMH folds: bt_0037c4bb07ba03bf / bt_c791ed4759387a41 / bt_4a753cf579495275.
+
+Update 2026-10-04: operator approved the switch. The scheduled SOXX entry
+(order 94764d43, 16.137 sh for the 10-05 open) was cancelled before
+dispatch, AIR3-SOXX (saved 6054, deployment 1861) was undeployed, and
+AIR3 SMH ride (saved 6422) was deployed on the same Astral paper account
+at $10,000 — deployment 1922, run 6456096e. First SMH signal is evaluated
+at the next daily close.
