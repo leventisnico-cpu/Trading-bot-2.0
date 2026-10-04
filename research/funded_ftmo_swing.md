@@ -49,3 +49,35 @@ neither rule reaches 70% in every fold).
 ## Result
 (filled in after the run, below this line, without editing anything
 above)
+
+Run 2026-10-04, `python research/funded_ftmo.py --data-dir <dir>`; full
+table (both sizings, with and without keep-alive) in
+`reports/funded_ftmo_swing.md`.
+
+| symbol | strategy | pass within 18 months | funded 1y survival | verdict |
+|---|---|---|---|---|
+| QQQ (US100 proxy) | AIR3 | 28% | 54% | **NO-GO** |
+| QQQ (US100 proxy) | DIP2 | 8% | 46% | **NO-GO** |
+| SMH (semis proxy) | AIR3 | 18% | 45% | **NO-GO** |
+| SMH (semis proxy) | DIP2 | 7% | 43% | **NO-GO** |
+
+What was learned:
+
+1. **The keep-alive trade works as intended.** Without it no start date
+   passes (inactivity takes 61–89%); with it inactivity disappears as
+   a failure cause.
+2. **FTMO's daily-loss rule is the real wall.** It is measured from the
+   day's starting *balance*, which excludes floating P&L, so any open
+   position more than about 5% below its entry price breaches it, even
+   with no single bad day. For a swing strategy it acts as a hidden 5%
+   stop on every trade. That is now the main failure cause (39–66% of
+   attempts at 1.0×), and it also halves funded survival relative to the
+   generic model.
+3. **Neither rule was designed for that constraint.** AIR3 holds through
+   10–25% pullbacks by design; DIP2 has no stop and adds after falls.
+4. A strategy built for a prop account would need its own stop well
+   inside 5% of entry and about 1% risk per trade. That is a new
+   hypothesis and needs a new note; it was not tested here.
+5. FTMO's rules were taken from search extracts of ftmo.com because
+   direct page fetches were blocked in this environment; the operator
+   should read the pages before relying on them.
