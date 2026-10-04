@@ -148,6 +148,8 @@ class Trade:
     pnl: float
     r: float
     reason: str
+    stop_pct: float = 0.0       # stop distance as a share of entry price
+    risk_pct: float = 0.0       # dollars at risk as a share of equity
 
 
 class Market:
@@ -288,7 +290,20 @@ def trade_day(m: Market, d, prev_d, equity: float,
     gross = side * shares * (exit_px - px)
     pnl = gross - commission(shares) * 2
     return Trade(d, side, px, stop, target, shares, exit_px, pnl,
-                 side * (exit_px - px) / risk, reason)
+                 side * (exit_px - px) / risk, reason,
+                 stop_pct=risk / entry, risk_pct=shares * risk / equity)
+
+
+def funnel(m: Market) -> Tuple[int, int, int]:
+    """Days (after the first) on which 1h and 4h bias agree at 10:00 ET,
+    days with a long or short break of structure, and all days."""
+    agree = bos = 0
+    for i, d in enumerate(m.days[1:], 1):
+        ix = m.day_idx[d]
+        t = m.b5.end[ix[min(5, len(ix) - 1)]]      # end of the 09:55 bar
+        agree += m.htf_bias(t) != 0
+        bos += any(find_setup(m, d, m.days[i - 1], s) for s in (1, -1))
+    return agree, bos, len(m.days) - 1
 
 
 def run_tjr(m: Market, days: Sequence, cash: float,
@@ -406,6 +421,10 @@ def main(argv=None) -> int:
             .dt.tz_convert(NY).dt.date
         daily = daily.drop_duplicates("date", keep="last").sort_values("date")
         m = Market(df5)
+        agree, nbos, ndays = funnel(m)
+        out += [f"**{sym} funnel:** 1h and 4h bias agree at 10:00 ET on "
+                f"{agree} of {ndays} days; a sweep plus break of structure "
+                f"(either side) happens on {nbos}.", ""]
         for cash in (10_000.0, 870.0):
             for name, sides in (("A two-sided", (1, -1)),
                                 ("B long-only (TFSA)", (1,))):
@@ -424,10 +443,17 @@ def main(argv=None) -> int:
                     gp = sum(t.pnl for t in all_tr if t.pnl > 0)
                     gl = -sum(t.pnl for t in all_tr if t.pnl < 0)
                     fees = sum(2 * commission(t.shares) for t in all_tr)
+                    med = sorted(all_tr, key=lambda t: t.stop_pct)[len(all_tr) // 2]
+                    medr = sorted(all_tr, key=lambda t: t.risk_pct)[len(all_tr) // 2]
+                    out.append(
+                        f"Median stop distance {med.stop_pct:.2%} of price; "
+                        f"median risk taken {medr.risk_pct:.2%} of equity "
+                        f"(target {RISK:.0%}, capped by no margin).")
                     out.append(
                         f"Full sample: {len(all_tr)} trades on "
                         f"{len(m.days)} days, avg {sum(rs)/len(rs):+.2f}R, "
-                        f"profit factor {gp / gl if gl else float('inf'):.2f}, "
+                        f"profit factor "
+                        f"{'n/a (no material losses)' if gl < 1 else f'{gp / gl:.2f}'}, "
                         f"commissions ${fees:,.0f}, exits: "
                         + ", ".join(f"{k} {sum(1 for t in all_tr if t.reason == k)}"
                                     for k in ("target", "stop", "time")) + ".")

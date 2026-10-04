@@ -124,14 +124,16 @@ Full sample, $10,000, 2024-09-10 → 2026-10-02:
 
 What was learned:
 
-1. **It rarely trades.** 7–13 setups in 516 days. The 1-hour and 4-hour
-   swing structure agreed on about 93 of SPY's days; only about 19 of
-   those produced a sweep and a 5-minute break before noon.
-2. **No margin kills the sizing.** A sweep stop on SPY is often 0.1% of
-   price, so 1% risk needs about 10× leverage. TJR gets it from
-   futures; the TFSA has none. Capped at 100% of equity, each trade
-   risks about 0.1% of the account, so even SMH's good run (7 of 9 hit
-   the 2R target) added only +4%.
+1. **It rarely trades.** 7–13 trades in 516 days. The 1-hour and 4-hour
+   bias agreed at 10:00 ET on 93–102 of 515 days per symbol, and a sweep
+   plus 5-minute break before noon happened on 19–24 (the report prints
+   these counts per symbol).
+2. **No margin kills the sizing.** The median stop was 0.16% of price
+   on SPY and 0.23–0.37% on QQQ and SMH, so risking 1% of the account
+   needs roughly 3–6× leverage. TJR gets it from futures; the TFSA has
+   none. Capped at 100% of equity, the median trade risked 0.12–0.37%
+   of the account, so even SMH's good run (7 of 9 hit the 2R target)
+   added only +4%.
 3. **The edge is not established.** SPY and QQQ lost on average; SMH's
    +1.45R comes from 9 trades, too few to separate skill from luck.
 4. **AIR3 beat it on every symbol.** AIR3 also fails the gate on this
@@ -146,3 +148,25 @@ What was learned:
    frequent short-term trading inside a TFSA as carrying on a business,
    which makes the gains taxable. An intraday method run daily raises
    that risk; AIR3's handful of trades a year does not.
+
+### Review addendum (2026-10-04, after the safety review; no rule changed)
+
+* The funnel counts and stop/risk medians above were first quoted from
+  an ad-hoc check; the script now prints them into the report, and item
+  1 and 2 were corrected to the printed values (the earlier "about
+  0.1%" understated the stops). Every trade, return and verdict is
+  identical to the first run.
+* **$870 run:** every variant also fails. With one to a few shares per
+  trade, the $1.00 minimum per order turns most 2R winners on SPY and
+  QQQ into break-even or small losses (0% win rate in most windows);
+  long-only lost 2.6% on SPY and 1.3% on QQQ, and made 1.7% on SMH,
+  against +25% to +141% buy-and-hold.
+* Two implementation details the rules left open, both of which can
+  only flatter the strategy: (a) on the bar where the limit fills, a
+  target touch counts if the stop was not touched, although the bar's
+  high may have come before the fill; (b) the time exit is the day's
+  last bar, which is the 15:55 bar except on early-close days. Neither
+  changes the verdict.
+* Daily bars are stamped at midnight New York time, so the AIR3
+  comparison's dates are correct (no look-ahead). One duplicated
+  2026-09-30 SPY/QQQ daily row is resolved by keeping the full-day bar.
