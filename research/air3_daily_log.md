@@ -130,3 +130,26 @@ SMH, so the TFSA runs it by hand from the Astral signal (route B in
 amendment that allows a signed waiver. SMH closed 630.60 on 2026-10-02,
 21% above the 524.47 buy level: the first signal on Monday's close is
 expected to be a BUY for Tuesday's open.
+
+## Weekly re-validation (2026-10-04, Sunday 22:12 UTC)
+
+Astral strategy 41110 (AIR3 SMH ride, hysteresis 5%) against 41122
+(buy-and-hold SMH, aligned), $100k, 1 bp commission, 2 bp slippage.
+
+| window | AIR3 return | AIR3 CAGR | AIR3 max DD | trades | win rate | B&H return | B&H max DD | AIR3 lower DD |
+|---|---|---|---|---|---|---|---|---|
+| full 2014-01 → 2026-10 | +1,144% | 23.6% | −27.6% | 5 closed + 1 open | 80% | +2,190% | −44.9% | yes |
+| fold 1 2013-03 → 2018-06 | +121% | 19.5% | −18.0% | 1 + 1 open | 100% | +134% | −22.9% | yes |
+| fold 2 2017-06 → 2022-08 | +58% | 11.1% | −27.6% | 3 | 67% | +99% | −37.2% | yes |
+| fold 3 2021-08 → 2026-10 | +319% | 39.6% | −24.1% | 1 + 1 open | 100% | +445% | −34.9% | yes |
+
+Against the 2026-10-04 baseline: full sample, fold 1 and fold 2 are
+unchanged; fold 3 moved from +304% to +319% (AIR3) and +424% to +445%
+(B&H) because the window now runs to Friday's close. **No flag:** win
+rate 80% (≥ 70%), AIR3's drawdown is lower than buy-and-hold's in every
+fold, nothing moved by a wide margin.
+
+Paper deployment 1924 ($870): flat, no orders yet. SMH closed 630.60
+on Friday, 21% above the 524.47 entry level with SMA50 above SMA200, so
+the first evaluation at Monday's close is expected to schedule a BUY for
+Tuesday's open. No exit distance applies until a position is open.
