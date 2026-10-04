@@ -93,3 +93,56 @@ does not change the verdict.
 ## Result
 (filled in after the run, below this line, without editing anything
 above)
+
+Run 2026-10-04 with `python research/tjr_backtest.py --data-dir <dir>`;
+full tables in `reports/tjr_ny_sweep_bos.md`. Input sha256:
+
+```
+c15309666a81034bf5949c233b9e2fd67f69232b9a54942c996013f63e6e2d17  spy.csv
+8075868e78e68a104a5d92d2b134ac0fcc0116e7d48ba8e73313916782901889  qqq.csv
+7044ecd37dd7f5d4dddfc4c11b05e09789ec7f05d53810bff3befbd680f96601  smh.csv
+0917a7ac89d9858a3ad780748c2796731b8d24ee9f3f4167787ba81c218b2355  spy_1d.csv
+762a47ac05821c13e0b654d1144091aabee0436bf6c77b7c536887504c67eae3  qqq_1d.csv
+86affc285ab46f9c3bd9638708a0b5ddf514be37a65fab856e15017b5d551879  smh_1d.csv
+```
+
+Full sample, $10,000, 2024-09-10 → 2026-10-02:
+
+| symbol | variant | trades | avg R | return | max DD | B&H return | B&H max DD | gate |
+|---|---|---|---|---|---|---|---|---|
+| SPY | A two-sided | 11 | −0.23 | −0.8% | 1.1% | +37.5% | 17.8% | FAIL (0/3) |
+| SPY | B long-only | 10 | −0.15 | −0.5% | 0.8% | +37.5% | 17.8% | FAIL (0/3) |
+| QQQ | A two-sided | 13 | −0.08 | −0.6% | 1.5% | +58.1% | 21.2% | FAIL (0/3) |
+| QQQ | B long-only | 7 | −0.03 | +0.3% | 0.4% | +58.1% | 21.2% | FAIL (0/3) |
+| SMH | A two-sided | 9 | +1.45 | +4.5% | 1.0% | +171.8% | 30.8% | FAIL (0/3) |
+| SMH | B long-only | 7 | +1.72 | +4.2% | 0.0% | +171.8% | 30.8% | FAIL (0/3) |
+| SPY | AIR3 (comparison) | 1 | | +17.1% | 13.7% | +37.5% | 17.8% | FAIL (0/3) |
+| QQQ | AIR3 (comparison) | 2 | | +21.8% | 12.5% | +58.1% | 21.2% | FAIL (0/3) |
+| SMH | AIR3 (comparison) | 1 | | +115.0% | 23.9% | +171.8% | 30.8% | FAIL (0/3) |
+
+**Verdict: FAIL on every symbol, both variants.** Not deployable.
+
+What was learned:
+
+1. **It rarely trades.** 7–13 setups in 516 days. The 1-hour and 4-hour
+   swing structure agreed on about 93 of SPY's days; only about 19 of
+   those produced a sweep and a 5-minute break before noon.
+2. **No margin kills the sizing.** A sweep stop on SPY is often 0.1% of
+   price, so 1% risk needs about 10× leverage. TJR gets it from
+   futures; the TFSA has none. Capped at 100% of equity, each trade
+   risks about 0.1% of the account, so even SMH's good run (7 of 9 hit
+   the 2R target) added only +4%.
+3. **The edge is not established.** SPY and QQQ lost on average; SMH's
+   +1.45R comes from 9 trades, too few to separate skill from luck.
+4. **AIR3 beat it on every symbol.** AIR3 also fails the gate on this
+   two-year window: it was a bull market and AIR3 was in cash for part
+   of it. Its long-run verdicts stand in
+   `reports/minipropos_expectancy_*.md`.
+5. **Tempting re-runs, not allowed under this note:** looser bias (1h
+   only), more liquidity levels, a 1R or 3R target, longer kill zone.
+   Any of them is a new note, and with only two years of 5-minute
+   history there is no untouched data left to test it on.
+6. **TFSA tax note (not a backtest result):** the CRA can treat
+   frequent short-term trading inside a TFSA as carrying on a business,
+   which makes the gains taxable. An intraday method run daily raises
+   that risk; AIR3's handful of trades a year does not.
