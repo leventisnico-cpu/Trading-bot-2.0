@@ -61,3 +61,37 @@ governed by `scripts/expectancy.py`, which this note does not change.
 ## Result
 (filled in after the run, below this line, without editing anything
 above)
+
+Run 2026-10-04, `python research/funded_backtest.py --data-dir <dir>`;
+full tables in `reports/funded_ai_70pct.md`.
+
+| symbol | strategy | trades | win rate | fold win rates | eval pass | funded 1y survival | verdict |
+|---|---|---|---|---|---|---|---|
+| SMH | AIR3 | 10 | 60% | 25% / 67% / 100% | 0% | 32% | FAIL |
+| SMH | DIP2 | 156 | 69% | 76% / 58% / 73% | 0% | 81% | FAIL |
+| QQQ | AIR3 | 8 | 62% | 33% / 50% / 100% | 0% | 57% | FAIL |
+| QQQ | DIP2 | 133 | 68% | 67% / 59% / 77% | 0% | 86% | FAIL |
+
+**Verdict: no prop candidate.** What was learned:
+
+1. **The 30-day inactivity rule decides everything.** 85–97% of
+   evaluation attempts end as "inactive". AIR3 holds one position for
+   months and DIP2 trades about 7 times a year, so both regularly go 30
+   days without a fill. Whether a real firm counts an *open position*
+   as activity, and whether it has an inactivity rule in the evaluation
+   at all, is a fact about the firm, not the strategy; it must be read
+   from the firm's rules before any money is spent.
+2. **DIP2 is close to 70% but not there.** 68–69% over 15–23 years, with
+   one fold at 58–59%. A rule that wins 70% everywhere was not found.
+   Its average loss is about as large as its average win, so win rate
+   alone is not the edge.
+3. **DIP2 keeps a funded account alive** (81–86% one-year survival at
+   1.0×) but earns only about +4% a year there. At 2.0× the 5% daily
+   loss rule takes most accounts.
+4. **AIR3's win rate on SMH is 60% from 2003** (the 75% quoted before was
+   2007 onward, 8 trades): ten trades are too few for a win rate to mean
+   much.
+5. Not allowed under this note: changing RSI thresholds, exit rules,
+   sizing or the inactivity assumption to get over 70%. A firm-specific
+   rerun (that firm's published rules replacing the generic model) is a
+   new note.
