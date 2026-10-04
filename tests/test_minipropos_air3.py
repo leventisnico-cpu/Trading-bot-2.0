@@ -164,6 +164,7 @@ def test_smh_paper_config_matches_the_astral_deployment():
 
 
 def test_app_factory_builds_air3_from_config():
+    pytest.importorskip("ib_insync")   # app.py wires ib_insync; CI lacks it
     from mini_prop_os.app import build_strategy
     cfg = load_config(AIR3_CFG)
     s = build_strategy(cfg)
