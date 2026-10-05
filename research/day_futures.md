@@ -91,3 +91,37 @@ reported as it is.
 
 (filled in after the run, below this line, without editing anything
 above)
+
+Run 2026-10-05, `python research/day_futures.py --data-dir <dir> --report
+reports/day_futures.md`. Full table in `reports/day_futures.md`.
+516 sessions: selection 309 (2024-09-11 → 2025-12-03), test 207
+(2025-12-04 → 2026-10-05).
+
+| system | chosen parameter | test win rate | test PF | test net $ (1 MES + 1 MNQ) | trades/session | months + |
+|---|---|---|---|---|---|---|
+| R (RSI(2) pullback) | t = 0.10% | 73% | 0.79 | −6,365 | 4.4 | 3/11 |
+| G (gap fade) | none reached 70% | 50–51% | 0.82 | −3,558 to −4,318 | 0.9–1.4 | 3–4/11 |
+
+**Verdict: NO-GO.** R reaches the 70% win rate but loses money: the
+average win is $36 and the average loss $122. Sensitivity, outside the
+pre-registered test and over the whole sample: at **zero** costs R
+with t = 0.10–0.30% has a profit factor of only 1.02–1.11; at 0.5
+bp/side it is 0.88–1.02. The high win rate is bought with losses 3–4×
+larger than wins, and there is no edge underneath to pay for it. G has
+no edge at all (about 50% wins, PF below 1 even before costs).
+
+## Round 2: DAY-70b (pre-registered 2026-10-05, after round 1's result)
+
+One variant, judged by the same selection rule and GO bar as round 1.
+This is a second look at the same data, so a pass would need extra
+caution before going to paper.
+
+**R2:** R plus a daily-trend filter.
+* Longs only if the previous session's close is above the 20-session
+  average of daily closes; shorts only if it is below.
+* Everything else as R: target t, stop 3t, entries from 09:45 to 15:00,
+  flat at 15:55.
+* Free parameter: t ∈ {0.10, 0.15, 0.20}%.
+
+### Result
+(filled in below after the run)
