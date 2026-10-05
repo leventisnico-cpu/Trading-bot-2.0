@@ -162,3 +162,17 @@ period is reported alongside for consistency.
 
 ### Result
 (filled in below after the run)
+
+Run 2026-10-05 (`reports/day_futures_r3.md`). Test period: 42% wins, PF
+0.92, −$1,198, 4/11 profitable months. Selection period: 46% wins, PF
+0.75. **NO-GO.** The published intraday-momentum effect is not present
+in SPY/QQQ over 2024–2026 after costs.
+
+## Overall verdict (rounds 1–3)
+
+No day-trading rule tested here is profitable after costs, at any win
+rate. The ones that win ≥ 70% of trades (R, R2) lose money, because the
+losers are 3–4× the winners. This repo has tested six ideas so far:
+TJR's sweep/BOS, the AI-70 swing set, FTMO swing, prop-native, FAST-4,
+and DAY-70 rounds 1–3. FAST-4 is the only one with a 70% win rate and a
+positive profit factor, and it holds positions for 1–10 days.
