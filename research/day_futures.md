@@ -1,0 +1,93 @@
+# Research note: DAY-70, daily index-futures day trades with a 70% win rate
+
+Written 2026-10-05, **before** any number was looked at.
+
+The operator's order (2026-10-05) is daily day trades on futures with a
+minimum 70% win rate, paper-traded for 2 weeks before any funded
+account.
+
+FAST-4 (`research/ftmo_fast_pass.md`) is a swing system that trades a
+few times a month, so it does not meet this order. This note replaces it
+as the system under test.
+
+## Instruments and data
+
+* **Contracts and proxies:** MES and MNQ (micro E-mini S&P 500 and
+  Nasdaq-100). They are traded through their ETF twins, SPY and QQQ,
+  which track the futures tick for tick in the cash session.
+* **Why proxies:** Astral rejects raw futures contracts ("Direct futures
+  contracts are not supported yet"). The paper run must therefore use
+  the ETFs.
+* **P&L conversion:** P&L is converted to micro-futures dollars. 1 MES =
+  $5 × S&P points ≈ $50 × SPY dollars. 1 MNQ = $2 × NDX points ≈
+  $81 × QQQ dollars (the NDX/QQQ ratio is about 40.6).
+* **Data:** Astral 5-minute bars, regular session only, 2024-09-11 to
+  2026-10-05. Input sha256: SPY `08f74f09…`, QQQ `97571a72…`.
+* **Selection period:** the first 60% of sessions. **Test period:** the
+  last 40%. Every result is reported for both.
+* **Costs:** 1 bp of price per side, about 2 bp round trip. For MES at
+  S&P 7,700 that is about 1.5 points ≈ $7.70 round trip. A realistic
+  micro round trip, with commission ~$1.24 plus 1 tick of slippage each
+  side, costs about $3.75, so these costs are conservative.
+
+## Fills (conservative)
+
+* A signal on a bar's close fills at the **next bar's open**.
+* Stops and targets rest in the market and fill at their price, or at
+  the bar's open if the bar gaps through.
+* If a bar touches both the stop and the target, the **stop** counts.
+* Every position is flat by the 15:55 bar close. No position is ever
+  held overnight.
+* Each symbol has at most one position at a time. New entries stop at
+  15:00.
+
+## The two systems (fixed rules; one free parameter each)
+
+**G: opening-gap fade.**
+* Gap = today's 09:30 open / yesterday's last close − 1.
+* If g_min ≤ |gap| ≤ 1.0%, fade the gap. Decide at the close of the
+  09:30–09:35 bar and fill at the next bar's open.
+* Target: yesterday's close (the gap filled). Stop: entry ∓ |gap| × close
+  (the gap's size again, beyond the entry). Time exit: 15:55.
+* At most 1 trade per symbol per day.
+* Free parameter: g_min ∈ {0.10, 0.20, 0.30}%.
+
+**R: intraday RSI(2) pullback with the day's direction.**
+* RSI(2) is Wilder's, computed on 5-minute closes and carried across
+  days.
+* Long when RSI(2) < 10 and close > today's 09:30 open. Short when
+  RSI(2) > 90 and close < today's 09:30 open.
+* Target: t% from entry. Stop: 3 × t% from entry. Time exit: 15:55.
+* Entries from 09:45 to 15:00. Several trades per day are allowed, one
+  at a time per symbol.
+* Free parameter: t ∈ {0.10, 0.15, 0.20, 0.30}%.
+
+## Choosing, in the selection period only
+
+1. For each system, pick the parameter value with the highest profit
+   factor among those with a win rate ≥ 70%. Ties go to the smaller
+   value.
+2. Then pick the system with the higher selection-period profit factor.
+   If neither system reaches 70% in selection, the verdict is NO-GO.
+
+## GO bar: test period, chosen system, SPY and QQQ combined, after costs
+
+All five must hold:
+1. **Win rate ≥ 70%.**
+2. **Profit factor ≥ 1.2** and net P&L > 0.
+3. **At least 1 trade per session on average.** These are daily day
+   trades.
+4. **Profitable in at least 6 of the test-period calendar months.**
+5. **Max drawdown smaller than half the test-period net P&L**, measured
+   on 1 MES + 1 MNQ per signal.
+
+If GO, the system goes to the Astral paper account for 2 weeks (the
+operator's order) and is then wired into the FTMO/futures bot.
+
+If NO-GO, it does **not** go to paper as a "70% system". The result is
+reported as it is.
+
+## Result
+
+(filled in after the run, below this line, without editing anything
+above)
