@@ -123,6 +123,16 @@ def rsi_pullback(sym: str, d: pd.DataFrame, t: float):
     return out
 
 
+def rsi_trend(sym: str, d: pd.DataFrame, t: float):
+    """R2: R, but longs only above / shorts only below the 20-session
+    average of daily closes (as of the previous session)."""
+    closes = d.groupby("day", sort=True).close.last()
+    ma = closes.rolling(20).mean()
+    regime = (closes > ma).astype(int) - (closes < ma).astype(int)
+    allowed = regime.shift(1).where(ma.shift(1).notna(), 0)   # yesterday's
+    return [x for x in rsi_pullback(sym, d, t) if allowed.get(x.day, 0) == x.side]
+
+
 def stats(trades, n_days):
     if not trades:
         return dict(n=0, win=0, pf=0, net=0, per_day=0, dd=0, months_pos="0/0")
@@ -143,6 +153,7 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--data-dir", required=True, type=Path)
     ap.add_argument("--report", type=Path)
+    ap.add_argument("--round", type=int, default=1, choices=[1, 2])
     a = ap.parse_args(argv)
     data, sha = {}, {}
     for s in ("SPY", "QQQ"):
@@ -155,8 +166,11 @@ def main(argv=None) -> int:
     n_days = {"selection": sum(1 for x in days if x < cut),
               "test": sum(1 for x in days if x >= cut)}
 
-    systems = {"G": ("g_min", [0.001, 0.002, 0.003], gap_fade),
-               "R": ("t", [0.001, 0.0015, 0.002, 0.003], rsi_pullback)}
+    if a.round == 1:
+        systems = {"G": ("g_min", [0.001, 0.002, 0.003], gap_fade),
+                   "R": ("t", [0.001, 0.0015, 0.002, 0.003], rsi_pullback)}
+    else:
+        systems = {"R2": ("t", [0.001, 0.0015, 0.002], rsi_trend)}
     rows, results = [], {}
     for name, (pname, values, fn) in systems.items():
         for v in values:
@@ -179,7 +193,7 @@ def main(argv=None) -> int:
     if choice:
         chosen = max(choice, key=lambda n: results[(n, choice[n], "selection")][0]["pf"])
 
-    lines = ["# DAY-70 results", "",
+    lines = [f"# DAY-70 results (round {a.round})", "",
              f"Data: Astral 5m, {days[0]} to {days[-1]} ({len(days)} sessions); "
              f"selection {days[0]} to {cut} ({n_days['selection']}), test {cut} to "
              f"{days[-1]} ({n_days['test']}). sha256 SPY `{sha['SPY']}…`, QQQ `{sha['QQQ']}…`. "

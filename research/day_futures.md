@@ -125,3 +125,40 @@ caution before going to paper.
 
 ### Result
 (filled in below after the run)
+
+Run 2026-10-05 (`--round 2`, `reports/day_futures_r2.md`). Selection
+chose t = 0.20% (70% wins, PF 1.06). In the test period it made **64%
+wins, PF 0.95, −$770, 5/11 profitable months. NO-GO.** At t = 0.10%,
+R2 keeps its 72% win rate in the test period but has PF 0.79. The trend
+filter does not create an edge.
+
+## Conclusion of rounds 1–2
+
+On two years of 5-minute index data, a simple intraday system can win
+70% of its trades, but none of these makes money. The average loss is
+3–4× the average win, and the raw edge is about zero before costs. The
+only system in this repo that has both a 70%+ win rate and a real edge
+is FAST-4, which holds 1–10 days (`research/ftmo_fast_pass.md`).
+
+## Round 3: DAY-M (pre-registered 2026-10-05). NOT a 70% system.
+
+The operator asked for a 70% win rate. Rounds 1–2 show that no simple
+day-trading rule meets it profitably, so this round tests the best-known
+*profitable* intraday effect so that the operator can choose. The win
+rate is reported, not required.
+
+**M: intraday momentum** (Gao, Han, Li & Zhou 2018, "Market intraday
+momentum").
+* Signal: the return from yesterday's last close to today's 10:00 bar
+  close. If it is positive, buy at the open of the 15:30 bar; if it is
+  negative, short there.
+* Exit: the 15:55 bar close.
+* One trade per symbol per day, every day. No stop (it is a 30-minute
+  hold). No free parameter.
+
+GO bar (test period, after costs): PF ≥ 1.2, net > 0, ≥ 6/11 profitable
+months, ≥ 0.9 trades/session, max DD < half of net. The selection
+period is reported alongside for consistency.
+
+### Result
+(filled in below after the run)
