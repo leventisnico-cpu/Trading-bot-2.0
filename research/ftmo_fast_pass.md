@@ -88,3 +88,22 @@ What was learned:
    are the record and none is a candidate. A genuinely new source of
    edge (for example intraday data with more history than the two years
    Astral provides) would be needed for a new, honest test.
+
+### Addendum 2026-10-05: the operator's question, "profitable within a year?"
+
+The question was asked by the operator and computed with this note's
+simulator. The settings are 3% risk, no combined-risk cap, and challenge
+start dates every 5 sessions from 2019 onward with a full year of data
+after them (339 starts).
+
+| outcome 12 months after starting the challenge | share of starts |
+|---|---|
+| no funded account yet (failed or still in the evaluation) | 91% (310) |
+| funded but breached | 1% (4) |
+| funded, no breach, not in profit | 5% (18) |
+| **funded, no breach, in profit** | **2% (7)** |
+
+Win rate by calendar year, 2012–2026: 55%–88%. It is below 70% in 9 of
+the 15 years (2012 66%, 2013 67%, 2014 66%, 2015 61%, 2016 65%,
+2018 57%, 2019 55%, 2020 68%, 2026 to date 61%). The 70% is a long-run
+average, not a floor.
