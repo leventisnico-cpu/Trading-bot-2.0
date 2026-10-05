@@ -1,0 +1,17 @@
+{
+  "initial_balance": 15000.0,
+  "day": "2026-10-05",
+  "day_start_balance": 15000.0,
+  "plan_day": "2026-10-05",
+  "plan_checked": "2026-10-05",
+  "pending_exits": [],
+  "pending_entries": [],
+  "pending_atr": {},
+  "executed_day": null,
+  "held": {},
+  "to_close": [],
+  "last_fill": "2026-10-04T23:15:00+00:00",
+  "trading_days": [],
+  "blocked_until": null,
+  "halted": null
+}

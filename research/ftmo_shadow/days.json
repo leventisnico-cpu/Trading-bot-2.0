@@ -1,1 +1,15 @@
-[]
+[
+  {
+    "day": "2026-10-05",
+    "balance": 15000.0,
+    "equity": 15000.0,
+    "min_equity": 15000.0,
+    "daily_floor": 14250.0,
+    "open": [],
+    "plan": "",
+    "deals": [],
+    "trading_days": 0,
+    "flags": [],
+    "errors": 0
+  }
+]

@@ -162,3 +162,20 @@ paper slot can run the FTMO bot's FAST-4 test (deployment 1949). AIR3
 stays the TFSA plan (route B): the daily check computes SMH's levels
 from Astral daily bars and reports the order. Monday 2026-10-05: if SMH
 closes at or above 524.47 with SMA50 above SMA200, BUY at Tuesday's open.
+
+### 2026-10-05 (Monday, after the close)
+
+* **SMH:** close 633.85 (last 30-minute bar; Astral's daily bar for today
+  had not posted), SMA50 571.30, SMA200 500.91. Buy level 1.05 × SMA200
+  = 525.95, sell level 0.95 × SMA200 = 475.86. Close is 20.5% above the
+  buy level and SMA50 > SMA200.
+* **AIR3 order for the TFSA (route B): BUY SMH at Tuesday 2026-10-06's
+  open.** The operator places it by hand in IBKR. Once held, the exit is
+  a close below the sell level (475.86 today, 25% below the close).
+* **Paper deployment:** none for AIR3 since 1924 was stopped on
+  2026-10-04 (the paper slot runs the FTMO bot test, deployment 1949).
+* **ETF scan (1Y / 6M / YTD %):** SOXX 104.4 / 71.3 / 95.8, USD (2×, context)
+  99.4 / 101.9 / 96.1, SMH 84.6 / 60.1 / 76.0, XSD 64.0 / 62.4 / 71.8,
+  SMHX 61.1 / 65.6 / 67.1, THNQ 48.9 / 67.4 / 58.4. Top 3 unleveraged by
+  1Y: SOXX, SMH, XSD. Nothing new beats SMH on all three (SOXX already
+  swept; USD and SOXL are leveraged), so no backtest.

@@ -1,5 +1,7 @@
 {
-  "day_min": {},
+  "day_min": {
+    "2026-10-05": 15000.0
+  },
   "deals_logged": 0,
   "errors": 0
 }
