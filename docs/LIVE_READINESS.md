@@ -9,7 +9,7 @@ operator signs off per the orders below.
 
 | rail | what runs | state | who can switch it on |
 |---|---|---|---|
-| Astral paper | saved strategy 6422 "AIR3 SMH ride (5% band)", deployment 1924, $870, fractional shares | **stopped 2026-10-04 ~23:10 UTC** (flat, no orders) on the operator's choice: Astral allows one strategy per paper account and the operator gave it to the FTMO bot's FAST-4 test (deployment 1949, `docs/FTMO_BOT.md`). AIR3's SMH levels now come from the daily check (rules computed from Astral daily bars) | — |
+| Astral paper | saved strategy 6422 "AIR3 SMH ride (5% band)", deployment 1924, $870, fractional shares | **stopped 2026-10-04 ~23:10 UTC** (flat, no orders) on the operator's choice: Astral allows one strategy per paper account and the operator gave it to the FTMO bot's FAST-4 test (deployment 1949, redeployed as 1999 on 2026-10-06 after a data-feed failure; `docs/FTMO_BOT.md`). AIR3's SMH levels now come from the daily check (rules computed from Astral daily bars) | — |
 | IBKR paper via this repo | `mini_prop_os` with `deploy/config.tfsa-paper-air3.yaml` (SMH, daily bars, one share, port 4002) | **ready**; needs IB Gateway on the operator's machine | operator (see Monday checklist) |
 | IBKR live | the bot pointed at the live account | **blocked** twice: `main.py` exits 4 because `air3_trend` is `DEPLOYABLE: no` (it fails the gate on SMH), and no live port may appear in a config until the live-readiness order is signed | operator, by order (route 1 or 2 below) |
 

@@ -70,9 +70,14 @@ to it.
 
 Two runs check the bot before any money goes to FTMO:
 
-1. **Astral paper deployment 1949** (saved strategy 6489, "FAST-4 FTMO
+1. **Astral paper deployment 1999** (saved strategy 6489, "FAST-4 FTMO
    shadow (index ETFs)"): the same rule on QQQ/SPY/DIA/IWM, $15,000 of
-   paper capital. It fills real paper orders at Astral, but sizes 49% of
+   paper capital. It replaced deployment 1949, whose data feed failed on
+   2026-10-05 19:36 UTC (source_failed, flat, no orders). 1949 was
+   undeployed and the same strategy redeployed on 2026-10-06 14:19 UTC.
+   It was healthy and ready to trade at 14:21 UTC. Astral bug report
+   fc0b281e. Monday 2026-10-05's close was not evaluated on Astral; the
+   shadow run covers it. It fills real paper orders at Astral, but sizes 49% of
    equity per position (Astral cannot size by risk), so its P&L is not
    the FTMO bot's. Its 2019-2026 backtest: 221 trades, 70.6% win rate,
    profit factor 1.77, which agrees with the research.
