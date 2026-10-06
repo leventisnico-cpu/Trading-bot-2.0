@@ -179,3 +179,18 @@ closes at or above 524.47 with SMA50 above SMA200, BUY at Tuesday's open.
   SMHX 61.1 / 65.6 / 67.1, THNQ 48.9 / 67.4 / 58.4. Top 3 unleveraged by
   1Y: SOXX, SMH, XSD. Nothing new beats SMH on all three (SOXX already
   swept; USD and SOXL are leveraged), so no backtest.
+
+### 2026-10-06 (Tuesday, after the close)
+
+* **SMH:** close 632.50 (Astral daily bar), SMA50 572.98, SMA200 502.37.
+  Buy level 527.49, sell level 0.95 × SMA200 = 477.26.
+* **Position:** treated as held from today's open (the BUY reported on
+  2026-10-05). **No order.** The close is $155.24 (24.5%) above the sell
+  level; an exit needs a close below 477.26.
+* **ETF scan (1Y / 6M / YTD %):** SOXX 104.4 / 71.3 / 95.7, USD (2×,
+  context) 100.9 / 103.5 / 97.6, SMH 84.2 / 59.7 / 75.6, XSD 65.8 / 64.2 /
+  73.6, SMHX 64.2 / 68.8 / 70.3, WTAI 51.6 / 56.6 / 56.5. Top 3 unleveraged
+  by 1Y: SOXX, SMH, XSD. Nothing new beats SMH on all three (SOXX already
+  swept; USD and SOXL are leveraged), so no backtest.
+* **FTMO paper test:** Astral deployment 1999 (redeployed from 1949 on
+  2026-10-06) and the bot shadow both made no trades today.
