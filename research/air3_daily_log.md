@@ -194,3 +194,47 @@ closes at or above 524.47 with SMA50 above SMA200, BUY at Tuesday's open.
   swept; USD and SOXL are leveraged), so no backtest.
 * **FTMO paper test:** Astral deployment 1999 (redeployed from 1949 on
   2026-10-06) and the bot shadow both made no trades today.
+
+### 2026-10-07 (Wednesday, after the close)
+
+* **SMH:** close 625.17, taken from the last regular-session 30-minute bar
+  because Astral had not posted a daily bar for today. Astral's 2026-10-06
+  daily bar had been replaced by a partial one (close 637.12 on 91k
+  shares), so the 632.50 posted on 2026-10-06 was used instead.
+  SMA50 574.89, SMA200 503.76, buy level 528.95, sell level 478.58.
+* **Position:** held. **No order.** The close is $146.60 (23.4%) above the
+  sell level.
+* **ETF scan (1Y / 6M / YTD %):** SOXX 106.7 / 67.6 / 93.5, USD (2×,
+  context) 101.7 / 95.7 / 95.7, SMH 85.4 / 56.3 / 73.6, XSD 66.1 / 60.9 /
+  70.5, SMHX 63.8 / 65.2 / 68.0, THNQ 49.7 / 64.6 / 55.9. Top 3 unleveraged
+  by 1Y: SOXX, SMH, XSD. SMHX and THNQ beat SMH on 6M only, so no backtest.
+* **FTMO paper test:** no trades by Astral deployment 1999 or the bot shadow.
+
+### 2026-10-08 (Thursday, after the close)
+
+* **SMH:** close 606.83 (last regular-session 30-minute bar; down 2.9% on
+  the day). SMA50 576.94, SMA200 505.02, buy level 530.27, sell level
+  479.77.
+* **Position:** held. **No order.** The close is $127.06 (20.9%) above the
+  sell level.
+* **Data problem in Astral's daily bars (found today):**
+  - Since 2026-10-05 the daily series carries extra bars stamped 20:00 UTC
+    that repeat the next session. SMH 2026-10-05T20:00 is the 10-06
+    session; 2026-10-06T20:00 is the 10-07 session. IWM, QQQ and SPY show
+    the same pattern.
+  - Some daily bars are partial: QQQ 10-07 has 0.5M shares, SPY 10-06 has
+    49k, DIA 10-02 has 117k.
+  - From now on this check keeps only the midnight-stamped daily bars (one
+    per date) and takes recent closes from the last regular-session
+    30-minute bar.
+  - The 30-minute bars the bot shadow uses are complete: 13 regular-session
+    bars per day for QQQ, SPY, DIA and IWM.
+* **ETF scan (1Y / 6M / YTD %):** SOXX 93.2 / 52.1 / 87.0, USD (2×,
+  context) 78.9 / 68.5 / 82.9, SMH 75.5 / 43.6 / 68.6, XSD 55.7 / 47.0 /
+  64.2, SMHX 52.7 / 51.7 / 61.9, THNQ 43.3 / 56.7 / 53.1. Top 3 unleveraged
+  by 1Y: SOXX, SMH, XSD. Nothing new beats SMH on all three, so no
+  backtest.
+* **FTMO paper test:** no trades by Astral or the bot shadow.
+  - A separate RSI(2) calculation from the 30-minute closes agrees: no
+    symbol is below 10 (QQQ 15.8, IWM 14.5).
+  - IWM closed at 277.54, just above its SMA200 of 276.71.
