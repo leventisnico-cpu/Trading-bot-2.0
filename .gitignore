@@ -4,3 +4,15 @@ __pycache__/
 state/mini_prop_os.log
 state/executions.jsonl
 state/kill_switch.json
+
+# Local runtime files (never commit)
+.env
+.venv/
+state/config.yaml
+state/dca_state.json
+
+# FTMO bot runtime (never commit)
+state/ftmo_config.yaml
+state/ftmo_state.json
+state/ftmo_state.tmp
+state/ftmo_bot.log
