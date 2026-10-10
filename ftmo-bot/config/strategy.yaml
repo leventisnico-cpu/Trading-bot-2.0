@@ -1,0 +1,54 @@
+# One parameter set for all four instruments (SPEC.md "Strategy spec").
+# Changing ANY value here after an OOS run resets the OOS clock: the backtest
+# ledger keys runs by a hash of this file and will refuse OOS until in-sample
+# has been re-run with the new parameters.
+name: asian_breakout
+timezone: Europe/Prague          # CE(S)T — FTMO's daily reset clock
+
+instruments:
+  EURUSD:
+    range:   {start: "00:00", end: "08:00"}
+    session: {start: "09:00", end: "12:00"}
+    currencies: [EUR, USD]
+  GBPUSD:
+    range:   {start: "00:00", end: "08:00"}
+    session: {start: "09:00", end: "12:00"}
+    currencies: [GBP, USD]
+  NAS100:
+    range:   {start: "09:00", end: "15:15"}   # pre-cash range
+    session: {start: "15:30", end: "18:00"}
+    currencies: [USD]
+  XAUUSD:
+    range:   {start: "00:00", end: "08:00"}
+    session: {start: "14:00", end: "17:00"}
+    currencies: [USD]
+
+bar_minutes: 15
+trend:
+  timeframe_minutes: 240
+  ema_period: 50
+  slope_bars: 6
+  atr_period: 14
+  flat_atr_mult: 0.1             # |slope| < 0.1 × ATR(14, 4H) → no trade
+  lookback_bars: 200             # 4H bars fed to the strategy (same in backtest and live)
+stop:
+  atr_period: 14                 # ATR(14, 15m)
+  atr_cap_mult: 1.5              # natural stop wider than this → skip the trade
+target_r: 2.0
+breakeven_r: 1.0
+time_exit_minutes_before_end: 15
+news:
+  window_minutes: 30
+  impact: High
+
+risk:
+  risk_per_trade_pct: 0.0075     # of INITIAL challenge balance
+  max_open_slots: 2
+  correlated_groups:
+    - [EURUSD, GBPUSD]           # one slot; never held in opposite directions
+  max_consecutive_losses: 2      # daily soft stop
+
+splits:
+  insample: ["2020-01-01", "2023-12-31"]
+  oos:      ["2024-01-01", "2025-12-31"]
+  holdout:  ["2026-01-01", null]  # null = latest available data; touched once
