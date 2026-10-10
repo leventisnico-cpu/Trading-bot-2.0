@@ -31,3 +31,4 @@
 {"equity": 500.0, "halted": false, "traded": false, "ts": "2026-10-08T01:06:16.947084+00:00", "type": "cycle_done"}
 {"daily_return": 0.0, "decision": "OK", "drawdown": 0.0, "reason": "ok", "ts": "2026-10-09T01:17:42.086213+00:00", "type": "pre_trade"}
 {"equity": 500.0, "halted": false, "traded": false, "ts": "2026-10-09T01:17:42.087489+00:00", "type": "cycle_done"}
+{"reason": "refusing to trade \u2014 bad price data: ZAG.TO: last value is NaN", "ts": "2026-10-10T01:02:06.994648+00:00", "type": "refusal"}
