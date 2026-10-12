@@ -238,3 +238,27 @@ closes at or above 524.47 with SMA50 above SMA200, BUY at Tuesday's open.
   - A separate RSI(2) calculation from the 30-minute closes agrees: no
     symbol is below 10 (QQQ 15.8, IWM 14.5).
   - IWM closed at 277.54, just above its SMA200 of 276.71.
+
+### 2026-10-09 (Friday): Astral paper deployment misfired (found 2026-10-12)
+
+* **What happened:** Astral deployment 1999 (FAST-4, saved 6489) bought
+  QQQ (9.833 @ 751.89) and SPY (9.499 @ 776.25) at Friday's open.
+  - Its signals came from the defective daily bars noted on 2026-10-08:
+    the order payloads cite bars stamped 2026-10-07T20:00Z, which are
+    really the 10-08 session.
+  - On clean closes, the FAST-4 rule did not fire on 10-08: RSI(2) was
+    15.8 for QQQ and 32.1 for SPY. The bot shadow correctly took no trade.
+* **Exit:** 10–30 seconds later Astral closed both positions as
+  "protection_activation_failed" emergency exits (QQQ @ 751.54, SPY @
+  776.19). The round trips lost about $4 of paper money. No positions are
+  open.
+* **Afterwards:** the deployment's event log shows about 20 re-activations
+  between 2026-10-09 18:48Z and 2026-10-11 21:22Z.
+* **Reported to Astral:** bug report d573b589-4c4c-4011-8f69-ba7ccd2c12c8,
+  covering the daily-bar defects, the false entries, the failed stop
+  protection and the re-activation loop.
+* **Divergence verdict:** this is not a bot bug.
+  - The bot reads 30-minute bars, which are complete.
+  - Until Astral fixes its daily bars, deployment 1999's signals are not a
+    valid check of the rule. It stays deployed (paper) so the fix can be
+    seen, and its trades are logged as platform errors.
