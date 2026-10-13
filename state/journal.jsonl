@@ -32,3 +32,6 @@
 {"daily_return": 0.0, "decision": "OK", "drawdown": 0.0, "reason": "ok", "ts": "2026-10-09T01:17:42.086213+00:00", "type": "pre_trade"}
 {"equity": 500.0, "halted": false, "traded": false, "ts": "2026-10-09T01:17:42.087489+00:00", "type": "cycle_done"}
 {"reason": "refusing to trade \u2014 bad price data: ZAG.TO: last value is NaN", "ts": "2026-10-10T01:02:06.994648+00:00", "type": "refusal"}
+{"daily_return": 0.0, "decision": "OK", "drawdown": 0.0, "reason": "ok", "ts": "2026-10-13T02:38:00.657928+00:00", "type": "pre_trade"}
+{"equity": 600.0, "halted": false, "traded": false, "ts": "2026-10-13T02:38:00.659300+00:00", "type": "cycle_done"}
+{"amount": 100.0, "since": "2026-10-09", "ts": "2026-10-13T02:38:00.659553+00:00", "type": "contribution"}
