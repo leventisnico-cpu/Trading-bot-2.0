@@ -6,3 +6,16 @@ INFO FTMO day 2026-10-07: day-start balance 15000.00
 INFO plan for the next open: exits [], entries []
 INFO FTMO day 2026-10-08: day-start balance 15000.00
 INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-10-09: day-start balance 15000.00
+INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-10-12: day-start balance 15000.00
+INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-10-13: day-start balance 15000.00
+INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-10-14: day-start balance 15000.00
+INFO plan for the next open: exits [], entries ['US100', 'US500']
+INFO FTMO day 2026-10-15: day-start balance 15000.00
+INFO buy QQQ 15.91 lots stop 688.66: Fill(ok=True, price=716.93084475, ticket=1, message='done')
+INFO entry US500 cut from 23.37 to 14.03 lots: open stops already risk 449.82, room 270.18
+INFO buy SPY 14.03 lots stop 746.15: Fill(ok=True, price=765.4002681000001, ticket=2, message='done')
+INFO plan for the next open: exits [], entries []

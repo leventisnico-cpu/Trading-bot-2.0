@@ -262,3 +262,128 @@ closes at or above 524.47 with SMA50 above SMA200, BUY at Tuesday's open.
   - Until Astral fixes its daily bars, deployment 1999's signals are not a
     valid check of the rule. It stays deployed (paper) so the fix can be
     seen, and its trades are logged as platform errors.
+
+### 2026-10-09, 10-12 and 10-13 (written 2026-10-15: these daily runs were missed)
+
+The session stalled and the daily runs for these three sessions did not
+happen. The levels below are recomputed from Astral's SMH daily series
+downloaded on 2026-10-14 at 20:43 UTC. That download is clean: one bar
+per date, all stamped 04:00 or 05:00 UTC, and the 2026-10-06 bar matches
+the 632.50 used on that day.
+
+| session | SMH close | SMA50 | SMA200 | buy level | sell level | above sell |
+|---|---|---|---|---|---|---|
+| 2026-10-09 | 603.33 | 578.24 | 506.24 | 531.55 | 480.92 | $122.41 (25.5%) |
+| 2026-10-12 | 590.99 | 579.25 | 507.38 | 532.74 | 482.01 | $108.98 (22.6%) |
+| 2026-10-13 | 588.12 | 580.10 | 508.50 | 533.92 | 483.07 | $105.05 (21.7%) |
+
+* **Position:** held. **No order** on any of the three days.
+* **ETF scans:** missed. They cannot be rebuilt afterwards because the
+  bulk performance call only returns current values.
+* **FTMO paper test:** the bot shadow (caught up on 2026-10-14) planned
+  nothing on these days. Astral deployment 1999 made no trades. Its event
+  log shows repeated `protection_source_failed` / `source_recovered`
+  episodes (QQQ, SPY, DIA, IWM price feed timeouts) on 10-12 and 10-13;
+  each one cleared on its own.
+
+### 2026-10-14 (Wednesday, after the close; written 2026-10-15)
+
+* **SMH:** close 564.74 (Astral daily bar), SMA50 579.88, SMA200 509.49.
+  Buy level 534.96, sell level 0.95 × SMA200 = 484.02.
+* **Position:** held. **No order.** The close is $80.72 (16.7%) above the
+  sell level.
+* **ETF scan** (taken 2026-10-15 13:53 UTC, so it reflects this close;
+  1Y / 6M / YTD %): SOXX 73.4 / 24.1 / 65.6, SMH 59.0 / 19.9 / 50.9, SMHX
+  39.7 / 22.0 / 43.4, THNQ 36.3 / 32.9 / 41.0, XSD 33.1 / 18.4 / 44.8.
+  - Top 3 unleveraged by 1Y: SOXX, SMH, SMHX.
+  - Nothing unswept in the routine's list beats SMH on all three.
+  - Outside that list, FTXL (First Trust Nasdaq Semiconductor, history
+    since 2011) beats SMH on all three: 89.2 / 23.3 / 71.8. It has not
+    been swept with the AIR3 rule. It is a candidate for the next sweep.
+* **FTMO paper test: first FAST-4 signal of the test.**
+  - **Bot shadow:** the plan at the close was "buy US100, buy US500" for
+    Thursday's open.
+  - **Independent check** from the 30-minute closes:
+
+    | symbol | close | SMA200 | RSI(2) | signal |
+    |---|---|---|---|---|
+    | QQQ | 728.91 | 673.69 | 3.2 | entry |
+    | SPY | 769.53 | 724.05 | 7.4 | entry |
+    | IWM | 271.35 | 277.21 | 3.0 | none (below SMA200) |
+    | DIA | 515.60 | 503.94 | 42.3 | none |
+
+  - **Astral 1999 bought QQQ at 19:54 UTC (15:54 ET)**, six minutes
+    before the close. It used two market orders from two runtime runs one
+    second apart:
+    - 10.077224 at 729.17;
+    - 0.201537 at 729.197.
+
+    The total is 10.278761 shares ($7,495), 50.0% of the $15,000 rather
+    than the rule's 49%. The order payloads cite one-second live "bars"
+    (open = high = low = close, volume 0), not the daily bar.
+  - **Astral placed no SPY order**, although SPY met the rule at the close.
+  - **Divergences:**
+    1. Entry before the close instead of at the next open.
+    2. SPY missed.
+    3. A duplicate top-up order, despite `accumulate: false`.
+
+    These are platform behaviour, not a bot bug: the shadow's plan matches
+    the rule computed independently. A second Astral bug report was
+    prepared on 2026-10-15 but not filed, because the operator declined the
+    report call. The details are in this entry.
+  - **Deployment health:** price-feed timeouts at 13:31 and 15:19 UTC
+    cleared on their own. The deployment re-activated at 19:54 and 20:09
+    UTC and was ready to trade at 20:09 UTC.
+
+### 2026-10-15 (Thursday)
+
+* **Morning fill check (13:52 UTC):** Astral placed no orders at the open.
+  It still held QQQ 10.278761 at 729.17, and its health was ok (the QQQ
+  protection feed had recovered at 13:51 UTC).
+* **SMH:** close 558.76, taken from the last regular-session 30-minute bar
+  because the daily bar had not posted. SMA50 579.66, SMA200 510.46. Buy
+  level 535.99, sell level 484.94.
+* **Position:** held. **No order.** The close is $73.82 (15.2%) above the
+  sell level. SMH is 12.5% below the 2026-10-06 open (638.38) at which the
+  operator was told to buy.
+* **ETF scan** (routine list; 1Y / 6M / YTD %):
+  - SOXX 79.0 / 28.1 / 71.0;
+  - SMH 63.5 / 23.4 / 55.2;
+  - SMHX 43.6 / 25.5 / 47.4;
+  - THNQ 40.2 / 36.7 / 45.1;
+  - XSD 38.0 / 22.7 / 50.0;
+  - XLK 33.1 / 25.8 / 31.4;
+  - IYW 31.6 / 26.1 / 29.6;
+  - FTEC 30.2 / 24.9 / 30.0;
+  - VGT 30.0 / 24.8 / 29.8;
+  - WTAI 32.2 / 20.0 / 36.0;
+  - CHAT 31.5 / 13.8 / 41.3;
+  - AIQ 26.8 / 21.6 / 26.0;
+  - QQQ 20.9 / 14.2 / 18.5;
+  - context only: USD (2×) 62.6 / 20.8 / 56.8 and SOXL (3×) 168.5 / 24.9 /
+    155.4.
+
+  Top 3 unleveraged by 1Y: SOXX, SMH, SMHX. No unswept ETF beats SMH on
+  all three, so there is no backtest.
+* **FTMO paper test: the bot shadow's first trades.**
+  - It bought at 10:05 ET:
+    - QQQ 15.91 lots at 716.93, stop 688.66 (3 × ATR 9.42);
+    - SPY 14.03 lots at 765.40, stop 746.15 (3 × ATR 6.42).
+  - The SPY entry was cut from 23.37 lots by the combined-risk cap: the
+    open stops already risked $449.82, which left $270.18 of room.
+  - At the close:
+    - equity 15,267.31 (+1.78%), lowest equity 14,998.89;
+    - daily floor 14,250, max-loss floor 13,500, trading days 1;
+    - flags ok, no tick errors.
+  - **No exit planned.** Each close is below its SMA5 (QQQ 728.11 vs
+    739.56; SPY 771.78 vs 775.20), and these are day 1 of 10.
+  - **Astral 1999:** no new orders. It holds QQQ 10.278761 at 729.17, about
+    −$10.9 at the 728.11 close. It holds no SPY.
+
+    | symbol | bot shadow | Astral 1999 |
+    |---|---|---|
+    | QQQ | 15.91 @ 716.93 (10-15 10:05 ET) | 10.28 @ 729.17 (10-14 15:54 ET) |
+    | SPY | 14.03 @ 765.40 (10-15 10:05 ET) | none |
+
+    The sizing difference is by design. The timing difference and the
+    missing SPY are not; they are Astral's (see 2026-10-14).
