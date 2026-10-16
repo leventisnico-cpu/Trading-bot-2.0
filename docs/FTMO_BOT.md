@@ -108,6 +108,59 @@ What paper cannot test: FTMO's symbol names, contract sizes, server
 clock and order filling. Those are covered only by the preflight and the
 dry-run week on FTMO's own MT5 terminal.
 
+### Result (2026-10-16, last session of the two-week test)
+
+**Verdict: the bot is ready for the next step, the preflight and
+dry-run week on FTMO's MT5 terminal (setup steps 6–7). It is not proven
+for live money yet. FAST-4 itself is still NO-GO for a fast pass.**
+
+**The bot (shadow run, 2026-10-05 to 2026-10-16, ten sessions):**
+* No tick errors, no guard trips, and no flags in any session.
+* One FAST-4 signal, on the 2026-10-14 close:
+  - QQQ RSI(2) 3.2 and SPY RSI(2) 7.4, both above their 200-day average;
+  - IWM was below its 200-day average, so the trend filter blocked it.
+* Both entries filled at 10:05 ET on 2026-10-15:
+  - QQQ 15.91 at 716.93, stop 688.66 (3 × ATR);
+  - SPY 14.03 at 765.40, stop 746.15.
+* The combined-risk cap cut SPY from 23.37 lots, so both stops together
+  risk $720, or 4.8% of the account.
+* Every day's plan matched an independent RSI(2)/SMA200 computation.
+  That includes 2026-10-09, when Astral entered on bad data and the bot
+  correctly did nothing.
+* At the 2026-10-16 close:
+  - equity 14,863.32 (−0.91%), lowest 14,781.21 (−1.46%);
+  - the daily floor (14,250) and the max-loss floor (13,500) were never
+    approached;
+  - both positions are still open, on day 2 of 10.
+* **No exit has run yet.**
+
+**Astral deployment 1999 is not usable as an execution reference:**
+* data feed failure on 2026-10-05 (redeployed);
+* false entries and failed stop protection on 10-09;
+* repeated price-feed failures and re-activation loops;
+* on 10-14, a duplicated QQQ entry six minutes before the close and no
+  SPY entry;
+* position marks that do not update.
+
+Bug reports fc0b281e and d573b589 were filed. A third, for 10-14, was
+prepared but not sent. Details are in `research/air3_daily_log.md`.
+
+**What this test did not cover:**
+* exits and the 10-session time stop;
+* the profit target and keep-alive in a real account;
+* FTMO's symbols, contract sizes and filling;
+* the MT5 server clock;
+* real order routing.
+
+**Next steps:**
+1. The shadow keeps running until the QQQ and SPY trades close (at most
+   eight more sessions) so the exit path is seen once.
+2. Run the preflight and a dry-run week on FTMO's MT5 terminal: first a
+   free trial or demo account if FTMO offers one, otherwise the paid
+   account in dry-run. Live orders only after that week looks right.
+3. The odds above have not changed. Each evaluation fee buys about a
+   one-in-five chance of passing within 18 months.
+
 ## Setup (Windows PC or Windows VPS outside the US)
 
 1. Buy the FTMO 2-Step challenge yourself (CAD 15,000 is the account the

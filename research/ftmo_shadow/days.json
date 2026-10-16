@@ -121,5 +121,21 @@
     "trading_days": 1,
     "flags": [],
     "errors": 0
+  },
+  {
+    "day": "2026-10-16",
+    "balance": 15000.0,
+    "equity": 14863.317408584498,
+    "min_equity": 14781.2064385845,
+    "daily_floor": 14250.0,
+    "open": [
+      "QQQ 15.91@716.93 sl 688.66",
+      "SPY 14.03@765.40 sl 746.15"
+    ],
+    "plan": "",
+    "deals": [],
+    "trading_days": 1,
+    "flags": [],
+    "errors": 0
   }
 ]

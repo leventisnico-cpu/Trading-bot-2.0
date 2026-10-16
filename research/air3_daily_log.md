@@ -387,3 +387,46 @@ the 632.50 used on that day.
 
     The sizing difference is by design. The timing difference and the
     missing SPY are not; they are Astral's (see 2026-10-14).
+
+### 2026-10-16 (Friday, after the close)
+
+* **SMH:** close 539.79, taken from the last regular-session 30-minute
+  bar. SMA50 579.03, SMA200 511.35. Buy level 536.91, sell level 485.78.
+  - Astral's daily series is defective again. A bar stamped
+    2026-10-14T20:00Z holds the 10-15 session (close 558.76), and the
+    2026-10-15 bar is partial (close 550.86).
+  - The levels use the clean daily bars through 10-14 plus the 30-minute
+    closes for 10-15 (558.76) and 10-16.
+* **Position:** held. **No order.** The close is $54.01 (11.1%) above the
+  sell level. SMH is 15.4% below the 2026-10-06 open (638.38).
+* **ETF scan** (1Y / 6M / YTD %):
+  - SOXX 70.7 / 21.5 / 63.8;
+  - SMH 57.2 / 18.7 / 49.9;
+  - SMHX 37.5 / 19.1 / 41.9;
+  - THNQ 36.6 / 30.0 / 40.1;
+  - XSD 32.9 / 14.4 / 43.7;
+  - XLK 29.0 / 20.7 / 27.4;
+  - IYW 27.9 / 21.6 / 25.8;
+  - FTEC 26.7 / 20.0 / 26.2;
+  - VGT 26.7 / 20.0 / 26.1;
+  - WTAI 26.1 / 12.6 / 29.5;
+  - CHAT 24.3 / 6.5 / 34.0;
+  - AIQ 22.7 / 15.9 / 21.9;
+  - QQQ 18.3 / 10.8 / 15.5;
+  - context only: USD (2×) 49.4 / 11.8 / 46.6 and SOXL (3×) 130.9 / 6.0 /
+    122.9.
+
+  Top 3 unleveraged by 1Y: SOXX, SMH, SMHX. No unswept ETF beats SMH on
+  all three, so there is no backtest.
+* **FTMO paper test, last session:**
+  - **Bot shadow:** holds QQQ 15.91 at 716.93 (stop 688.66) and SPY 14.03
+    at 765.40 (stop 746.15).
+    - Equity 14,863.32 (−0.91%), lowest 14,781.21.
+    - Flags ok, no tick errors.
+    - No exit planned: QQQ closed at 710.01 against an SMA5 of 731.31,
+      SPY at 763.51 against 772.19.
+  - **Astral 1999:** no trades. It still holds QQQ 10.278761 at 729.17,
+    about −$197 at the 710.01 close; its position mark has stayed at
+    729.197 since entry.
+  - The readiness verdict is in `docs/FTMO_BOT.md` ("Result
+    (2026-10-16)").
