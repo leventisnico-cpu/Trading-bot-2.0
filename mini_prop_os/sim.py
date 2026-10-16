@@ -45,6 +45,7 @@ class SimConfig:
     tick_size: float = 0.25
     slippage_ticks: int = 1          # adverse slippage per fill
     commission_per_unit: float = 0.62  # IBKR micro-future, per side
+    commission_min_per_order: float = 0.0  # e.g. IBKR Pro stocks: $1.00
     initial_cash: float = 100_000.0
     split_fills: bool = True         # 2+ unit orders fill in two partials
 
@@ -122,6 +123,10 @@ class SimulatedBroker:
                     exec_id=f"sim-{self._exec_seq}"))
                 self.commissions_paid += part * self.cfg.commission_per_unit
                 fills += 1
+            # Per-order minimum: top up once per order, not per partial.
+            self.commissions_paid += max(
+                0.0, self.cfg.commission_min_per_order
+                - qty * self.cfg.commission_per_unit)
         return fills
 
     @property
