@@ -437,8 +437,8 @@ the 632.50 used on that day.
   bar (the daily bar says 548.46). SMA50 578.33, SMA200 512.28. Buy level
   537.90, sell level 486.67.
   - Astral's SMH daily series is clean again: one bar per session, and
-    the 10-15 and 10-16 bars match the 30-minute closes (558.84 and
-    539.79).
+    the 10-15 and 10-16 daily closes (558.84 and 539.79) are within $0.20
+    of the 30-minute closes.
 * **Position:** held. **No order.** The close is $61.54 (12.6%) above the
   sell level. SMH is 14.1% below the 2026-10-06 open (638.38).
 * **ETF scan** (1Y / 6M / YTD %):
@@ -463,8 +463,14 @@ the 632.50 used on that day.
 * **FTMO bot shadow** (day 3 of 10 for both trades):
   - Holds QQQ 15.91 at 716.93 (stop 688.66) and SPY 14.03 at 765.40 (stop
     746.15).
-  - Equity 15,035.31 (+0.24%), lowest 14,857.62 (−0.95%). Flags ok, no
-    tick errors.
+  - Equity 15,035.31 (+0.24%). Flags ok, no tick errors.
+  - The day's lowest mark, 14,857.62 (−0.95%), is the opening mark at
+    Friday's close. During the session equity never went below 15,002.87
+    (at the 10:00 ET bar lows).
+  - Astral revised Friday's last 30-minute bars after the 10-16 entry was
+    written (QQQ 710.01 to 709.86, SPY 763.51 to 763.27). Friday's equity
+    is therefore 14,857.62 now, not 14,863.32. Closing figures logged on
+    the day can drift like this.
   - No exit planned: QQQ closed at 718.24 against an SMA5 of 725.73, SPY
     at 766.44 against 769.82.
   - No entry signal: RSI(2) is 42.3 for QQQ, 41.5 for SPY and 51.4 for
@@ -475,7 +481,7 @@ the 632.50 used on that day.
     re-activated, it sold 10.077224 at 724.00 and 0.201537 at 724.002.
     The order reason is `strategy_rule_exit:exit QQQ`. The trade lost
     $53.15 (bought 10-14 at 729.17).
-  - Cause, reconstructed from the bars:
+  - Cause, reconstructed from Astral's own daily bars:
     - Astral's QQQ daily series has a bar stamped 2026-10-18T20:00Z, a
       Sunday, that holds the 10-19 session.
     - Counting that bar as well as the live price pulls the 5-day average
@@ -490,8 +496,8 @@ the 632.50 used on that day.
     UTC). The DIA, IWM, QQQ and SPY feeds failed after it. The deployment
     re-activated at 20:21 UTC and reports health ok, ready to trade, and
     flat.
-  - Not reported to Astral: the operator declined the bug-report call on
-    2026-10-15.
+  - Not yet reported to Astral. The operator declined the earlier report
+    call on 2026-10-15.
 
   | symbol | bot shadow | Astral 1999 |
   |---|---|---|
