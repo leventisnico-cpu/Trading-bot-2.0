@@ -21,3 +21,5 @@ INFO buy SPY 14.03 lots stop 746.15: Fill(ok=True, price=765.4002681000001, tick
 INFO plan for the next open: exits [], entries []
 INFO FTMO day 2026-10-16: day-start balance 15000.00
 INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-10-19: day-start balance 15000.00
+INFO plan for the next open: exits [], entries []

@@ -430,3 +430,70 @@ the 632.50 used on that day.
     729.197 since entry.
   - The readiness verdict is in `docs/FTMO_BOT.md` ("Result
     (2026-10-16)").
+
+### 2026-10-19 (Monday, after the close)
+
+* **SMH:** close 548.21, taken from the last regular-session 30-minute
+  bar (the daily bar says 548.46). SMA50 578.33, SMA200 512.28. Buy level
+  537.90, sell level 486.67.
+  - Astral's SMH daily series is clean again: one bar per session, and
+    the 10-15 and 10-16 bars match the 30-minute closes (558.84 and
+    539.79).
+* **Position:** held. **No order.** The close is $61.54 (12.6%) above the
+  sell level. SMH is 14.1% below the 2026-10-06 open (638.38).
+* **ETF scan** (1Y / 6M / YTD %):
+  - SOXX 71.4 / 20.8 / 66.7;
+  - SMH 58.0 / 18.2 / 52.3;
+  - SMHX 39.6 / 18.2 / 44.5;
+  - THNQ 35.4 / 28.8 / 40.3;
+  - XSD 34.2 / 13.4 / 46.2;
+  - XLK 29.0 / 20.4 / 29.1;
+  - IYW 27.3 / 21.0 / 27.3;
+  - FTEC 26.7 / 19.6 / 27.9;
+  - VGT 26.3 / 19.5 / 27.7;
+  - WTAI 27.3 / 13.3 / 32.2;
+  - CHAT 26.0 / 7.0 / 36.3;
+  - AIQ 22.8 / 16.4 / 23.8;
+  - QQQ 17.5 / 10.7 / 16.9;
+  - context only: USD (2×) 53.0 / 11.5 / 51.2 and SOXL (3×) 133.8 / 4.3 /
+    135.0.
+
+  Top 3 unleveraged by 1Y: SOXX, SMH, SMHX. No unswept ETF beats SMH on
+  all three, so there is no backtest.
+* **FTMO bot shadow** (day 3 of 10 for both trades):
+  - Holds QQQ 15.91 at 716.93 (stop 688.66) and SPY 14.03 at 765.40 (stop
+    746.15).
+  - Equity 15,035.31 (+0.24%), lowest 14,857.62 (−0.95%). Flags ok, no
+    tick errors.
+  - No exit planned: QQQ closed at 718.24 against an SMA5 of 725.73, SPY
+    at 766.44 against 769.82.
+  - No entry signal: RSI(2) is 42.3 for QQQ, 41.5 for SPY and 51.4 for
+    DIA, and IWM is below its 200-day average. The independent
+    computation agrees.
+* **Astral 1999 sold its QQQ position mid-session, on a false signal.**
+  - At 15:53:40 UTC (11:53 ET), one second after the deployment
+    re-activated, it sold 10.077224 at 724.00 and 0.201537 at 724.002.
+    The order reason is `strategy_rule_exit:exit QQQ`. The trade lost
+    $53.15 (bought 10-14 at 729.17).
+  - Cause, reconstructed from the bars:
+    - Astral's QQQ daily series has a bar stamped 2026-10-18T20:00Z, a
+      Sunday, that holds the 10-19 session.
+    - Counting that bar as well as the live price pulls the 5-day average
+      down to 722.95, under the 724.00 price, so the exit rule fired.
+    - On the clean series the average is 726.86 and the rule is false. At
+      the close QQQ (718.24) was still below its SMA5 (725.73), and the
+      bot shadow correctly holds.
+  - These are the same two defects as before: a duplicate daily bar, and
+    a daily rule evaluated on a live price after a re-activation (the
+    10-14 entry also fired at a re-activation).
+  - The QQQ protection feed failed twice before the exit (14:22 and 14:55
+    UTC). The DIA, IWM, QQQ and SPY feeds failed after it. The deployment
+    re-activated at 20:21 UTC and reports health ok, ready to trade, and
+    flat.
+  - Not reported to Astral: the operator declined the bug-report call on
+    2026-10-15.
+
+  | symbol | bot shadow | Astral 1999 |
+  |---|---|---|
+  | QQQ | 15.91 @ 716.93, open | sold 10-19 11:53 ET @ 724.00, −$53.15 |
+  | SPY | 14.03 @ 765.40, open | none |
