@@ -503,3 +503,54 @@ the 632.50 used on that day.
   |---|---|---|
   | QQQ | 15.91 @ 716.93, open | sold 10-19 11:53 ET @ 724.00, −$53.15 |
   | SPY | 14.03 @ 765.40, open | none |
+
+### 2026-10-20 (Tuesday, after the close)
+
+* **SMH:** close 546.07, taken from the last 5-minute bar. SMA50 577.87,
+  SMA200 513.15. Buy level 538.81, sell level 487.49.
+  - Astral's 15:30 ET 30-minute bar holds only 15:30–15:35 ET (close
+    548.87, volume 102k against 1.1M the day before). The 5-minute bars
+    run to 16:00. The daily bar had not posted at 16:41 ET.
+* **Position:** held. **No order.** The close is $58.58 (12.0%) above the
+  sell level. SMH is 14.5% below the 2026-10-06 open (638.38).
+* **ETF scan** (1Y / 6M / YTD %):
+  - SOXX 70.7 / 19.7 / 66.0;
+  - SMH 57.4 / 17.8 / 51.7;
+  - SMHX 38.9 / 16.5 / 43.9;
+  - THNQ 35.8 / 28.2 / 40.7;
+  - XSD 34.7 / 11.4 / 46.8;
+  - XLK 28.7 / 20.0 / 28.8;
+  - IYW 26.9 / 20.4 / 26.9;
+  - FTEC 26.5 / 18.9 / 27.7;
+  - VGT 26.2 / 18.8 / 27.6;
+  - WTAI 26.6 / 12.4 / 31.5;
+  - CHAT 25.1 / 5.2 / 35.3;
+  - AIQ 23.2 / 17.2 / 24.2;
+  - QQQ 17.3 / 11.0 / 16.8;
+  - context only: USD (2×) 51.9 / 11.4 / 50.2 and SOXL (3×) 130.9 / 1.7 /
+    132.1.
+
+  Top 3 unleveraged by 1Y: SOXX, SMH, SMHX. No unswept ETF beats SMH on
+  all three, so there is no backtest.
+* **FTMO bot shadow: first exit signal.**
+  - SPY closed at 768.53, above its SMA5 of 767.92. The plan for
+    Wednesday's open is "exit US500": SPY 14.03 lots, entry 765.40, day 4.
+    The trade is +$43.97 at the close.
+  - QQQ holds: 717.21 against an SMA5 of 720.44 (day 4 of 10).
+  - No entry signal: RSI(2) is 38.3 for QQQ, 59.9 for SPY and 90.0 for
+    DIA, and IWM is below its 200-day average. The independent
+    computation agrees.
+  - Equity 15,048.36 (+0.32%), lowest 14,886.01 (−0.76%) at the 09:30 ET
+    bar lows. Flags ok, no tick errors.
+  - The SPY margin is only $0.61, so I checked the close: Astral's six
+    5-minute bars for 15:30–16:00 ET add up to the 30-minute bar, and its
+    daily bar also closes at 768.534.
+* **Astral 1999:** no orders. It has been flat since the false QQQ exit on
+  10-19.
+  - Its price feed failed nine times between 13:32 and 18:32 UTC (QQQ,
+    DIA, IWM), with feed delays of up to 9 minutes. It re-activated at
+    17:43 and 20:07 UTC.
+  - Its SPY daily series now stamps the 10-19 and 10-20 sessions
+    2026-10-18T20:00Z and 2026-10-19T20:00Z.
+  - Not redeployed: the faults are on Astral's side and have hit every
+    deployment, and a redeploy needs the operator's approval of a preview.

@@ -1,10 +1,12 @@
 {
   "initial_balance": 15000.0,
-  "day": "2026-10-19",
+  "day": "2026-10-20",
   "day_start_balance": 15000.0,
-  "plan_day": "2026-10-19",
-  "plan_checked": "2026-10-19",
-  "pending_exits": [],
+  "plan_day": "2026-10-20",
+  "plan_checked": "2026-10-20",
+  "pending_exits": [
+    "US500"
+  ],
   "pending_entries": [],
   "pending_atr": {},
   "executed_day": "2026-10-15",
