@@ -169,5 +169,22 @@
     "trading_days": 1,
     "flags": [],
     "errors": 0
+  },
+  {
+    "day": "2026-10-21",
+    "balance": 15073.9127975965,
+    "equity": 15209.038897624,
+    "min_equity": 15048.359888584499,
+    "daily_floor": 14250.0,
+    "open": [
+      "QQQ 15.91@716.93 sl 688.66"
+    ],
+    "plan": "exit US100",
+    "deals": [
+      "sell SPY 14.03@770.6685 +73.91 (FAST4 exit)"
+    ],
+    "trading_days": 2,
+    "flags": [],
+    "errors": 0
   }
 ]

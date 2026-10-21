@@ -25,3 +25,6 @@ INFO FTMO day 2026-10-19: day-start balance 15000.00
 INFO plan for the next open: exits [], entries []
 INFO FTMO day 2026-10-20: day-start balance 15000.00
 INFO plan for the next open: exits ['US500'], entries []
+INFO FTMO day 2026-10-21: day-start balance 15000.00
+INFO close SPY 14.03 lots (exit): Fill(ok=True, price=770.66846465, ticket=2, message='done')
+INFO plan for the next open: exits ['US100'], entries []

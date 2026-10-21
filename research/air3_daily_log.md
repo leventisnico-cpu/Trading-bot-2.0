@@ -554,3 +554,50 @@ the 632.50 used on that day.
     2026-10-18T20:00Z and 2026-10-19T20:00Z.
   - Not redeployed: the faults are on Astral's side and have hit every
     deployment, and a redeploy needs the operator's approval of a preview.
+
+### 2026-10-21 (Wednesday, after the close)
+
+* **SMH:** close 556.75, taken from the last regular-session 30-minute
+  bar (its six 5-minute bars agree). SMA50 577.55, SMA200 514.04. Buy
+  level 539.75, sell level 488.34.
+  - Astral's SMH daily series now has the same defect as QQQ and SPY: a
+    bar stamped 2026-10-20T20:00Z holds the 10-21 session. The levels skip
+    it.
+  - The 10-20 daily bar has posted at 546.36, and the 30-minute bar now
+    says 546.42. The 10-20 entry used 546.07 from the 5-minute bars. The
+    10-20 sell level is unchanged at 487.49.
+* **Position:** held. **No order.** The close is $68.40 (14.0%) above the
+  sell level. SMH is 12.8% below the 2026-10-06 open (638.38).
+* **ETF scan** (1Y / 6M / YTD %):
+  - SOXX 75.2 / 21.3 / 69.5;
+  - SMH 61.2 / 19.8 / 54.5;
+  - SMHX 43.0 / 17.6 / 47.1;
+  - THNQ 38.8 / 30.5 / 44.0;
+  - XSD 39.8 / 11.8 / 49.8;
+  - XLK 30.8 / 21.9 / 30.9;
+  - IYW 28.7 / 22.7 / 28.7;
+  - FTEC 28.7 / 21.1 / 29.9;
+  - VGT 28.4 / 21.0 / 29.7;
+  - WTAI 29.2 / 14.3 / 33.7;
+  - CHAT 28.3 / 7.2 / 37.8;
+  - AIQ 25.4 / 19.2 / 25.8;
+  - QQQ 18.6 / 12.6 / 18.1;
+  - context only: USD (2×) 60.7 / 16.4 / 56.2 and SOXL (3×) 148.7 / 5.3 /
+    145.6.
+
+  Top 3 unleveraged by 1Y: SOXX, SMH, SMHX. No unswept ETF beats SMH on
+  all three, so there is no backtest.
+* **FTMO bot shadow: first exit done, QQQ exit planned.**
+  - At 10:05 ET it sold SPY 14.03 lots at 770.67 (bought 10-15 at 765.40)
+    for +$73.91. Balance 15,073.91.
+  - QQQ closed at 725.42, above its SMA5 of 719.77, so the plan for
+    Thursday's open is "exit US100" (day 5 of 10).
+  - No entry signal: RSI(2) is 75.1 for QQQ, 83.3 for SPY and 95.1 for
+    DIA, and IWM is below its 200-day average. The independent
+    computation agrees.
+  - Equity 15,209.04 (+1.39%). The lowest, 15,048.36, is the opening mark
+    at Tuesday's close. Trading days 2. Flags ok, no tick errors.
+* **Astral 1999:** no orders, flat.
+  - Its price feeds failed six more times (QQQ, DIA, SPY), and one DIA
+    episode lasted two hours.
+  - The QQQ feed was still down at the close.
