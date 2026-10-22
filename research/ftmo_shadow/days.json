@@ -186,5 +186,20 @@
     "trading_days": 2,
     "flags": [],
     "errors": 0
+  },
+  {
+    "day": "2026-10-22",
+    "balance": 15032.506021062,
+    "equity": 15032.506021062,
+    "min_equity": 14993.219747624,
+    "daily_floor": 14323.9127975965,
+    "open": [],
+    "plan": "",
+    "deals": [
+      "sell QQQ 15.91@714.3283 -41.41 (FAST4 exit)"
+    ],
+    "trading_days": 3,
+    "flags": [],
+    "errors": 0
   }
 ]

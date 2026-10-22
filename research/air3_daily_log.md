@@ -601,3 +601,64 @@ the 632.50 used on that day.
   - Its price feeds failed six more times (QQQ, DIA, SPY), and one DIA
     episode lasted two hours.
   - The QQQ feed was still down at the close.
+
+### 2026-10-22 (Thursday, after the close)
+
+* **SMH:** close 523.18, taken from the last regular-session 30-minute
+  bar (its 5-minute bars agree). Astral's daily bar says 523.35. SMA50
+  576.31, SMA200 514.72. Buy level 540.46, sell level 488.99.
+  - SMH fell 6.0% on the day, from 556.70 to 523.35 on the daily bars.
+  - Astral has removed the misdated 2026-10-20T20:00Z bar from the SMH
+    daily series.
+  - The 30-minute series now closes 10-21 at 556.63 (556.75 in the
+    10-21 entry), and the 10-21 daily bar has posted at 556.70. The
+    10-21 sell level is unchanged at 488.34.
+* **Position:** held. **No order.** The close is $34.19 (7.0%) above the
+  sell level. SMH is 18.0% below the 2026-10-06 open (638.38).
+* **ETF scan** (1Y / 6M / YTD %):
+  - SOXX 67.4 / 10.2 / 58.0;
+  - SMH 54.6 / 9.8 / 45.3;
+  - SMHX 36.2 / 7.0 / 37.2;
+  - THNQ 35.4 / 23.1 / 38.1;
+  - XSD 36.3 / 2.6 / 40.6;
+  - XLK 27.8 / 15.4 / 26.7;
+  - IYW 25.9 / 16.3 / 24.7;
+  - FTEC 26.4 / 15.1 / 26.0;
+  - VGT 26.1 / 15.1 / 25.9;
+  - WTAI 23.0 / 3.6 / 25.0;
+  - CHAT 22.5 / −2.5 / 29.6;
+  - AIQ 23.2 / 12.9 / 22.0;
+  - QQQ 16.3 / 7.5 / 14.7;
+  - context only: USD (2×) 45.9 / −1.6 / 38.8 and SOXL (3×) 113.9 /
+    −22.3 / 95.4.
+
+  Top 3 unleveraged by 1Y: SOXX, SMH, XSD (XSD 36.32 edges SMHX 36.20).
+  No unswept ETF beats SMH on all three, so there is no backtest.
+* **FTMO bot shadow: QQQ sold. Both trades are closed and the bot is
+  flat.**
+  - At 10:05 ET it sold QQQ 15.91 lots at 714.33 (bought 10-15 at
+    716.93) for −$41.41. The price is the 09:30 ET bar's close, 714.36,
+    less the simulated 0.005% half spread.
+  - QQQ opened at 713.63, 1.6% below the 10-21 close of 725.42 that
+    signalled the exit. The trade was worth +$135.06 at that close and
+    filled at a loss. FAST-4 exits at the next open by design, and the
+    research models the same fill.
+  - Balance 15,032.51: +$32.51 (+0.22%) for the round trip (SPY +$73.91,
+    QQQ −$41.41).
+  - No entry signal: RSI(2) is 18.0 for QQQ, 21.2 for SPY and 95.3 for
+    DIA, and IWM is below its 200-day average. The independent
+    computation agrees. QQQ would have to close below 682.60 and SPY
+    below 745.43 to signal, well under the day's lows (702.00 and
+    761.22). SPY's last 30-minute bar looks thin (volume 2.1M against
+    3.9M for the bar before), but no plausible close changes the answer.
+  - Equity 15,032.51. The lowest, 14,993.22, is QQQ at the 09:30 ET
+    bar's low (711.86) before the sale. The daily floor moved up with the
+    SPY profit, to 14,323.91 (day-start balance 15,073.91 less 750).
+    Trading days 3. Flags ok, no tick errors.
+  - Astral has since revised QQQ's 10-21 close to 725.21 and SPY's
+    10-20 close to 769.01. Both are still above their SMA5s (719.78 and
+    768.04), so both exits stand.
+* **Astral 1999:** no orders, flat since 10-19.
+  - One price-feed failure today (DIA at 13:54 UTC, hard timeout). It
+    re-activated at 21:13 UTC on 10-21 and at 20:40 UTC today.
+  - No divergence: neither Astral nor the shadow had an entry signal.

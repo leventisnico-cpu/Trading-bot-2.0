@@ -132,7 +132,7 @@ for live money yet. FAST-4 itself is still NO-GO for a fast pass.**
   - the daily floor (14,250) and the max-loss floor (13,500) were never
     approached;
   - both positions are still open, on day 2 of 10.
-* **No exit has run yet.**
+* No exit had run yet. Both ran the next week (see "Round trip" below).
 
 **Astral deployment 1999 is not usable as an execution reference:**
 * data feed failure on 2026-10-05 (redeployed);
@@ -146,20 +146,63 @@ Bug reports fc0b281e and d573b589 were filed. A third, for 10-14, was
 prepared but not sent. Details are in `research/air3_daily_log.md`.
 
 **What this test did not cover:**
-* exits and the 10-session time stop;
+* exits (signal exits are covered since; see "Round trip" below) and
+  the 10-session time stop;
 * the profit target and keep-alive in a real account;
 * FTMO's symbols, contract sizes and filling;
 * the MT5 server clock;
 * real order routing.
 
 **Next steps:**
-1. The shadow keeps running until the QQQ and SPY trades close (at most
-   eight more sessions) so the exit path is seen once.
+1. Done 2026-10-22: the shadow kept running until the QQQ and SPY
+   trades closed, so the exit path has been seen once.
 2. Run the preflight and a dry-run week on FTMO's MT5 terminal: first a
    free trial or demo account if FTMO offers one, otherwise the paid
    account in dry-run. Live orders only after that week looks right.
 3. The odds above have not changed. Each evaluation fee buys about a
    one-in-five chance of passing within 18 months.
+
+### Round trip (2026-10-21 and 10-22): both exits ran
+
+The shadow kept running after the two-week test until both trades
+closed. Both exits were planned the evening before, and both plans
+matched the independent computation.
+
+* **SPY:** closed at 768.53 on 10-20, above its SMA5 (767.92). The bot
+  sold at 10:05 ET on 10-21: 14.03 lots at 770.67, **+$73.91**.
+* **QQQ:** closed at 725.42 on 10-21, above its SMA5 (719.77). The bot
+  sold at 10:05 ET on 10-22: 15.91 lots at 714.33, **−$41.41**.
+  - QQQ opened 1.6% below the close that signalled the exit. The trade
+    was worth +$135.06 at that close and filled at a loss.
+  - That is FAST-4's next-open exit working as designed, not a fault.
+    The research models the same fill.
+* **Net:** balance **15,032.51 (+0.22%)** after 14 sessions (10-05 to
+  10-22).
+  - One win and one loss. Two trades say nothing about the 70% win rate.
+  - The lowest equity of the whole run was 14,781.21 (−1.46%), on 10-16.
+* The day-start balance and the daily floor moved up with the realized
+  profit, as FTMO computes them: 15,073.91 and 14,323.91 on 10-22.
+* No tick errors, guard trips or flags in any session.
+* The closes above are the ones the bot acted on. Astral has since
+  revised them (SPY 769.01, QQQ 725.21); both are still above their
+  SMA5s, so both exits stand.
+* Astral 1999 gives no comparison for the exits. It sold its QQQ on
+  10-19 on a phantom bar and has been flat since.
+
+**Now covered:**
+* the SMA5 exit;
+* next-open exit fills;
+* realized P&L flowing into the day-start balance and the daily floor.
+
+**Still not covered:**
+* the 10-session time stop;
+* a stop-loss fill;
+* the profit target and the keep-alive;
+* FTMO's symbols, contract sizes, filling, server clock and order
+  routing.
+
+The daily shadow run continues, flat until the next FAST-4 signal, so a
+time stop or a stop-loss exit can be seen as well.
 
 ## Setup (Windows PC or Windows VPS outside the US)
 

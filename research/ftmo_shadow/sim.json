@@ -1,14 +1,6 @@
 {
-  "balance": 15073.9127975965,
-  "positions": [
-    {
-      "ticket": 1,
-      "symbol": "QQQ",
-      "volume": 15.91,
-      "price_open": 716.93084475,
-      "sl": 688.6582913740494
-    }
-  ],
+  "balance": 15032.506021062,
+  "positions": [],
   "next_ticket": 3,
   "deals": [
     {
@@ -40,7 +32,17 @@
       "price": 770.6685,
       "pnl": 73.91,
       "why": "FAST4 exit"
+    },
+    {
+      "time": "2026-10-22T10:05:00-04:00",
+      "ticket": 1,
+      "side": "sell",
+      "symbol": "QQQ",
+      "volume": 15.91,
+      "price": 714.3283,
+      "pnl": -41.41,
+      "why": "FAST4 exit"
     }
   ],
-  "clock": "2026-10-21T20:06:00+00:00"
+  "clock": "2026-10-22T20:06:00+00:00"
 }
