@@ -1,0 +1,48 @@
+{
+  "balance": 15032.506021062,
+  "positions": [],
+  "next_ticket": 3,
+  "deals": [
+    {
+      "time": "2026-10-15T10:05:00-04:00",
+      "ticket": 1,
+      "side": "buy",
+      "symbol": "QQQ",
+      "volume": 15.91,
+      "price": 716.9308,
+      "sl": 688.6582913740494,
+      "why": "FAST4 entry"
+    },
+    {
+      "time": "2026-10-15T10:05:00-04:00",
+      "ticket": 2,
+      "side": "buy",
+      "symbol": "SPY",
+      "volume": 14.03,
+      "price": 765.4003,
+      "sl": 746.149317023795,
+      "why": "FAST4 entry"
+    },
+    {
+      "time": "2026-10-21T10:05:00-04:00",
+      "ticket": 2,
+      "side": "sell",
+      "symbol": "SPY",
+      "volume": 14.03,
+      "price": 770.6685,
+      "pnl": 73.91,
+      "why": "FAST4 exit"
+    },
+    {
+      "time": "2026-10-22T10:05:00-04:00",
+      "ticket": 1,
+      "side": "sell",
+      "symbol": "QQQ",
+      "volume": 15.91,
+      "price": 714.3283,
+      "pnl": -41.41,
+      "why": "FAST4 exit"
+    }
+  ],
+  "clock": "2026-10-23T20:06:00+00:00"
+}

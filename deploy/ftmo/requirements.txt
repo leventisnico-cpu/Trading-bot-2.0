@@ -1,0 +1,4 @@
+# FTMO bot on Windows (MetaTrader5 is a Windows-only package).
+MetaTrader5>=5.0.45
+PyYAML>=6.0
+tzdata>=2024.1   # time zones for zoneinfo on Windows

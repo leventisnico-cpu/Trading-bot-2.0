@@ -1,0 +1,218 @@
+[
+  {
+    "day": "2026-10-05",
+    "balance": 15000.0,
+    "equity": 15000.0,
+    "min_equity": 15000.0,
+    "daily_floor": 14250.0,
+    "open": [],
+    "plan": "",
+    "deals": [],
+    "trading_days": 0,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-06",
+    "balance": 15000.0,
+    "equity": 15000.0,
+    "min_equity": 15000.0,
+    "daily_floor": 14250.0,
+    "open": [],
+    "plan": "",
+    "deals": [],
+    "trading_days": 0,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-07",
+    "balance": 15000.0,
+    "equity": 15000.0,
+    "min_equity": 15000.0,
+    "daily_floor": 14250.0,
+    "open": [],
+    "plan": "",
+    "deals": [],
+    "trading_days": 0,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-08",
+    "balance": 15000.0,
+    "equity": 15000.0,
+    "min_equity": 15000.0,
+    "daily_floor": 14250.0,
+    "open": [],
+    "plan": "",
+    "deals": [],
+    "trading_days": 0,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-09",
+    "balance": 15000.0,
+    "equity": 15000.0,
+    "min_equity": 15000.0,
+    "daily_floor": 14250.0,
+    "open": [],
+    "plan": "",
+    "deals": [],
+    "trading_days": 0,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-12",
+    "balance": 15000.0,
+    "equity": 15000.0,
+    "min_equity": 15000.0,
+    "daily_floor": 14250.0,
+    "open": [],
+    "plan": "",
+    "deals": [],
+    "trading_days": 0,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-13",
+    "balance": 15000.0,
+    "equity": 15000.0,
+    "min_equity": 15000.0,
+    "daily_floor": 14250.0,
+    "open": [],
+    "plan": "",
+    "deals": [],
+    "trading_days": 0,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-14",
+    "balance": 15000.0,
+    "equity": 15000.0,
+    "min_equity": 15000.0,
+    "daily_floor": 14250.0,
+    "open": [],
+    "plan": "buy US100 buy US500",
+    "deals": [],
+    "trading_days": 0,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-15",
+    "balance": 15000.0,
+    "equity": 15267.306238584499,
+    "min_equity": 14998.892808584498,
+    "daily_floor": 14250.0,
+    "open": [
+      "QQQ 15.91@716.93 sl 688.66",
+      "SPY 14.03@765.40 sl 746.15"
+    ],
+    "plan": "",
+    "deals": [
+      "buy QQQ 15.91@716.9308",
+      "buy SPY 14.03@765.4003"
+    ],
+    "trading_days": 1,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-16",
+    "balance": 15000.0,
+    "equity": 14863.317408584498,
+    "min_equity": 14781.2064385845,
+    "daily_floor": 14250.0,
+    "open": [
+      "QQQ 15.91@716.93 sl 688.66",
+      "SPY 14.03@765.40 sl 746.15"
+    ],
+    "plan": "",
+    "deals": [],
+    "trading_days": 1,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-19",
+    "balance": 15000.0,
+    "equity": 15035.3141285845,
+    "min_equity": 14857.615198584499,
+    "daily_floor": 14250.0,
+    "open": [
+      "QQQ 15.91@716.93 sl 688.66",
+      "SPY 14.03@765.40 sl 746.15"
+    ],
+    "plan": "",
+    "deals": [],
+    "trading_days": 1,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-20",
+    "balance": 15000.0,
+    "equity": 15048.359888584499,
+    "min_equity": 14886.0061785845,
+    "daily_floor": 14250.0,
+    "open": [
+      "QQQ 15.91@716.93 sl 688.66",
+      "SPY 14.03@765.40 sl 746.15"
+    ],
+    "plan": "exit US500",
+    "deals": [],
+    "trading_days": 1,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-21",
+    "balance": 15073.9127975965,
+    "equity": 15209.038897624,
+    "min_equity": 15048.359888584499,
+    "daily_floor": 14250.0,
+    "open": [
+      "QQQ 15.91@716.93 sl 688.66"
+    ],
+    "plan": "exit US100",
+    "deals": [
+      "sell SPY 14.03@770.6685 +73.91 (FAST4 exit)"
+    ],
+    "trading_days": 2,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-22",
+    "balance": 15032.506021062,
+    "equity": 15032.506021062,
+    "min_equity": 14993.219747624,
+    "daily_floor": 14323.9127975965,
+    "open": [],
+    "plan": "",
+    "deals": [
+      "sell QQQ 15.91@714.3283 -41.41 (FAST4 exit)"
+    ],
+    "trading_days": 3,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-23",
+    "balance": 15032.506021062,
+    "equity": 15032.506021062,
+    "min_equity": 15032.506021062,
+    "daily_floor": 14282.506021062,
+    "open": [],
+    "plan": "",
+    "deals": [],
+    "trading_days": 3,
+    "flags": [],
+    "errors": 0
+  }
+]

@@ -19,11 +19,13 @@
       "SPY",
       "EFA",
       "EEM",
-      "AGG"
+      "AGG",
+      "SMH"
     ],
-    "rows": 6956,
+    "rows": 6980,
     "start": "1999-01-04",
-    "end": "2026-08-28",
+    "end": "2026-10-02",
     "common_start": "2003-09-29"
-  }
+  },
+  "smh_note": "SMH column added 2026-10-04 from Astral canonical daily OHLCV closes (unadjusted; dividends under 1%/yr), 2007-04-12 onward. Rows after 2026-08-28 carry SMH only. Used by the AIR3 expectancy gate."
 }
