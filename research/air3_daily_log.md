@@ -717,3 +717,66 @@ the 632.50 used on that day.
   - Not redeployed, for the same reasons as before: the faults are on
     Astral's side, and a redeploy needs the operator's approval of a
     preview. Monday's morning check will look at its health again.
+
+## Weekly re-validation (2026-10-25, Sunday 22:11 UTC)
+
+**Method.** Astral's backtest tool needs an approval in the app, and
+that approval has gone unanswered every week since 10-11, so the 10-11
+and 10-18 re-validations did not run.
+* This week uses `research/air3_replica.py`, a local replica of 41110
+  (AIR3) and 41122 (buy-and-hold).
+* Data: Astral's SMH daily bars, 2012-01-03 → 2026-10-23.
+* Settings: $100k, 1 bp commission, 2 bp slippage. Trading starts after
+  220 warm-up bars inside each window, as on Astral.
+
+**Calibration.** On data through 10-02, the replica reproduces the 10-04
+Astral runs.
+* AIR3 is within 2 points in every window: full +1,148% (Astral
+  +1,144%), folds +121% / +60% / +319% (Astral +121% / +58% / +319%).
+* The trades, win rates and drawdowns are the same.
+* Buy-and-hold matches except fold 3: +460% against Astral's +445%.
+  - That return swings from +399% to +492% depending on which June 2022
+    day it enters.
+  - Its drawdown stays at −35% to −36% whichever day it enters.
+
+| window | AIR3 return | AIR3 CAGR | AIR3 max DD | trades | win rate | B&H return | B&H max DD | AIR3 lower DD |
+|---|---|---|---|---|---|---|---|---|
+| full 2014-01 → 2026-10-23 | +948% | 21.8% | −27.7% | 5 closed + 1 open | 80% | +1,821% | −44.9% | yes |
+| fold 1 2013-03 → 2018-06 | +121% | 19.5% | −18.0% | 1 + 1 open | 100% | +133% | −22.9% | yes |
+| fold 2 2017-06 → 2022-08 | +60% | 11.3% | −27.7% | 3 | 67% | +98% | −37.3% | yes |
+| fold 3 2021-08 → 2026-10-23 | +252% | 33.5% | −24.1% | 1 + 1 open | 100% | +370% | −34.9% | yes |
+
+Closed trades in the full sample: −0.2%, +76%, +8%, +63% and +97%. The
+open trade was bought at the 2025-07-01 open (276.80) and is now +90%.
+
+**Against 10-04:**
+* The full sample fell from +1,144% to +948% and fold 3 from +319% to
+  +252%.
+* Both fell because SMH dropped 16.4% from 630.60 (10-02) to 527.20
+  (10-23) while the rule held its open trade.
+* Folds 1 and 2 are closed windows and did not change.
+* The trades, win rates and drawdowns did not change.
+
+**Flags:**
+* Win rate 80% (≥ 70%): no flag.
+* AIR3's drawdown is lower than buy-and-hold's in every fold: no flag.
+* **Wide move, flagged.** The returns moved by a wide margin: −196
+  points on the full sample and −67 on fold 3.
+  - It is the open trade marked down with the market, not a change in
+    the rule's record.
+  - AIR3's equity is 20.7% below its 2026-06-22 peak (SMH −21.2% from
+    668.91). The worst drawdown so far is −24.1% in fold 3 and −27.7% in
+    the full sample.
+  - A further SMH drop of about 4% would set a new fold-3 drawdown,
+    still well short of buy-and-hold's −34.9%.
+
+**Paper deployment 1924** ($870, saved 6422) has been undeployed since
+2026-10-04 23:10 UTC, so there is no paper position to report. Astral's
+paper slot runs the FTMO bot test.
+
+**TFSA position** (the operator follows the rule by hand):
+* Held since the 10-06 open at 638.38.
+* At Friday's close of 527.20 it is −17.4%, or −$111.18 per share.
+* The sell level is 489.66 (0.95 × SMA200 515.43). The close is $37.54
+  (7.7%) above it.
+* SMA50 (575.07) is still above SMA200.
