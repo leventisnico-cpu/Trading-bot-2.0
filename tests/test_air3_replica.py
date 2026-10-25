@@ -28,11 +28,13 @@ def window(df):
 
 
 def test_buy_and_hold_fills_at_the_first_eligible_close_after_220_warmup_bars():
-    df = bars([100.0] * 230)
+    closes = [100.0 + 0.1 * i for i in range(230)]
+    df = bars(closes, [x - 0.5 for x in closes])
     r = replica.run(df, *window(df), "bh")
+    qty = 0.95 * CAP / closes[220]
+    cash = CAP - qty * closes[220] * BUY
     assert r["from"] == df["date"][220]
-    qty = 0.95 * CAP / 100.0
-    assert r["ret"] == pytest.approx((CAP - qty * 100.0 * BUY + qty * 100.0) / CAP - 1)
+    assert r["ret"] == pytest.approx((cash + qty * closes[-1]) / CAP - 1)
     assert r["open"] and r["closed"] == 0
 
 

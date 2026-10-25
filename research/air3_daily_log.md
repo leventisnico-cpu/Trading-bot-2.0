@@ -752,8 +752,8 @@ the 632.50 used on that day.
 * Buy-and-hold is within 6 points in three windows: full +2,196%
   (Astral +2,190%), fold 1 +134% (+134%), fold 2 +97% (+99%).
 * Fold 3 buy-and-hold is unexplained: +457.5% against Astral's +445%,
-  with drawdowns of −35.3% against −34.9%. No entry date after the
-  warm-up reproduces Astral's figure.
+  with drawdowns of −35.3% against −34.9%. No single entry date after
+  the warm-up reproduces both the +445% and the −34.9%.
 
 | window | AIR3 return | AIR3 CAGR | AIR3 max DD | trades | win rate | B&H return | B&H max DD | AIR3 lower DD |
 |---|---|---|---|---|---|---|---|---|
