@@ -841,7 +841,8 @@ paper slot runs the FTMO bot test.
     after 67.6 hours.
   - Today: DIA failed at 14:07 UTC. SPY recovered at 14:09 and QQQ failed
     at 14:37. Then SPY failed at 18:28 and 18:59 UTC with IWM and QQQ
-    also down, and there was no recovery before the close.
+    also down. By 19:00 UTC all four feeds were down (health record), and
+    there was no recovery before the close.
   - It was degraded through the close on 10-23 and again today. A FAST-4
     signal on such a day would probably be missed on Astral. There was
     no signal either day.
