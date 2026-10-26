@@ -33,3 +33,5 @@ INFO close QQQ 15.91 lots (exit): Fill(ok=True, price=714.3282818, ticket=1, mes
 INFO plan for the next open: exits [], entries []
 INFO FTMO day 2026-10-23: day-start balance 15032.51
 INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-10-26: day-start balance 15032.51
+INFO plan for the next open: exits [], entries []

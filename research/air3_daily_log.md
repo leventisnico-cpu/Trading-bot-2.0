@@ -798,3 +798,51 @@ paper slot runs the FTMO bot test.
 * The sell level is 489.66 (0.95 × SMA200 515.43). The close is $37.54
   (7.7%) above it.
 * SMA50 (575.07) is still above SMA200.
+
+### 2026-10-26 (Monday, after the close)
+
+* **SMH:** close 541.61, taken from the last regular-session 30-minute
+  bar (volume 1.52M, complete). Astral's daily bar for today had not
+  posted. SMA50 574.15, SMA200 516.25. Buy level 542.06, sell level
+  490.43.
+* **Position:** held. **No order.** The close is $51.18 (10.4%) above
+  the sell level. SMH is 15.2% below the 2026-10-06 open (638.38). The
+  close is just under the buy level, which matters only when flat.
+* **ETF scan** (1Y / 6M / YTD %):
+  - SOXX 61.7 / 6.5 / 63.3;
+  - SMH 50.5 / 6.9 / 50.4;
+  - SMHX 29.0 / 3.1 / 40.8;
+  - THNQ 30.2 / 23.6 / 40.7;
+  - XSD 31.0 / −3.3 / 44.0;
+  - XLK 24.6 / 16.3 / 29.4;
+  - IYW 22.0 / 16.4 / 26.6;
+  - FTEC 22.9 / 16.1 / 28.5;
+  - VGT 22.8 / 16.1 / 28.4;
+  - WTAI 19.0 / 5.4 / 28.3;
+  - CHAT 17.3 / −1.0 / 33.0;
+  - AIQ 18.6 / 14.1 / 23.8;
+  - QQQ 13.4 / 7.3 / 15.9;
+  - context only: USD (2×) 35.9 / −4.1 / 46.5 and SOXL (3×) 93.2 /
+    −29.5 / 115.3.
+
+  Top 3 unleveraged by 1Y: SOXX, SMH, XSD (XSD 31.0 ahead of THNQ 30.2
+  and SMHX 29.0). No unswept ETF beats SMH on all three, so there is no
+  backtest.
+* **FTMO bot shadow:** flat, no trade, no entry signal.
+  - RSI(2) is 61.2 for QQQ, 57.9 for SPY and 42.7 for DIA, and IWM is
+    below its 200-day average. The independent computation agrees.
+  - Balance and equity 15,032.51 (+0.22%). Daily floor 14,282.51.
+    Trading days 3. Flags ok, no tick errors.
+  - Astral revised Friday's cut-short bars: QQQ 704.39 (30-minute bar
+    704.78 on Friday), SPY 759.91 (760.21) and DIA 521.38 (521.37). With
+    the revised close, SPY's Friday RSI(2) is 14.9, still above 10.
+* **Astral 1999:** no orders, flat since 10-19.
+  - Friday's outage (from 17:54 UTC) ended at today's open, 13:30 UTC,
+    after 67.6 hours.
+  - Today: DIA failed at 14:07 UTC. SPY recovered at 14:09 and QQQ failed
+    at 14:37. Then SPY failed at 18:28 and 18:59 UTC with IWM and QQQ
+    also down, and there was no recovery before the close.
+  - It was degraded through the close on 10-23 and again today. A FAST-4
+    signal on such a day would probably be missed on Astral. There was
+    no signal either day.
+  - Not redeployed, for the same reasons as before.
