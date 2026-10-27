@@ -847,3 +847,54 @@ paper slot runs the FTMO bot test.
     signal on such a day would probably be missed on Astral. There was
     no signal either day.
   - Not redeployed, for the same reasons as before.
+
+### 2026-10-27 (Tuesday, after the close)
+
+* **SMH:** close 557.98. Astral's daily bar has posted, and the last
+  regular-session 30-minute bar says 557.90 (volume 1.41M, complete).
+  SMA50 573.45, SMA200 517.09. Buy level 542.95, sell level 491.24.
+  Monday's daily bar posted at 541.62, against 541.61 logged from the
+  30-minute bar.
+* **Position:** held. **No order.** The close is $66.74 (13.6%) above
+  the sell level. SMH is 12.6% below the 2026-10-06 open (638.38). The
+  close is above the buy level, which matters only when flat.
+* **ETF scan** (1Y / 6M / YTD %):
+  - SOXX 68.2 / 12.3 / 69.8;
+  - SMH 55.0 / 10.2 / 54.9;
+  - SMHX 34.0 / 9.6 / 46.2;
+  - THNQ 34.2 / 28.9 / 45.0;
+  - XSD 37.1 / 4.4 / 50.8;
+  - XLK 26.8 / 18.0 / 31.6;
+  - IYW 23.6 / 17.3 / 28.3;
+  - FTEC 24.8 / 17.8 / 30.4;
+  - VGT 24.6 / 17.7 / 30.3;
+  - WTAI 22.6 / 8.3 / 32.3;
+  - CHAT 21.5 / 3.3 / 37.7;
+  - AIQ 19.9 / 15.0 / 25.2;
+  - QQQ 14.8 / 8.6 / 17.4;
+  - context only: USD (2×) 42.5 / −2.1 / 53.7 and SOXL (3×) 115.8 /
+    −18.1 / 140.5.
+
+  Top 3 unleveraged by 1Y: SOXX, SMH, XSD (XSD 37.1 ahead of THNQ 34.2
+  and SMHX 34.0). No unswept ETF beats SMH on all three, so there is no
+  backtest.
+* **FTMO bot shadow:** flat, no trade, no entry signal.
+  - RSI(2) is 82.8 for QQQ, 77.1 for SPY, 48.0 for DIA and 93.3 for
+    IWM. The independent computation agrees.
+  - IWM closed above its 200-day average (280.13 against 278.29) for the
+    first time since 10-12, so it can signal again. Its RSI(2) is far
+    from 10.
+  - The last 30-minute bars are complete (volumes in line with Monday's).
+  - Balance and equity 15,032.51 (+0.22%). Daily floor 14,282.51.
+    Trading days 3. Flags ok, no tick errors.
+* **Astral 1999:** no orders, flat since 10-19.
+  - Monday's outage (from 18:59 UTC) ended at today's open, 13:30 UTC,
+    after 18.5 hours.
+  - Today: DIA failed at 14:39 UTC and recovered after 5 minutes. DIA
+    failed again at 15:23 UTC, and at 16:43 UTC all four feeds were
+    down. Health at 20:44 UTC: degraded and not ready to trade, unchanged
+    since 16:44 UTC.
+  - That is three closes in a row (10-23, 10-26, 10-27) with the
+    deployment degraded. A FAST-4 signal on those days would probably
+    have been missed on Astral. There was no signal on any of them.
+  - Not redeployed, for the same reasons as before.
