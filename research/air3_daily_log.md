@@ -898,3 +898,60 @@ paper slot runs the FTMO bot test.
     deployment degraded. A FAST-4 signal on those days would probably
     have been missed on Astral. There was no signal on any of them.
   - Not redeployed, for the same reasons as before.
+
+### 2026-10-28 (Wednesday, after the close)
+
+* **SMH:** close 567.96, taken from the last regular-session 30-minute
+  bar (volume 1.28M, complete). Astral's daily bar for today had not
+  posted; the daily export is byte-identical to Tuesday's. SMA50 573.41,
+  SMA200 517.98. Buy level 543.88, sell level 492.08.
+* **Position:** held. **No order.** The close is $75.88 (15.4%) above
+  the sell level. SMH is 11.0% below the 2026-10-06 open (638.38).
+  SMA50 is still above SMA200.
+* **ETF scan** (1Y / 6M / YTD %):
+  - SOXX 71.4 / 19.0 / 73.3;
+  - SMH 56.3 / 15.6 / 57.6;
+  - SMHX 35.9 / 16.6 / 48.2;
+  - THNQ 37.0 / 33.3 / 46.8;
+  - XSD 39.7 / 10.2 / 52.2;
+  - XLK 26.5 / 21.0 / 32.7;
+  - IYW 23.0 / 19.6 / 29.0;
+  - FTEC 24.4 / 20.4 / 31.2;
+  - VGT 24.2 / 20.4 / 31.2;
+  - WTAI 26.7 / 15.7 / 37.0;
+  - CHAT 24.3 / 10.1 / 41.2;
+  - AIQ 21.1 / 18.2 / 26.6;
+  - QQQ 14.6 / 10.4 / 18.1;
+  - context only: USD (2×) 37.4 / 5.9 / 57.3 and SOXL (3×) 128.6 /
+    −2.0 / 155.4.
+
+  The 6M figures jumped because the six-month base date rolled past
+  SMH's 2026-04-27 close (506.26) to 04-28 (491.21). Top 3 unleveraged
+  by 1Y: SOXX, SMH, XSD (XSD 39.7 ahead of THNQ 37.0 and SMHX 35.9). No
+  unswept ETF beats SMH on all three, so there is no backtest.
+* **FTMO bot shadow:** flat, no trade, no entry signal.
+  - RSI(2) is 88.5 for QQQ, 84.3 for SPY, 70.9 for DIA and 95.5 for
+    IWM. IWM is above its 200-day average for a second day (281.21
+    against 278.41). The independent computation agrees.
+  - The last 30-minute bars are complete.
+  - Astral rewrote part of DIA's 30-minute history overnight. Monday now
+    has only the 13:30–15:30 ET bars (5 of 13) and Tuesday is missing
+    11:30–12:30 ET (10 of 13); Tuesday's export had all 13 for both
+    days. The closes survive (Tuesday's revised to 523.22 from 523.27,
+    and SPY's to 769.67 from 769.73). The gaps narrow DIA's ATR(14) to
+    4.73 from about 4.9. A DIA entry in the next few days would get a
+    stop about 0.5 tighter, less as the smoothing fades. No effect
+    today.
+  - Balance and equity 15,032.51 (+0.22%). Daily floor 14,282.51.
+    Trading days 3. Flags ok, no tick errors.
+* **Astral 1999:** no orders, flat since 10-19.
+  - Degraded all day. All four feeds have been down since 10-27 16:43
+    UTC, and unlike Monday and Tuesday it did not recover at the open.
+    There were no events today; the health record has not changed since
+    10-27 16:44 UTC and still says not ready to trade.
+  - That makes four closes in a row (10-23, 10-26, 10-27, 10-28) at
+    which a FAST-4 signal would probably have been missed on Astral.
+    There was no signal on any of them.
+  - The morning check reported it to the operator at 14:10 UTC. Not
+    redeployed: the fault is in Astral's price feed, and a redeploy
+    needs the operator's approval of a preview.
