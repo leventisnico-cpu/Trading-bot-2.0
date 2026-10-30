@@ -266,5 +266,18 @@
     "trading_days": 3,
     "flags": [],
     "errors": 0
+  },
+  {
+    "day": "2026-10-30",
+    "balance": 15032.506021062,
+    "equity": 15032.506021062,
+    "min_equity": 15032.506021062,
+    "daily_floor": 14282.506021062,
+    "open": [],
+    "plan": "buy US30 buy US100",
+    "deals": [],
+    "trading_days": 3,
+    "flags": [],
+    "errors": 0
   }
 ]

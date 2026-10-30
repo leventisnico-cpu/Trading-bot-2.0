@@ -1008,3 +1008,66 @@ paper slot runs the FTMO bot test.
     was no signal on any of them.
   - Reported to the operator at the morning check (14:20 UTC). Not
     redeployed: a redeploy needs the operator's approval of a preview.
+
+### 2026-10-30 (Friday, after the close)
+
+* **SMH:** close 522.49 (Astral's daily bar, posted), −7.0% on the day.
+  The last 30-minute bar says 522.84. SMA50 572.62, SMA200 519.50. Buy
+  level 545.48, sell level 493.53.
+* **Position:** held. **No order.** The close is $28.96 (5.9%) above
+  the sell level and only 0.6% above SMA200. SMH is 18.2% below the
+  2026-10-06 open (638.38). A close below 493.53, 5.5% under today's,
+  would be a SELL for the next open.
+* **ETF scan** (1Y / 6M / YTD %):
+  - SOXX 54.4 / 2.2 / 56.6;
+  - SMH 43.6 / 3.1 / 45.1;
+  - SMHX 25.4 / 1.7 / 36.2;
+  - THNQ 27.9 / 20.4 / 35.6;
+  - XSD 29.8 / −7.4 / 40.6;
+  - XLK 19.5 / 12.6 / 24.7;
+  - IYW 16.8 / 11.3 / 21.6;
+  - FTEC 18.3 / 13.3 / 24.2;
+  - VGT 18.3 / 13.4 / 24.1;
+  - WTAI 15.2 / 2.0 / 24.5;
+  - CHAT 13.5 / −3.4 / 27.8;
+  - AIQ 14.1 / 7.6 / 18.2;
+  - QQQ 10.3 / 3.4 / 12.4;
+  - context only: USD (2×) 15.3 / −10.1 / 33.1 and SOXL (3×) 62.6 /
+    −39.3 / 83.3.
+
+  Top 3 unleveraged by 1Y: SOXX, SMH, XSD (XSD 29.8 ahead of THNQ 27.9
+  and SMHX 25.4). No unswept ETF beats SMH on all three, so there is no
+  backtest.
+* **FTMO bot shadow: entry signals.**
+  - RSI(2) fell below 10 on three of the four ETFs, all above their
+    200-day averages: DIA 7.45 (close 517.14, SMA200 505.98), QQQ 8.39
+    (690.61, 679.27) and SPY 9.51 (756.04, 728.71). IWM is at 31.9. The
+    independent computation agrees.
+  - With at most two positions, the bot plans to buy US30 (DIA) and
+    US100 (QQQ), the two lowest readings, at Monday's 10:05 ET fill.
+    Stops will sit 3 × ATR(14) below the fills: 15.15 for DIA (ATR
+    5.05) and 38.13 for QQQ (ATR 12.71).
+  - Margins: the signals would flip at closes of 519.02 for DIA
+    (+0.36%), 695.92 for QQQ (+0.77%) and 756.86 for SPY (+0.11%). The
+    closing 30-minute bars carry full volume (QQQ 10.1M, SPY 16.5M, DIA
+    0.52M shares), so a revision that large is unlikely. SPY, the
+    closest call, is not in the plan.
+  - Astral's QQQ daily bar says 684.49, not 690.61. Its high (703.70)
+    is above every 30-minute high, so it looks like it includes
+    after-hours trades. Either close gives an RSI(2) well below 10.
+  - Balance and equity 15,032.51 (+0.22%). Daily floor 14,282.51.
+    Trading days 3. Flags ok, no tick errors.
+* **Astral 1999: DIA only, a divergence.**
+  - Despite its degraded health, it scheduled a DIA buy for Monday's
+    open: 14.16 shares, 49% of about $14,943 equity, signalled on the
+    same 517.142 close. It has no QQQ or SPY order.
+  - The shadow plans DIA and QQQ. Two possible causes, which I cannot
+    tell apart from outside: QQQ's daily series on Astral carries a
+    stray extra bar (the 684.49 one), or the deployment's QQQ feed,
+    over an hour behind at 13:44 UTC, never delivered the closing bar.
+    SPY has no 10-30 daily bar on Astral at all.
+  - Health: recovered at the open (13:30 UTC). DIA failed at 13:34 and
+    all four feeds by 13:44 UTC; not ready to trade since.
+  - Not redeployed: a redeploy would cancel the scheduled DIA order,
+    now the only live part of the comparison. Monday's morning check
+    will look for a QQQ order and the DIA fill.
