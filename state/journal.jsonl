@@ -61,3 +61,6 @@
 {"equity": 800.0, "halted": false, "traded": false, "ts": "2026-10-28T00:35:25.182137+00:00", "type": "cycle_done"}
 {"daily_return": 0.0, "decision": "OK", "drawdown": 0.0, "reason": "ok", "ts": "2026-10-29T01:04:53.752423+00:00", "type": "pre_trade"}
 {"equity": 800.0, "halted": false, "traded": false, "ts": "2026-10-29T01:04:53.754146+00:00", "type": "cycle_done"}
+{"daily_return": 0.0, "decision": "OK", "drawdown": 0.0, "reason": "ok", "ts": "2026-10-30T01:10:57.936776+00:00", "type": "pre_trade"}
+{"filled": 19.0, "order_id": 1, "price": 41.63999938964844, "side": "BUY", "status": "FILLED", "symbol": "XEC.TO", "ts": "2026-10-30T01:10:57.938629+00:00", "type": "order_result"}
+{"equity": 798.4461880081177, "halted": false, "traded": true, "ts": "2026-10-30T01:10:57.940370+00:00", "type": "cycle_done"}
