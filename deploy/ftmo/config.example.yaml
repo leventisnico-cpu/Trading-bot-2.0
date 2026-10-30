@@ -1,0 +1,32 @@
+# FTMO bot (FAST-4) — copy to state/ftmo_config.yaml (git-ignored) and edit.
+# NO credentials here, ever: log the FTMO MT5 terminal in by hand; the bot
+# attaches to the running terminal.
+#
+# Research verdict for FAST-4 at 3% risk (research/ftmo_fast_pass.md):
+# NO-GO. 2019-2026: 18% of start dates passed both phases within 18 months;
+# a funded account survived 12 months in 37%. Run it knowing that.
+
+symbols:                 # strategy name -> FTMO MT5 symbol (check Market Watch)
+  US100: US100.cash
+  US500: US500.cash
+  US30: US30.cash
+  US2000: US2000.cash
+risk_per_trade: 0.03     # operator's order (2026-10-04)
+max_positions: 2
+notional_cap: 5.0
+atr_stop_mult: 3.0
+max_hold_sessions: 10
+initial_balance: 15000   # the FTMO account size; the loss lines are % of this
+profit_target: 0.10      # Phase 1: 0.10, Phase 2: 0.05, funded account: null
+min_trading_days: 4
+max_loss: 0.10
+daily_loss: 0.05
+guard_buffer: 0.002      # flatten 0.2% of initial before a loss line
+cap_combined_risk: true  # size each entry so all open stops together stay above both loss lines
+keepalive_days: 25       # evaluation only (ignored when profit_target is null)
+keepalive_symbol: US500
+magic: 404040
+dry_run: true            # set false AND pass --execute to send orders
+state_path: state/ftmo_state.json
+log_path: state/ftmo_bot.log
+mt5_path: null           # e.g. C:/Program Files/FTMO MetaTrader 5/terminal64.exe
