@@ -1,0 +1,33 @@
+name: ftmo-bot
+on:
+  push:
+    paths: ["ftmo-bot/**", ".github/workflows/ftmo-bot.yml"]
+  pull_request:
+    paths: ["ftmo-bot/**", ".github/workflows/ftmo-bot.yml"]
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: ftmo-bot
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.11"
+      - run: uv sync --group dev --frozen
+      - name: ruff
+        run: |
+          uv run ruff check src tests
+          uv run ruff format --check src tests
+      - name: mypy (strict)
+        run: uv run mypy
+      - name: pytest
+        run: uv run pytest --cov=ftmo_bot --cov-branch --cov-report=json:coverage.json
+      - name: ftmo_rules.py at 100% branch coverage (go/no-go gate)
+        run: >
+          uv run pytest -q tests/test_ftmo_rules.py
+          --cov=ftmo_bot.risk.ftmo_rules --cov-branch --cov-fail-under=100

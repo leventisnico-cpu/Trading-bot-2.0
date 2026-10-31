@@ -11,6 +11,10 @@ allocation the evidence actually supports.
 
 ## What's here
 
+> **New:** [`ftmo-bot/`](ftmo-bot/README.md) is a separate, self-contained FTMO
+> challenge bot (forex/indices/metals CFDs on MT5) built to its own spec. Its
+> gates have not been run on real data yet.
+
 | | |
 |---|---|
 | `docs/PHASE_0-2_REPORT.md` | Asset class derived from capital ($100/wk, Canada), venue research, strategy evidence |

@@ -42,8 +42,10 @@ EXCHANGE_TZ = ZoneInfo("America/Toronto")
 
 def fetch_prices(symbols: list[str]) -> pd.DataFrame:
     import yfinance as yf
+    # threads=False: parallel downloads race on yfinance's SQLite cache
+    # ("database is locked"), which turns a price into NaN and blocks the cycle.
     df = yf.download(symbols, period="2y", interval="1d",
-                     auto_adjust=True, progress=False)["Close"]
+                     auto_adjust=True, progress=False, threads=False)["Close"]
     if isinstance(df, pd.Series):
         df = df.to_frame(symbols[0])
     return df[symbols]
@@ -52,10 +54,10 @@ def fetch_prices(symbols: list[str]) -> pd.DataFrame:
 def exchange_today(now: datetime | None = None) -> date:
     """The session date on the exchange (TSX), not the runner's UTC date.
 
-    GitHub starts the 21:30 UTC schedule hours late; runs have begun past
-    00:00 UTC, where date.today() already reads tomorrow. A month-end run
-    that slips past midnight UTC then sees the 1st, is_last_trading_day_of_month
-    says no, and the month's only decision never happens.
+    GitHub starts the 21:30 UTC schedule hours late; runs routinely begin
+    past 00:00 UTC, where date.today() already reads tomorrow. The cycle for
+    the second-to-last session then believes it is month-end and rebalances
+    a session early, and the real month-end cycle is dated the 1st.
     """
     now = now or datetime.now(timezone.utc)
     return now.astimezone(EXCHANGE_TZ).date()
