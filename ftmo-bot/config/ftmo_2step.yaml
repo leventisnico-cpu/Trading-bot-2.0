@@ -1,0 +1,84 @@
+# FTMO 2-Step Standard challenge profile (SPEC.md "FTMO rules engine").
+# Rules drift: confirm every figure marked VERIFY on ftmo.com / the demo
+# terminal before paying a fee.
+profile: ftmo_2step
+account_currency: USD
+initial_balance: 100000
+reset_timezone: Europe/Prague
+challenge_fee: 540                # VERIFY (FTMO 100K fee, account currency)
+
+phases:
+  - {name: challenge,    profit_target_pct: 0.10}
+  - {name: verification, profit_target_pct: 0.05}
+min_trading_days: 4
+
+ftmo_limits:                      # what FTMO enforces
+  daily_loss_pct: 0.05            # of initial balance, equity-based
+  overall_loss_pct: 0.10          # of initial balance
+  overall_mode: static            # floor = initial × (1 − pct)
+
+engine_limits:                    # what this bot enforces (tighter)
+  daily_loss_pct: 0.025           # → flatten all, block new entries for the day
+  overall_loss_pct: 0.06          # → flatten all, halt bot, manual restart
+
+friday_cutoff: "21:00"            # no positions past Friday 21:00 CE(S)T
+
+guard:
+  poll_seconds: 5
+  heartbeat_stale_seconds: 10
+  daily_summary_time: "00:05"
+
+mt5:
+  server_timezone: Europe/Athens  # VERIFY: tz in which the FTMO server stamps bars/ticks
+  magic: 20261005
+  signal_max_age_seconds: 120     # never act on a bar that closed longer ago than this
+
+# Contract specs. contract_size × price move = P&L in quote currency per lot.
+# All four quote in USD = account currency, so quote_to_account is 1.0.
+# typical_spread is FTMO's published typical spread; the backtest uses
+# max(tick spread, typical_spread) — the worse of the two.
+contracts:
+  EURUSD:
+    mt5_symbol: EURUSD
+    contract_size: 100000
+    pip_size: 0.0001
+    slippage: 0.00002             # 0.2 pip
+    commission_per_lot_side: 3.0  # $3/lot/side
+    typical_spread: 0.00002       # VERIFY
+    min_lot: 0.01
+    lot_step: 0.01
+    max_lot: 50
+    dukascopy: {instrument: EURUSD, price_divisor: 100000}
+  GBPUSD:
+    mt5_symbol: GBPUSD
+    contract_size: 100000
+    pip_size: 0.0001
+    slippage: 0.00002
+    commission_per_lot_side: 3.0
+    typical_spread: 0.00004       # VERIFY
+    min_lot: 0.01
+    lot_step: 0.01
+    max_lot: 50
+    dukascopy: {instrument: GBPUSD, price_divisor: 100000}
+  NAS100:
+    mt5_symbol: US100.cash        # VERIFY symbol name on the FTMO server
+    contract_size: 1              # VERIFY: $ per index point per lot
+    pip_size: 1.0
+    slippage: 1.0                 # 1 point
+    commission_per_lot_side: 0.0  # VERIFY on demo
+    typical_spread: 1.0           # VERIFY
+    min_lot: 0.01
+    lot_step: 0.01
+    max_lot: 500
+    dukascopy: {instrument: USA100IDXUSD, price_divisor: 1000}
+  XAUUSD:
+    mt5_symbol: XAUUSD
+    contract_size: 100            # oz per lot
+    pip_size: 0.1
+    slippage: 0.10                # 10 cents
+    commission_per_lot_side: 3.0  # VERIFY on demo
+    typical_spread: 0.20          # VERIFY
+    min_lot: 0.01
+    lot_step: 0.01
+    max_lot: 50
+    dukascopy: {instrument: XAUUSD, price_divisor: 1000}
