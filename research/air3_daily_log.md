@@ -1141,3 +1141,55 @@ bot test (deployment 1999):
 * The sell level is 493.53 (0.95 × SMA200 519.50). The close is $28.96
   (5.9%) above it.
 * SMA50 (572.62) is still above SMA200.
+
+### 2026-11-02 (Monday, after the close)
+
+* **SMH:** close 507.82 from the last 30-minute bar (today's daily bar
+  has not posted), −2.8% on the day. SMA50 571.56, SMA200 520.06. Buy
+  level 546.06, sell level 494.06.
+* **Position:** held. **No order.** The close is $13.76 (2.8%) above
+  the sell level and now 2.4% below SMA200. SMH is 20.4% below the
+  2026-10-06 open (638.38). A close below 494.06, 2.7% under today's,
+  would be a SELL for the next open. It is still above 503.60, the
+  close that would set a new fold-3 drawdown (Sunday's flag).
+* **ETF scan** (1Y / 6M / YTD %):
+  - SOXX 47.1 / −2.6 / 50.6;
+  - SMH 38.8 / −0.3 / 41.1;
+  - XSD 26.6 / −11.7 / 36.9;
+  - SMHX 21.7 / −2.0 / 32.1;
+  - THNQ 21.1 / 12.9 / 30.7;
+  - XLK 15.4 / 7.6 / 21.0;
+  - FTEC 14.5 / 8.5 / 20.9;
+  - VGT 14.4 / 8.6 / 20.8;
+  - IYW 13.2 / 7.0 / 18.4;
+  - AIQ 10.4 / 4.1 / 16.3;
+  - WTAI 8.9 / −3.4 / 20.2;
+  - CHAT 7.8 / −8.5 / 23.0;
+  - QQQ 7.8 / 1.0 / 10.9;
+  - context only: USD (2×) 7.1 / −15.5 / 25.7 and SOXL (3×) 40.3 /
+    −47.7 / 62.2.
+
+  Top 3 unleveraged by 1Y: SOXX, SMH, XSD. No unswept ETF beats SMH on
+  all three (THNQ leads on 6M only), so there is no backtest.
+* **FTMO bot shadow: not advanced; an export gap.**
+  - Astral's 30-minute export has no 11-02 bars before 13:30 ET for
+    SPY, DIA and IWM (from 18:30 UTC on; QQQ's day is complete). With
+    no DIA bars in the open window, the run skipped the planned US30
+    and US100 entries ("missed the open window; entries ['US30',
+    'US100'] skipped"), which is what the bot does when it cannot read
+    the session. On FTMO the bot reads MT5's own feed, so this is the
+    export, not the bot.
+  - The run itself was clean (exit 0, no tick errors, balance 15,032.51)
+    and planned US100 and US500 for 11-03. It was set aside and the
+    state restored to 10-30's, so tomorrow's run replays 11-02 once the
+    morning bars are filled in. If they are not, it will skip again
+    and nothing is lost.
+* **Astral 1999: DIA filled; still no QQQ; paused.**
+  - Friday's scheduled DIA buy filled at the open: 14.16 shares at
+    520.797 (14:31 UTC), $7,373.72, 49% of equity. It is the only
+    position. There was no QQQ order, as on Friday, so the divergence
+    stands.
+  - At 21:26 UTC the deployment reads lifecycle "paused", runtime
+    degraded, not ready to trade (blocking reason: lifecycle_paused).
+    The DIA position keeps its stop protection. Not redeployed: that
+    needs the operator's approval in the app.
