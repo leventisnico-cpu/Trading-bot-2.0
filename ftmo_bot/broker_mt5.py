@@ -31,11 +31,15 @@ SLEEP = _time.sleep
 
 class MT5Broker:
     def __init__(self, path: Optional[str] = None, probe: Optional[str] = None,
-                 strict: bool = True, rule: Optional[str] = None) -> None:
+                 strict: bool = True, rule: Optional[str] = None,
+                 login: Optional[int] = None) -> None:
         """``probe``: a liquid symbol whose ticks date the server clock.
-        ``rule``: pin a ``server_clock.RULES`` entry instead of fitting one."""
+        ``rule``: pin a ``server_clock.RULES`` entry instead of fitting one.
+        ``login``: the only account an order may go to, checked right
+        before every send (the terminal can be switched at any time)."""
         import MetaTrader5 as mt5   # imported here so CI never needs it
         self.mt5 = mt5
+        self.login = login
         self.probe = probe
         self.strict = strict
         if rule is not None and rule not in server_clock.RULES:
@@ -232,6 +236,17 @@ class MT5Broker:
         return self.mt5.ORDER_FILLING_RETURN
 
     def _send(self, req: dict) -> Fill:
+        """Every order goes through here: the account pin is checked
+        immediately before the send (the MT5 API takes no account, so a
+        switch in the instant between the two calls cannot be ruled out).
+        A refused close is retried by the runner like any failed close."""
+        if self.login is not None:
+            a = self.mt5.account_info()
+            if a is None or a.login != self.login:
+                why = (f"the terminal is on account {a.login}" if a is not None else
+                       f"the account cannot be read ({self.mt5.last_error()})")
+                log.warning("order refused: %s, not the pinned account %s", why, self.login)
+                return Fill(False, message=f"refused: {why}, not {self.login}")
         r = self.mt5.order_send(req)
         if r is None:
             return Fill(False, message=str(self.mt5.last_error()))

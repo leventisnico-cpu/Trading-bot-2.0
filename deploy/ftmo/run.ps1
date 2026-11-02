@@ -7,7 +7,7 @@
 # -Live and -Flat send orders only if state\ftmo_config.yaml says dry_run: false
 # (the trial config does; the challenge config starts in dry-run, where they
 # only log) and names the terminal's account in login: (the bot refuses
-# otherwise and prints the line to add). -Flat needs the -Live window stopped
+# otherwise and prints the login to set). -Flat needs the -Live window stopped
 # first (Ctrl+C), e.g. before a payout request.
 # Keep the window open while the bot runs; Ctrl+C stops it. Log: state\ftmo_bot.log
 param(

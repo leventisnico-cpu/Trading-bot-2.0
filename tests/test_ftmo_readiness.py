@@ -564,7 +564,7 @@ class MainBroker(FakeBroker):
     seed: list = []
     last = None
 
-    def __init__(self, path=None, probe=None, strict=True, rule=None):
+    def __init__(self, path=None, probe=None, strict=True, rule=None, login=None):
         bars, ds = history()
         super().__init__(bars)
         self.clock = ny(ds[-1], 12, 0)
@@ -825,7 +825,7 @@ def test_config_edited_in_notepad_loads_on_windows(tmp_path, monkeypatch):
         return real(self, encoding or "cp1252", *a, **k)
     monkeypatch.setattr(pathlib.Path, "read_text", windows)
     p = tmp_path / "c.yaml"
-    p.write_bytes("﻿# trial — my notes\nrisk_per_trade: 0.02\n".encode("utf-8"))
+    p.write_bytes("\ufeff# trial \u2014 my notes\nrisk_per_trade: 0.02\n".encode("utf-8"))
     assert load(p).risk_per_trade == 0.02
 
 
@@ -946,7 +946,7 @@ def test_a_refused_start_on_a_new_account_moves_no_state(tmp_path):
 
 def test_state_saved_by_notepad_with_a_byte_order_mark_loads(tmp_path):
     p = tmp_path / "st.json"
-    p.write_text("﻿" + json.dumps({"login": 7, "halted": None}), encoding="utf-8")
+    p.write_text("\ufeff" + json.dumps({"login": 7, "halted": None}), encoding="utf-8")
     assert State.load(p).login == 7
 
 
@@ -1087,3 +1087,375 @@ def test_setup_ps1_installs_the_trial_config_by_default():
     assert re.search(r'\[string\]\$Account = "trial"', text)
     assert re.search(r'if \(\$Account -eq "trial"\) \{ \$source = "deploy\\ftmo\\config\.trial\.yaml" \}', text)
     assert re.search(r'else \{ \$source = "deploy\\ftmo\\config\.example\.yaml" \}', text)
+
+
+# ------------------------------------- second review: the edges of the CLI
+
+class FlipBroker(MainBroker):
+    """Its terminal switches from account 1 to 2 right after the first read."""
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        self.reads = 0
+
+    def account(self):
+        self.reads += 1
+        return dataclasses.replace(super().account(), login=1 if self.reads == 1 else 2)
+
+
+@pytest.mark.parametrize("command", ["run", "flat"])
+def test_a_switch_between_the_two_account_reads_is_refused(
+        tmp_path, monkeypatch, capsys, started, command):
+    from ftmo_bot import __main__ as cli, broker_mt5
+    before = seeded(tmp_path, monkeypatch)
+    monkeypatch.setattr(broker_mt5, "MT5Broker", FlipBroker)
+    assert cli.main([command, "--config", cli_config(tmp_path, False), "--execute"]) == 1
+    assert "FAIL the terminal is on account 2" in capsys.readouterr().out
+    assert started == [] and MainBroker.last.sent == [] and MainBroker.last.pos
+    assert (tmp_path / "st.json").read_text() == before
+    assert not (tmp_path / "st.1.json").exists()
+
+
+@pytest.mark.parametrize("command,args", [
+    ("preflight", []), ("plan", []), ("run", ["--execute"]), ("flat", ["--execute"]),
+])
+def test_every_command_refuses_an_unreadable_state_cleanly(
+        tmp_path, monkeypatch, capsys, started, command, args):
+    from ftmo_bot import __main__ as cli, broker_mt5
+    monkeypatch.setattr(broker_mt5, "MT5Broker", MainBroker)
+    MainBroker.seed = [Position(5, "US500.cash", 1.0, 100, 90)]
+    p = tmp_path / "st.json"
+    p.write_text('{"login": 1,', encoding="utf-8")
+    assert cli.main([command, "--config", cli_config(tmp_path, False)] + args) == 1
+    assert f"FAIL state file {p}" in capsys.readouterr().out
+    assert started == [] and MainBroker.last.sent == [] and MainBroker.last.pos
+    assert p.read_text(encoding="utf-8") == '{"login": 1,'
+
+
+def test_run_refuses_a_misfit_size_without_a_traceback(tmp_path, monkeypatch, capsys, started):
+    from ftmo_bot import __main__ as cli
+    before = seeded(tmp_path, monkeypatch)
+    p = cli_config(tmp_path, False, extra="initial_balance: 10000\n")
+    assert cli.main(["run", "--config", p, "--execute"]) == 1
+    assert "FAIL initial_balance 10,000.00" in capsys.readouterr().out
+    assert started == [] and MainBroker.last.sent == []
+    assert (tmp_path / "st.json").read_text() == before
+
+
+@pytest.mark.parametrize("extra,msg", [
+    ("login: 1.5\n", "login must be the account number"),
+    ("logn: 1\n", "unknown settings ['logn']: check the spelling"),
+    ("dry_run:\n", "dry_run must be true or false"),         # the later key wins
+    ("dry_run: 0\n", "dry_run must be true or false"),
+    ("risk_per_trade: [0.03\n", ""),                          # not YAML
+    ("password: hunter2\n", "credentials do not belong in the config"),
+])
+def test_a_config_mistake_is_one_fail_line(tmp_path, monkeypatch, capsys, extra, msg):
+    from ftmo_bot import __main__ as cli, broker_mt5
+    monkeypatch.setattr(broker_mt5, "MT5Broker", MainBroker)
+    p = cli_config(tmp_path, False, extra=extra)
+    assert cli.main(["preflight", "--config", p]) == 1
+    out = capsys.readouterr().out
+    assert out.startswith(f"FAIL config {p}: ") and msg in out
+
+
+def test_a_missing_config_is_one_fail_line(tmp_path, capsys):
+    from ftmo_bot import __main__ as cli
+    assert cli.main(["preflight", "--config", str(tmp_path / "nope.yaml")]) == 1
+    assert capsys.readouterr().out.startswith("FAIL config ")
+
+
+def test_a_quoted_login_is_read_as_the_number(tmp_path, monkeypatch, capsys):
+    from ftmo_bot import __main__ as cli
+    seeded(tmp_path, monkeypatch)
+    p = cli_config(tmp_path, False, login='"1"')
+    assert load(p).login == 1
+    assert cli.main(["preflight", "--config", p]) == 0
+    assert "login not set" not in capsys.readouterr().out
+
+
+def test_an_unreachable_terminal_is_one_fail_line(tmp_path, monkeypatch, capsys):
+    from ftmo_bot import __main__ as cli, broker_mt5
+
+    class Down:
+        def __init__(self, *a, **k):
+            raise RuntimeError("MT5 initialize failed: (-6, 'Authorization failed'). "
+                               "Open the FTMO MT5 terminal and log in first.")
+    monkeypatch.setattr(broker_mt5, "MT5Broker", Down)
+    assert cli.main(["preflight", "--config", cli_config(tmp_path, False)]) == 1
+    out = capsys.readouterr().out
+    assert out.startswith("FAIL cannot reach the MT5 terminal: MT5 initialize failed")
+    assert "mt5_path" in out
+
+
+def test_refusals_say_to_replace_the_null_login_line(tmp_path, monkeypatch, capsys, started):
+    """PyYAML keeps the last of two keys: a second login line above the
+    shipped `login: null` would be ignored, so the messages say replace."""
+    from ftmo_bot import __main__ as cli
+    seeded(tmp_path, monkeypatch)
+    assert cli.main(["run", "--config", cli_config(tmp_path, False, login=None), "--execute"]) == 1
+    assert "(replace the `login: null` line)" in capsys.readouterr().out
+    assert cli.main(["preflight", "--config", cli_config(tmp_path, False, login=None)]) == 0
+    assert "(replace the `login: null` line;" in capsys.readouterr().out
+
+
+# -------------------------------------- third review: config types, the pin
+
+@pytest.mark.parametrize("text", ["[]\n", "- a\n", "0\n", "false\n", '""\n'])
+def test_a_config_that_is_not_key_value_lines_is_refused(tmp_path, text):
+    p = tmp_path / "c.yaml"
+    p.write_text(text, encoding="utf-8")
+    with pytest.raises(ValueError, match="key: value"):
+        load(p)
+
+
+def test_an_empty_config_file_means_the_defaults(tmp_path):
+    p = tmp_path / "c.yaml"
+    p.write_text("", encoding="utf-8")
+    c = load(p)
+    assert c.dry_run is True and c.login is None
+
+
+@pytest.mark.parametrize("login,ok", [
+    ("1234567", True), (" 1234567 ", True),
+    (chr(0xFF11) * 3, False),                 # fullwidth digits
+    (chr(0xB2), False),                       # a superscript two
+    ("+5", False), ("1_000", False), ("12.5", False), ("0", False), ("", False),
+])
+def test_a_quoted_login_must_be_plain_digits(tmp_path, login, ok):
+    p = tmp_path / "c.yaml"
+    p.write_text(f"login: {json.dumps(login)}\n", encoding="utf-8")
+    if ok:
+        assert load(p).login == 1234567
+    else:
+        with pytest.raises(ValueError, match="login must be the account number"):
+            load(p)
+
+
+@pytest.mark.parametrize("line,msg", [
+    ("cap_combined_risk:", "cap_combined_risk must be true or false, not blank"),
+    ("cap_combined_risk: 1", "cap_combined_risk must be true or false, not 1"),
+    ("keepalive_days:", "keepalive_days must be a whole number, not blank"),
+    ("keepalive_days: 2.5", "keepalive_days must be a whole number, not 2.5"),
+    ("risk_per_trade: 3%", "risk_per_trade must be a number, not '3%'"),
+    ("risk_per_trade: true", "risk_per_trade must be a number, not True"),
+    ("dry_run:", "dry_run must be true or false, not blank"),
+    ("symbols: {US500: null}", "symbols must be name: symbol lines"),
+    ("state_path:", "state_path must be text, not blank"),
+])
+def test_every_setting_has_its_type(tmp_path, line, msg):
+    p = tmp_path / "c.yaml"
+    p.write_text(line + "\n", encoding="utf-8")
+    with pytest.raises(ValueError) as e:
+        load(p)
+    assert msg in str(e.value)
+
+
+def test_both_shipped_configs_pass_the_type_checks():
+    for name in ("config.trial.yaml", "config.example.yaml"):
+        load(ROOT / "deploy/ftmo" / name)            # raises on any bad type
+
+
+def test_a_missing_metatrader5_package_says_to_run_setup(tmp_path, monkeypatch, capsys):
+    from ftmo_bot import __main__ as cli, broker_mt5
+
+    class NoPackage:
+        def __init__(self, *a, **k):
+            raise ImportError("No module named 'MetaTrader5'")
+    monkeypatch.setattr(broker_mt5, "MT5Broker", NoPackage)
+    assert cli.main(["preflight", "--config", cli_config(tmp_path, False)]) == 1
+    out = capsys.readouterr().out
+    assert out.startswith("FAIL the MetaTrader5 package is missing") and "setup.ps1" in out
+    assert "cannot reach" not in out and "mt5_path" not in out
+
+
+def test_an_unreachable_terminal_message_has_one_full_stop(tmp_path, monkeypatch, capsys):
+    from ftmo_bot import __main__ as cli, broker_mt5
+
+    class Down:
+        def __init__(self, *a, **k):
+            raise RuntimeError("MT5 initialize failed: (-6, 'x'). Open the terminal first.")
+    monkeypatch.setattr(broker_mt5, "MT5Broker", Down)
+    assert cli.main(["preflight", "--config", cli_config(tmp_path, False)]) == 1
+    out = capsys.readouterr().out
+    assert "Open the terminal first. With several" in out and ".." not in out
+
+
+def pinned_mt5(monkeypatch, login):
+    """An MT5Broker on WeekendMT5 at a trading moment, pinned to ``login``."""
+    from ftmo_bot import broker_mt5
+    bars, ds = history()
+    fake = WeekendMT5(bars, ny(ds[-1], 12, 0).astimezone(UTC))
+    monkeypatch.setitem(sys.modules, "MetaTrader5", fake)
+    return fake, broker_mt5.MT5Broker(probe=None, strict=False, rule="NY+7", login=login)
+
+
+def test_every_order_is_checked_against_the_pinned_account(monkeypatch):
+    fake, b = pinned_mt5(monkeypatch, login=77)          # WeekendMT5 is account 77
+    assert b.buy("US500.cash", 0.01, None, 404040, "t").ok
+    pos = Position(len(fake.orders), "US500.cash", 0.01, 100.0, 0.0)
+    fake.account_info = lambda: SimpleNamespace(login=78, server="T", currency="USD",
+                                                balance=15000.0, equity=15000.0,
+                                                trade_allowed=True)
+    sent = len(fake.orders)
+    for f in (b.buy("US500.cash", 0.01, None, 404040, "t"), b.close(pos, 404040, "t")):
+        assert not f.ok and "refused: the terminal is on account 78, not 77" in f.message
+    assert len(fake.orders) == sent                      # nothing reached account 78
+    fake.account_info = lambda: None                     # terminal gone: refused too
+    assert not b.buy("US500.cash", 0.01, None, 404040, "t").ok and len(fake.orders) == sent
+
+
+def test_an_unpinned_broker_sends_as_before(monkeypatch):
+    fake, b = pinned_mt5(monkeypatch, login=None)
+    fake.account_info = lambda: None                     # never consulted
+    assert b.buy("US500.cash", 0.01, None, 404040, "t").ok and len(fake.orders) == 1
+
+
+def test_main_pins_the_broker_to_the_configured_login(tmp_path, monkeypatch, started):
+    from ftmo_bot import __main__ as cli
+    seeded(tmp_path, monkeypatch)
+    seen = {}
+    real = MainBroker.__init__
+
+    def spy(self, *a, **k):
+        seen.update(k)
+        real(self, *a, **k)
+    monkeypatch.setattr(MainBroker, "__init__", spy)
+    assert cli.main(["run", "--config", cli_config(tmp_path, False), "--execute"]) == 0
+    assert seen.get("login") == 1
+
+
+# ------------------------------------------- fourth review: the last edges
+
+def test_a_password_pasted_into_login_is_never_printed(tmp_path, monkeypatch, capsys):
+    from ftmo_bot import __main__ as cli, broker_mt5
+    monkeypatch.setattr(broker_mt5, "MT5Broker", MainBroker)
+    secret = "Tr0ub4dor&3"
+    p = tmp_path / "c.yaml"
+    p.write_text(f"login: {secret}\n", encoding="utf-8")
+    with pytest.raises(ValueError) as e:
+        load(p)
+    assert secret not in str(e.value) and "login must be the account number" in str(e.value)
+    assert str(e.value).endswith("not text")
+    assert cli.main(["preflight", "--config", str(p)]) == 1
+    assert secret not in capsys.readouterr().out
+
+
+def test_every_config_field_has_a_known_type():
+    from ftmo_bot.config import TYPE_KINDS, field_kind
+    for f in dataclasses.fields(FtmoConfig):
+        kind, _ = field_kind(f.type)
+        assert kind in TYPE_KINDS, f"{f.name}: {f.type!r}"
+
+
+@pytest.mark.parametrize("kw", [
+    dict(max_loss=0.5), dict(daily_loss=0.2), dict(guard_buffer=-1.0),
+    dict(guard_buffer=0.05), dict(notional_cap=-3.0), dict(atr_stop_mult=0.0),
+    dict(max_hold_sessions=0), dict(magic=0), dict(keepalive_days=-1),
+    dict(min_trading_days=-1),
+])
+def test_settings_out_of_range_are_refused(kw):
+    with pytest.raises(ValueError):
+        FtmoConfig(**kw).validate()
+
+
+def test_a_close_refused_by_the_pin_stays_queued_and_closes_later(tmp_path, monkeypatch):
+    """Through the real MT5Broker and Runner: the terminal shows another
+    account at the moment of the close, so nothing is sent and the ticket
+    waits in to_close; back on the pinned account, the retry closes it."""
+    fake, b = pinned_mt5(monkeypatch, login=77)
+    fake.ps = [SimpleNamespace(ticket=9, symbol="US500.cash", volume=0.01,
+                               price_open=100.0, sl=90.0, magic=404040)]
+    r = Runner(cfg(tmp_path, dry_run=False, login=77, server_clock="NY+7"), b)
+    live = b.positions(404040)
+    assert [x.ticket for x in live] == [9]
+    real = fake.account_info
+    fake.account_info = lambda: SimpleNamespace(login=78, server="T", currency="USD",
+                                                balance=15000.0, equity=15000.0,
+                                                trade_allowed=True)
+    assert r._close(live[0], "test", fake.now) is False
+    assert r.st.to_close == [9] and fake.orders == []
+    fake.account_info = real                             # back on account 77
+    r.retry_closes(fake.now, b.positions(404040))
+    assert r.st.to_close == [] and fake.ps == [] and len(fake.orders) == 1
+
+
+def test_holding_counts_a_terminal_on_another_account_as_holding(tmp_path):
+    bars, ds = history()
+    b = Switchable(bars)
+    b.clock = ny(ds[-1], 12, 0)
+    r = Runner(cfg(tmp_path, dry_run=False), b)
+    assert r.holding() is False                          # its own account, nothing open
+    b.login = 2
+    assert r.holding() is True                           # it cannot see its own book
+
+
+
+# ------------------------------------------------ fifth review: the edges
+
+@pytest.mark.parametrize("line", [
+    "login: @Tr0ub4dor3", "login: *Tr0ub4dor3", "login: Tr0ub4dor3: x", "login: {Tr0ub4dor3",
+])
+def test_a_yaml_error_never_prints_the_line(tmp_path, monkeypatch, capsys, line):
+    """A password pasted into the config can make it invalid YAML, and
+    YAML's own message quotes the line: only the line number is shown."""
+    from ftmo_bot import __main__ as cli, broker_mt5
+    monkeypatch.setattr(broker_mt5, "MT5Broker", MainBroker)
+    p = tmp_path / "c.yaml"
+    p.write_text("dry_run: true\n" + line + "\n", encoding="utf-8")
+    assert cli.main(["preflight", "--config", str(p)]) == 1
+    out = capsys.readouterr().out
+    assert "Tr0ub4dor3" not in out
+    assert out.startswith(f"FAIL config {p}: not valid YAML at line ")   # 2, or 3 for `{`
+
+
+def test_a_refused_order_is_logged_with_its_cause(monkeypatch, caplog):
+    fake, b = pinned_mt5(monkeypatch, login=77)
+    fake.account_info = lambda: None
+    with caplog.at_level(logging.WARNING):
+        f = b.buy("US500.cash", 0.01, None, 404040, "t")
+    assert not f.ok and "cannot be read" in f.message and "(1, 'ok')" in f.message
+    assert "order refused" in caplog.text and "pinned account 77" in caplog.text
+    assert fake.orders == []
+
+
+@pytest.mark.parametrize("kw", [
+    dict(notional_cap=30.01), dict(atr_stop_mult=10.01), dict(max_loss=0.2001),
+    dict(profit_target=float("nan")), dict(profit_target=float("inf")),
+    dict(profit_target=1.5), dict(initial_balance=float("inf")),
+    dict(initial_balance=float("nan")),
+])
+def test_settings_past_the_upper_bounds_are_refused(kw):
+    with pytest.raises(ValueError):
+        FtmoConfig(**kw).validate()
+
+
+def test_settings_on_the_bounds_are_accepted():
+    FtmoConfig(max_loss=0.20, daily_loss=0.20, guard_buffer=0.0, notional_cap=30.0,
+               atr_stop_mult=10.0, max_hold_sessions=1, keepalive_days=0,
+               min_trading_days=0, profit_target=1.0).validate()
+
+
+@pytest.mark.parametrize("value,shown", [
+    ("true", "not a yes/no value"), ("2026-11-02", "not another kind of value"),
+    ("[1]", "not a list"), ("12.5", "not a decimal number"),
+])
+def test_a_wrong_login_is_described_not_echoed(tmp_path, value, shown):
+    p = tmp_path / "c.yaml"
+    p.write_text(f"login: {value}\n", encoding="utf-8")
+    with pytest.raises(ValueError) as e:
+        load(p)
+    assert str(e.value).endswith(shown)
+
+
+def test_a_bare_load_traceback_never_quotes_the_line(tmp_path):
+    """setup.ps1's check calls load() directly, so Python prints the whole
+    traceback: the YAML error (which quotes the line) must not be in it."""
+    import subprocess
+    p = tmp_path / "c.yaml"
+    p.write_text("dry_run: true\nlogin: @Tr0ub4dor3\n", encoding="utf-8")
+    r = subprocess.run([sys.executable, "-c", "import sys; from ftmo_bot.config import load; "
+                        "load(sys.argv[1])", str(p)],
+                       cwd=ROOT, capture_output=True, text=True, timeout=60)
+    assert r.returncode != 0
+    assert "ValueError: not valid YAML at line 2" in r.stderr
+    assert "Tr0ub4dor3" not in r.stderr + r.stdout

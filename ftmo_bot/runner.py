@@ -131,6 +131,13 @@ class Runner:
         self.path = Path(cfg.state_path)
         self.st = State.load(self.path)
         acct = self.b.account()
+        if cfg.login is not None and acct.login != cfg.login:
+            # main() checks this too; checking the account read here closes
+            # the gap between the two reads, and tick() then refuses any
+            # later switch away from st.login (= cfg.login).
+            raise RuntimeError(f"the terminal is on account {acct.login} but the config "
+                               f"is for account {cfg.login}: log the terminal into "
+                               f"{cfg.login}, or set login: to this account in the config")
         moves: List[Tuple[Path, Path]] = []      # applied once the checks pass
         if self.st.login is not None and self.st.login != acct.login:
             moves = self._switch_account(self.st.login, acct.login)
@@ -678,6 +685,11 @@ class Runner:
         return self.st.plan_day == prev.isoformat()
 
     def holding(self) -> bool:
+        """Bot positions on this state's account. A terminal on another
+        account cannot show them, so it counts as still holding: a halted
+        run keeps retrying until it sees its own book empty."""
+        if self.b.account().login != self.st.login:
+            return True
         return bool(self.b.positions(self.cfg.magic))
 
     def run(self, every: int = 60) -> None:    # pragma: no cover (loop)

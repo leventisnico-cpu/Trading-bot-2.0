@@ -358,11 +358,14 @@ server clock are what paper cannot test.
    ```
 
    Check, line by line:
+   * `FAIL cannot reach the MT5 terminal`: open MT5 and log in first;
+     with several MT5 terminals installed, set `mt5_path` in
+     `state\ftmo_config.yaml` to FTMO's `terminal64.exe`;
    * `account`: the trial's login, USD, `algo trading ON`;
    * `rules:`: the initial balance is the account size (`from the
      account` on a new account), the max-loss line 10% under it and the
      profit target 5% over it, as on FTMO's dashboard;
-   * `WARN: login not set` with the line to add: that is step 9;
+   * `WARN: login not set` with the login to set: that is step 9;
    * every symbol prints PASS with 205+ sessions. If one does not, open
      its M30 chart, press Home to load older bars (or raise Tools →
      Options → Charts → Max bars in chart and restart the terminal),
@@ -377,9 +380,9 @@ server clock are what paper cannot test.
    Any time, `run.ps1 -Plan` prints what the bot will do at the next
    open (read-only).
 9. Name the account the bot may trade: open `state\ftmo_config.yaml`
-   in Notepad, set `login:` to the trial's login number (in FTMO's
-   email; the preflight's WARN line shows it), for example
-   `login: 1234567`, and save. It is the account number, not the
+   in Notepad, replace the line `login: null` with the trial's login
+   number (in FTMO's email; the preflight's WARN line shows it), for
+   example `login: 1234567`, and save. It is the account number, not the
    password. Orders go only to that account: `-Live` refuses to start
    without it, or with the terminal on another account. Then start the
    bot:
@@ -479,9 +482,10 @@ The trial's rule lines do not apply there; the orders get tested.
   trading days and inactivity rule. By FTMO's definition it does.
 * FTMO's current rules: re-read them on ftmo.com before buying.
 * `setup.ps1` and `run.ps1` on Windows itself: they were parsed and run
-  under PowerShell 7 (Linux) with stand-ins for Python, pip and the bot
-  (34 cases: both configs, an existing config kept, the `py` launcher
-  and plain `python`, 32-bit, 3.10, 3.15 and Microsoft Store Pythons
+  under PowerShell 7 (Linux) with stand-ins for Python, pip and the bot,
+  in a one-off harness that is not kept in the repo (34 cases: both
+  configs, an existing config kept, the `py` launcher and plain
+  `python`, 32-bit, 3.10, 3.15 and Microsoft Store Pythons
   refused, an existing `.venv` checked, a `py` install prompt that must
   not hang it, a folder name with brackets, a pip failure, every
   `run.ps1` switch), not under Windows PowerShell 5.1 with the real

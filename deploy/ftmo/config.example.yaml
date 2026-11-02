@@ -24,6 +24,7 @@ initial_balance: null    # null: the account's balance when the bot first sees i
                          # start at their size). Set the size only if the bot first meets an
                          # account that has already traded; a size the balance cannot have is refused.
 profit_target: 0.10      # Phase 1: 0.10, Phase 2 (Verification): 0.05, funded account: null
+                         # (left blank it also means null: no target, so never blank it by mistake)
 min_trading_days: 4
 max_loss: 0.10
 daily_loss: 0.05

@@ -2,8 +2,8 @@
 #   powershell -ExecutionPolicy Bypass -File deploy\ftmo\setup.ps1
 #   powershell -ExecutionPolicy Bypass -File deploy\ftmo\setup.ps1 -Account challenge -Force
 #
-# 1. finds a 64-bit Python 3.11-3.14 (the MetaTrader5 package has no other;
-#    3.10 has wheels too but is not tested here);
+# 1. finds a 64-bit Python 3.11-3.14 (the bot needs 3.11+; the MetaTrader5
+#    package has no Windows build for 3.15 yet);
 # 2. creates .venv (or checks the one there) and installs the bot's packages
 #    (MetaTrader5, PyYAML, tzdata);
 # 3. installs a config as state\ftmo_config.yaml: the free-trial config by
@@ -24,8 +24,8 @@ $probe = "import struct, sys; print('%d %d.%d' % (struct.calcsize('P') * 8, sys.
 $good = @("3.11", "3.12", "3.13", "3.14")
 
 function Test-Python($exe, $pyArgs) {
-    # The version ("3.12") of a 64-bit Python the MetaTrader5 package can
-    # use, else $null. Native commands that write to stderr (the Microsoft
+    # The version ("3.12") of a 64-bit Python the bot can run on, else
+    # $null. Native commands that write to stderr (the Microsoft
     # Store's python alias does) must not stop the search, and stdin is
     # closed so an install prompt from the py launcher cannot hang it.
     $ErrorActionPreference = "Continue"
@@ -55,14 +55,14 @@ $venvPython = Join-Path $root ".venv\Scripts\python.exe"
 if (Test-Path -LiteralPath $venvPython) {
     $ver = Test-Python $venvPython @()
     if (-not $ver) {
-        throw (".venv was made with a Python the MetaTrader5 package cannot use (it " +
-               "needs 64-bit Python 3.11 to 3.14). Delete the .venv folder and run this again.")
+        throw (".venv was made with a Python the bot cannot use (it needs 64-bit " +
+               "Python 3.11 to 3.14). Delete the .venv folder and run this again.")
     }
     Write-Host "using the existing .venv (Python $ver)"
 } else {
     $py = Find-Python
     if (-not $py) {
-        throw ("No 64-bit Python 3.11 to 3.14 found (the MetaTrader5 package needs one). " +
+        throw ("No 64-bit Python 3.11 to 3.14 found (the bot and its MetaTrader5 package need one). " +
                "Install Python 3.12 (64-bit) from python.org, tick 'Add python.exe to PATH', " +
                "open a new PowerShell window and run this again.")
     }
@@ -112,5 +112,5 @@ Write-Host "     press the Algo Trading button (green), and add US30.cash, US100
 Write-Host "     US500.cash and US2000.cash to Market Watch."
 Write-Host "  2. Check everything (reads only, sends nothing):"
 Write-Host "     powershell -ExecutionPolicy Bypass -File deploy\ftmo\run.ps1 -Preflight"
-Write-Host "  3. Before run.ps1 -Live: put the account's login number in"
-Write-Host "     state\ftmo_config.yaml (login: 1234567). Orders go only to that account."
+Write-Host "  3. Before run.ps1 -Live: in state\ftmo_config.yaml replace 'login: null'"
+Write-Host "     with the account's login number (login: 1234567). Orders go only there."

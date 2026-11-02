@@ -2,9 +2,11 @@
 MT5 terminal into the FTMO account by hand and the bot attaches to that
 running terminal."""
 
+# Keep: FtmoConfig._check_types reads the field annotations as strings.
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import re
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -21,6 +23,24 @@ DEFAULT_SYMBOLS = {
     "US30": "US30.cash",
     "US2000": "US2000.cash",
 }
+
+#: annotation -> (accepted Python types, what to write in the YAML)
+TYPE_KINDS = {
+    "bool": ((bool,), "true or false"),
+    "int": ((int,), "a whole number"),
+    "float": ((int, float), "a number"),
+    "str": ((str,), "text"),
+    "Dict[str, str]": ((dict,), "name: symbol lines"),
+}
+
+
+def field_kind(annotation) -> tuple:
+    """('float', True) for 'Optional[float]': the TYPE_KINDS key and
+    whether null is allowed."""
+    t = str(annotation)
+    if t.startswith("Optional[") and t.endswith("]"):
+        return t[len("Optional["):-1], True
+    return t, False
 
 
 @dataclass
@@ -50,9 +70,10 @@ class FtmoConfig:
     login: Optional[int] = None           # the only account orders may go to (its number, not a password)
 
     def validate(self) -> None:
+        self._check_types()
         if not 0 < self.risk_per_trade <= 0.05:
             raise ValueError("risk_per_trade must be in (0, 5%]")
-        if self.initial_balance is not None and not self.initial_balance > 0:
+        if self.initial_balance is not None and not 0 < self.initial_balance < 1e12:
             raise ValueError("initial_balance must be positive (the account size) or null")
         if not 0 <= self.target_margin <= 0.02:
             raise ValueError("target_margin must be in [0, 2%]")
@@ -60,8 +81,8 @@ class FtmoConfig:
             raise ValueError(f"server_clock must be one of {list(RULES)} or null")
         if self.max_positions < 1:
             raise ValueError("max_positions must be >= 1")
-        if self.profit_target is not None and self.profit_target <= 0:
-            raise ValueError("profit_target must be positive or null")
+        if self.profit_target is not None and not 0 < self.profit_target <= 1:
+            raise ValueError("profit_target must be in (0, 100%] or null")
         if set(self.symbols) - set(DEFAULT_SYMBOLS):
             raise ValueError(f"unknown strategy symbols: {set(self.symbols) - set(DEFAULT_SYMBOLS)}")
         if self.keepalive_symbol not in self.symbols:
@@ -70,7 +91,46 @@ class FtmoConfig:
                                        or not isinstance(self.login, int)
                                        or self.login <= 0):
             raise ValueError("login must be the account number from FTMO's email "
-                             "(digits only, no quotes) or null")
+                             "(digits only) or null")
+        if not 0 < self.max_loss <= 0.20:
+            raise ValueError("max_loss must be in (0, 20%] (FTMO: 0.10)")
+        if not 0 < self.daily_loss <= self.max_loss:
+            raise ValueError("daily_loss must be in (0, max_loss] (FTMO: 0.05)")
+        if not 0 <= self.guard_buffer < self.daily_loss:
+            raise ValueError("guard_buffer must be in [0, daily_loss)")
+        if not 0 < self.notional_cap <= 30:
+            raise ValueError("notional_cap must be in (0, 30] x balance")
+        if not 0 < self.atr_stop_mult <= 10:
+            raise ValueError("atr_stop_mult must be in (0, 10]")
+        if self.max_hold_sessions < 1 or self.magic <= 0:
+            raise ValueError("max_hold_sessions must be >= 1 and magic positive")
+        if self.min_trading_days < 0 or self.keepalive_days < 0:
+            raise ValueError("min_trading_days and keepalive_days must be >= 0")
+
+    def _check_types(self) -> None:
+        """Every setting has its declared type. A key left blank in YAML is
+        null, not its default: `cap_combined_risk:` would turn the cap off
+        and `dry_run:` would count as live, so both refuse to load."""
+        for f in fields(self):
+            v = getattr(self, f.name)
+            kind, optional = field_kind(f.type)
+            accepted, want = TYPE_KINDS[kind]
+            if f.name == "login":
+                want = "the account number from FTMO's email (digits only)"
+            if v is None:
+                if optional:
+                    continue
+                raise ValueError(f"{f.name} must be {want}, not blank")
+            ok = isinstance(v, accepted) and (kind == "bool" or not isinstance(v, bool))
+            if ok and isinstance(v, dict):
+                ok = all(isinstance(k, str) and isinstance(x, str) for k, x in v.items())
+            if not ok:
+                # a password pasted into login: must never be printed back
+                shown = ({"str": "text", "float": "a decimal number", "bool": "a yes/no value",
+                          "list": "a list", "dict": "a mapping"}.get(type(v).__name__,
+                                                                     "another kind of value")
+                         if f.name == "login" else repr(v))
+                raise ValueError(f"{f.name} must be {want}, not {shown}")
 
 
 SECRET_KEYS = {"password", "login_password", "investor_password", "token",
@@ -79,10 +139,27 @@ SECRET_KEYS = {"password", "login_password", "investor_password", "token",
 
 def load(path: str | Path) -> FtmoConfig:
     # utf-8-sig: Windows Notepad may save a byte-order mark
-    raw = yaml.safe_load(Path(path).read_text(encoding="utf-8-sig")) or {}
-    bad = SECRET_KEYS & {k.lower() for k in raw}
+    try:
+        raw = yaml.safe_load(Path(path).read_text(encoding="utf-8-sig"))
+    except yaml.YAMLError as e:
+        # never str(e) or the chained error: YAML quotes the bad line, which
+        # may hold a pasted password (setup.ps1 prints tracebacks as they are)
+        mark = getattr(e, "problem_mark", None)
+        where = f" at line {mark.line + 1}" if mark is not None else ""
+        raise ValueError(f"not valid YAML{where}; check that line in Notepad") from None
+    if raw is None:                                  # an empty file: the defaults
+        raw = {}
+    if not isinstance(raw, dict):
+        raise ValueError("the config must be `key: value` lines")
+    bad = SECRET_KEYS & {str(k).lower() for k in raw}
     if bad:
         raise ValueError(f"credentials do not belong in the config: {sorted(bad)}")
+    unknown = sorted(str(k) for k in set(raw) - {f.name for f in fields(FtmoConfig)})
+    if unknown:
+        raise ValueError(f"unknown settings {unknown}: check the spelling")
+    login = raw.get("login")
+    if isinstance(login, str) and re.fullmatch(r"[0-9]{1,20}", login.strip()):
+        raw["login"] = int(login.strip())                    # login: "1234567"
     cfg = FtmoConfig(**raw)
     cfg.validate()
     return cfg

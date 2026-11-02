@@ -41,4 +41,4 @@ mt5_path: null           # e.g. C:/Program Files/FTMO MetaTrader 5/terminal64.ex
 server_clock: NY+7       # FTMO's server clock; null on another broker's demo
 login: null              # the trial's login number from FTMO's email (not the password),
                          # e.g. login: 1234567. Orders go only to this account; until it
-                         # is set, run.ps1 -Live refuses and prints the line to add.
+                         # is set, run.ps1 -Live refuses and prints the login to set.

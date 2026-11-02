@@ -47,7 +47,11 @@ def main(argv=None) -> int:
     ap.add_argument("--execute", action="store_true",
                     help="send real orders (also needs dry_run: false in the config)")
     a = ap.parse_args(argv)
-    cfg = load(a.config)
+    try:
+        cfg = load(a.config)        # a YAML error arrives as a ValueError without the line
+    except (OSError, ValueError, TypeError) as e:
+        print(f"FAIL config {a.config}: {e}")
+        return 1
     if a.command not in ("run", "flat") or not a.execute:
         cfg.dry_run = True
     Path(cfg.log_path).parent.mkdir(parents=True, exist_ok=True)
@@ -56,9 +60,18 @@ def main(argv=None) -> int:
                         handlers=[logging.StreamHandler(),
                                   logging.FileHandler(cfg.log_path, encoding="utf-8")])
     from .broker_mt5 import MT5Broker
-    b = MT5Broker(cfg.mt5_path, probe=cfg.symbols[cfg.keepalive_symbol],
-                  strict=a.command == "run", rule=cfg.server_clock)
-    acct = b.account()
+    try:
+        b = MT5Broker(cfg.mt5_path, probe=cfg.symbols[cfg.keepalive_symbol],
+                      strict=a.command == "run", rule=cfg.server_clock, login=cfg.login)
+        acct = b.account()
+    except ImportError as e:
+        print(f"FAIL the MetaTrader5 package is missing from this Python ({e}): "
+              "run deploy\\ftmo\\setup.ps1, then start the bot with deploy\\ftmo\\run.ps1")
+        return 1
+    except RuntimeError as e:
+        print(f"FAIL cannot reach the MT5 terminal: {str(e).rstrip('.')}. With several "
+              "MT5 terminals installed, set mt5_path in the config to FTMO's terminal64.exe.")
+        return 1
     print(f"account {acct.login} on {acct.server}, {acct.currency} "
           f"balance {acct.balance:,.2f} equity {acct.equity:,.2f}, "
           f"algo trading {'ON' if acct.trade_allowed else 'OFF'}")
@@ -70,8 +83,9 @@ def main(argv=None) -> int:
         return 1
     if not cfg.dry_run and cfg.login is None:        # orders could go out
         print(f"REFUSED: orders go only to the account named in the config. If "
-              f"{acct.login} on {acct.server} is the account to trade, add the line "
-              f"`login: {acct.login}` to {a.config} and start again.")
+              f"{acct.login} on {acct.server} is the account to trade, set "
+              f"`login: {acct.login}` in {a.config} (replace the `login: null` line) "
+              "and start again.")
         return 1
     if a.command == "plan":
         try:
@@ -107,8 +121,9 @@ def main(argv=None) -> int:
         else:                                       # compare with FTMO's dashboard
             print(rules_line(r))
         if cfg.login is None:
-            print(f"WARN: login not set; run.ps1 -Live and -Flat need the line "
-                  f"`login: {acct.login}` in {a.config} (the account this terminal is on)")
+            print(f"WARN: login not set; run.ps1 -Live and -Flat need `login: "
+                  f"{acct.login}` in {a.config} (replace the `login: null` line; "
+                  "the account this terminal is on)")
         for s, sym in cfg.symbols.items():
             spec = b.spec(sym)
             if not spec.exists:
