@@ -9,8 +9,10 @@ Every minute (``tick``):
 3. retry any close that failed earlier (exits are never blocked);
 4. guard: flatten everything just before a loss limit; entries stay
    blocked until the next FTMO day (for good after the max-loss line);
-5. target: once the phase target is reached with enough trading days,
-   flatten and halt so the phase can be reviewed on FTMO;
+5. target: once equity holds the phase target plus a small margin for
+   closing costs, flatten to lock the gain and stop FAST-4 entries; if
+   FTMO's minimum trading days are not met yet, add one minimum-lot
+   round trip per FTMO day, then halt so the phase can be reviewed;
 6. after 16:05 New York, plan from the session that just completed;
 7. 09:31-16:00 New York on the next session, execute that plan once:
    exits first (never blocked), then entries (until 10:30 only), each
@@ -18,8 +20,14 @@ Every minute (``tick``):
    On a holiday the plan waits for the next session; a plan older than
    the previous session is discarded. A failed or raising close is
    queued and retried every tick;
-8. evaluation only: a keep-alive trade if 25 days pass without a fill,
+8. keep-alive: a minimum-lot round trip if 25 days pass without an
+   opened position (FTMO closes inactive accounts, funded ones too),
    also through ``rules.check_entry``.
+
+Trading days are counted on FTMO's calendar (Prague dates) and only for
+opened positions; a close counts for nothing, which can only delay a
+halt, never bring one early. The state file belongs to one account: a
+terminal logged into another account (the next phase) starts fresh.
 
 A halted bot keeps ticking (retrying closes) until it holds nothing.
 In dry-run mode (the default) every order is logged and nothing is sent.
@@ -73,6 +81,9 @@ class State:
     trading_days: List[str] = field(default_factory=list)
     blocked_until: Optional[str] = None       # Prague date
     halted: Optional[str] = None
+    login: Optional[int] = None               # the account this state belongs to
+    target_locked: Optional[str] = None       # Prague date the target was locked in
+    last_roundtrip: Optional[str] = None      # Prague date of the last min-lot round trip
 
     @classmethod
     def load(cls, path: Path) -> "State":
@@ -88,15 +99,24 @@ class State:
 
 
 class Runner:
-    def __init__(self, cfg: FtmoConfig, broker: Broker) -> None:
+    def __init__(self, cfg: FtmoConfig, broker: Broker, readonly: bool = False) -> None:
+        """``readonly``: never move or write a state file (the ``plan``
+        command)."""
         self.cfg, self.b = cfg, broker
         self.path = Path(cfg.state_path)
         self.st = State.load(self.path)
         acct = self.b.account()
+        if self.st.login is not None and self.st.login != acct.login:
+            self._switch_account(self.st.login, acct.login, readonly)
+        self.st.login = acct.login
         if self.st.initial_balance is None:
             if cfg.initial_balance is None:
                 log.warning("initial_balance not set; using the current balance "
                             "%.2f. Set it to the FTMO account size.", acct.balance)
+            elif abs(acct.balance / cfg.initial_balance - 1) > 0.01:
+                log.warning("initial_balance %.2f in the config but the account "
+                            "balance is %.2f: check the account size and currency",
+                            cfg.initial_balance, acct.balance)
             self.st.initial_balance = cfg.initial_balance or acct.balance
         self.limits = rules.Limits(self.st.initial_balance, cfg.max_loss,
                                    cfg.daily_loss, cfg.guard_buffer)
@@ -104,13 +124,46 @@ class Runner:
         if self.st.last_fill is None:          # inactivity counts from the start
             self.st.last_fill = self.b.now().isoformat()
 
+    def _parked(self, login: int) -> Path:
+        return self.path.with_name(f"{self.path.stem}.{login}{self.path.suffix}")
+
+    def _switch_account(self, old: int, new: int, readonly: bool) -> None:
+        """The terminal is on another account than the state file. Park
+        the old account's state under its login and resume the new
+        account's parked state, or start fresh (the next phase). Switching
+        back and forth (a trial, a phase review) loses nothing, so the
+        inactivity clock and the trading days survive."""
+        mine = self._parked(new)
+        log.warning("state file belongs to account %s but the terminal is on %s: "
+                    "%s", old, new, f"resuming {mine}" if mine.exists()
+                    else "starting fresh (a new phase)")
+        if not readonly and self.path.exists():
+            self.path.replace(self._parked(old))
+        if mine.exists():
+            self.st = State.load(mine)
+            if not readonly:
+                mine.replace(self.path)
+        else:
+            self.st = State()
+
     def save(self) -> None:
         self.st.save(self.path)
 
     # --------------------------------------------------------- helpers
-    def _note_fill(self, now: datetime) -> None:
-        d = now.astimezone(NY).date().isoformat()
+    @staticmethod
+    def _prague(now: datetime) -> str:
+        return now.astimezone(PRAGUE).date().isoformat()
+
+    @staticmethod
+    def _in_session(now: datetime) -> bool:
+        local = now.astimezone(NY)
+        return local.weekday() < 5 and time(10, 0) <= local.time() <= time(15, 30)
+
+    def _note_open(self, now: datetime) -> None:
+        """A position was opened: resets the inactivity clock and counts a
+        trading day on FTMO's calendar. Closes count for neither."""
         self.st.last_fill = now.isoformat()
+        d = self._prague(now)
         if d not in self.st.trading_days:
             self.st.trading_days.append(d)
 
@@ -125,7 +178,6 @@ class Runner:
             f = Fill(False, message=f"error: {e}")
         log.info("close %s %.2f lots (%s): %s", pos.symbol, pos.volume, why, f)
         if f.ok:
-            self._note_fill(now)
             if pos.ticket in self.st.to_close:
                 self.st.to_close.remove(pos.ticket)
             s = self.by_broker.get(pos.symbol)
@@ -140,6 +192,13 @@ class Runner:
     def flatten(self, why: str, now: datetime, live: List[Position]) -> None:
         for p in live:
             self._close(p, why, now)
+
+    def stand_down(self, now: datetime, live: List[Position]) -> None:
+        """Close every bot position and drop the pending plan: FTMO pays
+        out only on a flat account. ``run`` picks up again afterwards."""
+        self.flatten("stand-down", now, live)
+        self._clear_plan()
+        self.save()
 
     # ----------------------------------------------------------- steps
     def roll_day(self, now: datetime) -> None:
@@ -161,7 +220,6 @@ class Runner:
             if self.st.held[s].get("ticket") not in live_tickets:
                 log.info("%s no longer open (stop hit or closed outside the bot)", s)
                 del self.st.held[s]
-                self._note_fill(now)
         for p in live:                               # unknown -> adopt
             s = self.by_broker.get(p.symbol)
             if p.ticket in self.st.to_close or s is None or s in self.st.held:
@@ -195,17 +253,45 @@ class Runner:
         return True
 
     def target(self, now: datetime, live: List[Position]) -> bool:
+        """The phase target. Equity at the target plus ``target_margin``
+        (room for closing costs) locks the gain in: everything is
+        flattened and FAST-4 entries stop. If FTMO's minimum trading days
+        are not met yet, one minimum-lot round trip per FTMO day adds
+        them; then the bot halts for the phase review. Equity back under
+        the target releases the lock and normal trading resumes."""
+        if self.cfg.profit_target is None:
+            return False
+        goal = self.st.initial_balance * (1 + self.cfg.profit_target)
         a = self.b.account()
-        if rules.target_reached(a.equity, self.st.initial_balance,
-                                self.cfg.profit_target,
-                                len(self.st.trading_days),
-                                self.cfg.min_trading_days):
-            log.warning("TARGET reached: equity %.2f - flattening and halting",
-                        a.equity)
+        days, need = len(self.st.trading_days), self.cfg.min_trading_days
+        if self.st.target_locked is None:
+            if a.equity < goal + self.cfg.target_margin * self.st.initial_balance:
+                return False
+            log.warning("TARGET: equity %.2f is over the target %.2f - flattening "
+                        "to lock it in (trading days %d/%d)", a.equity, goal, days, need)
             self.flatten("target", now, live)
+            self.st.target_locked = self._prague(now)
+            a = self.b.account()
+        if a.equity < goal:
+            log.warning("equity %.2f is under the target %.2f: lock released, "
+                        "trading resumes", a.equity, goal)
+            self.st.target_locked = None
+            return False
+        if days >= need:
+            log.warning("TARGET reached with %d trading days - halting for the "
+                        "phase review", days)
             self.st.halted = "profit target reached; review the phase on FTMO"
             return True
-        return False
+        if self.st.last_roundtrip != self._prague(now) and self._in_session(now):
+            why = rules.check_entry(a.equity, self.st.day_start_balance, self.limits,
+                                    len(self.b.positions(self.cfg.magic)),
+                                    self.cfg.max_positions, bool(self.st.blocked_until))
+            if why:
+                log.info("finish-line trade refused: %s", why)
+            else:
+                log.info("finish line: trading day %d of %d", days + 1, need)
+                self._roundtrip(now, "finish-line")
+        return True
 
     def _sessions(self, s: str, now: datetime) -> List[sessions.Session]:
         return sessions.build(self.b.bars(self.cfg.symbols[s], BAR_MINUTES,
@@ -293,7 +379,8 @@ class Runner:
                 log.info("entry %s skipped: already holding it", s)
                 continue
             a = self.b.account()
-            blocked = bool(self.st.blocked_until or self.st.halted)
+            blocked = bool(self.st.blocked_until or self.st.halted
+                           or self.st.target_locked)
             why = rules.check_entry(a.equity, self.st.day_start_balance,
                                     self.limits, len(current),
                                     self.cfg.max_positions, blocked)
@@ -340,17 +427,50 @@ class Runner:
             log.info("buy %s %.2f lots stop %.2f: %s", sym, vol, stop, f)
             if f.ok:
                 self.st.held[s] = {"ticket": f.ticket, "entry_day": today}
-                self._note_fill(now)
+                self._note_open(now)
             self.save()
 
+    def _roundtrip(self, now: datetime, why: str) -> None:
+        """Open and close the minimum lot of the keep-alive symbol: a trade
+        that resets FTMO's inactivity clock or adds a trading day, with
+        nothing left resting in the market. One attempt per FTMO day: a
+        buy that raises may or may not have filled (reconcile closes a
+        stray), so the day is not counted and tomorrow tries again."""
+        self.st.last_roundtrip = self._prague(now)
+        sym = self.cfg.symbols[self.cfg.keepalive_symbol]
+        spec = self.b.spec(sym)
+        if not spec.exists:
+            log.error("%s skipped: %s unavailable", why, sym)
+            return
+        if self.cfg.dry_run:                       # no trading day: none was opened
+            log.info("DRY-RUN %s: buy+close %s %.2f", why, sym, spec.volume_min)
+            self.st.last_fill = now.isoformat()
+            return
+        try:
+            f = self.b.buy(sym, spec.volume_min, None, self.cfg.magic, f"FAST4 {why}")
+        except Exception:
+            log.exception("%s buy %s failed; tried again tomorrow", why, sym)
+            return
+        log.info("%s buy %s: %s", why, sym, f)
+        if not f.ok:
+            return
+        self._note_open(now)
+        opened = [p for p in self.b.positions(self.cfg.magic) if p.ticket == f.ticket]
+        if not opened:
+            log.error("%s ticket %d not found; reconcile will close it", why, f.ticket)
+            return
+        self._close(opened[0], why, now)           # failure is queued for retry
+
     def keepalive(self, now: datetime, live: List[Position]) -> None:
-        if self.cfg.profit_target is None or self.cfg.keepalive_days <= 0:
+        """FTMO closes an account with no opened position for 30 days, in
+        the evaluation and on the funded account alike; ``keepalive_days``
+        0 turns this off."""
+        if self.cfg.keepalive_days <= 0 or not self._in_session(now):
             return
         if now - datetime.fromisoformat(self.st.last_fill) < timedelta(
                 days=self.cfg.keepalive_days):
             return
-        local = now.astimezone(NY)
-        if local.weekday() >= 5 or not time(10, 0) <= local.time() <= time(15, 30):
+        if self.st.last_roundtrip == self._prague(now):
             return
         a = self.b.account()
         why = rules.check_entry(a.equity, self.st.day_start_balance, self.limits,
@@ -359,30 +479,7 @@ class Runner:
         if why:
             log.info("keep-alive refused: %s", why)
             return
-        sym = self.cfg.symbols[self.cfg.keepalive_symbol]
-        spec = self.b.spec(sym)
-        if not spec.exists:
-            log.error("keep-alive skipped: %s unavailable", sym)
-            return
-        if self.cfg.dry_run:
-            log.info("DRY-RUN keep-alive: buy+close %s %.2f", sym, spec.volume_min)
-            self.st.last_fill = now.isoformat()
-            return
-        try:
-            f = self.b.buy(sym, spec.volume_min, None, self.cfg.magic, "FAST4 keepalive")
-        except Exception:                          # may have filled: reconcile closes it
-            log.exception("keep-alive buy %s failed", sym)
-            self._note_fill(now)
-            return
-        log.info("keep-alive buy %s: %s", sym, f)
-        if not f.ok:
-            return
-        self._note_fill(now)                       # never a second keep-alive
-        opened = [p for p in self.b.positions(self.cfg.magic) if p.ticket == f.ticket]
-        if not opened:
-            log.error("keep-alive ticket %d not found; reconcile will close it", f.ticket)
-            return
-        self._close(opened[0], "keepalive", now)   # failure is queued for retry
+        self._roundtrip(now, "keepalive")
 
     # ------------------------------------------------------------ tick
     def tick(self, now: Optional[datetime] = None) -> None:

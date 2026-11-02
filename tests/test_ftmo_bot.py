@@ -137,9 +137,6 @@ def test_guard_and_entry_check():
     assert rules.check_entry(15000, 15000, lim, 2, 2, False)
     assert rules.check_entry(15000, 15000, lim, 0, 2, True)
     assert rules.check_entry(15000, 15000, lim, 1, 2, False) is None
-    assert rules.target_reached(16500, 15000, 0.10, 4, 4)
-    assert not rules.target_reached(16500, 15000, 0.10, 3, 4)
-    assert not rules.target_reached(16500, 15000, None, 9, 4)
 
 
 # -------------------------------------------------------- fake broker
@@ -452,7 +449,7 @@ def test_target_flattens_and_halts(tmp_path):
     assert b.pos == [] and r.st.halted
 
 
-def test_keepalive_after_25_days_in_evaluation_only(tmp_path):
+def test_keepalive_after_25_days_in_every_phase(tmp_path):
     bars, ds = history()
     b = FakeBroker(bars)
     b.clock = ny(ds[-1], 11, 0)
@@ -466,7 +463,7 @@ def test_keepalive_after_25_days_in_evaluation_only(tmp_path):
     r2.roll_day(b.clock)
     r2.st.last_fill = (b.clock - timedelta(days=60)).isoformat()
     r2.keepalive(b.clock, [])
-    assert b.sent == []
+    assert [x[0] for x in b.sent] == ["buy", "close"]       # the funded account too
 
 
 def test_keepalive_refused_while_blocked(tmp_path):
@@ -553,7 +550,7 @@ def test_stopless_bot_position_is_closed_not_adopted(tmp_path):
     assert b.pos == [] and r.st.held == {} and r.st.to_close == []
 
 
-def test_keepalive_buy_exception_counts_as_activity(tmp_path):
+def test_keepalive_buy_exception_waits_for_the_next_day(tmp_path):
     bars, ds = history()
     b = FakeBroker(bars)
     b.clock = ny(ds[-1], 11, 0)
@@ -562,7 +559,9 @@ def test_keepalive_buy_exception_counts_as_activity(tmp_path):
     r.st.last_fill = (b.clock - timedelta(days=26)).isoformat()
     b.fail_buy = True
     r.keepalive(b.clock, [])
-    assert r.st.last_fill == b.clock.isoformat()
+    assert r.st.last_fill != b.clock.isoformat()             # not counted as activity
+    assert r.st.last_roundtrip == b.clock.astimezone(
+        ZoneInfo("Europe/Prague")).date().isoformat()        # but not retried today
 
 
 # ---------------------------------------------------- simulated broker

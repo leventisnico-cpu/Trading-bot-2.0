@@ -86,9 +86,3 @@ def check_entry(equity: float, day_start_balance: float, limits: Limits,
     if reason:
         return reason
     return None
-
-
-def target_reached(equity: float, initial: float, target: Optional[float],
-                   trading_days: int, min_days: int) -> bool:
-    return (target is not None and equity >= initial * (1 + target)
-            and trading_days >= min_days)

@@ -6,19 +6,34 @@ Built 2026-10-04 on the operator's order: "build the FTMO connection at
 
 ## Read this first
 
-The research verdict for FAST-4 is **NO-GO** for a fast pass. On
-2019–2026 data at 3% risk per trade:
+The research verdict for FAST-4 is **NO-GO** for a fast pass
+(`research/ftmo_fast_pass.md`; re-run 2026-11-02 on data to 2026-10-29
+with the same verdict). The bot's risk controls change how attempts end,
+not the speed (`research/ftmo_bot_policy.md`,
+`reports/ftmo_bot_policy.md`). At 3% risk per trade, by the start date
+of the attempt:
 
-| measure | result |
-|---|---|
-| win rate | 70% |
-| both phases passed within 18 months | 18% of start dates |
-| median time to pass, when it passes | about 13 months |
-| funded account survives 12 months | 37% |
-| main failure | two stops on the same day breach the 5% daily limit (now capped, see below) |
+| measure | bot, 2011–18 starts | bot, 2019–26 starts | bare rule, 2019–26 starts |
+|---|---|---|---|
+| both phases passed, within the data | 29% | 70% | 23% |
+| breached a rule (fee lost) | 41% | 1% | 77% |
+| still running when the data ends | 30% | 29% | 0% |
+| both phases within 18 months | 9% | 17% | 18% |
+| days to pass, median | 670 | 858 | 392 |
+| funded account survives 1 year | 85% | 99% | 36% |
+| funded 1-year return, median of survivors | +3.9% | +6.6% | +10.1% |
+| fees per funded account (EUR 89 per attempt) | 2.4 (EUR 214) | 1.02 (EUR 90) | 4.3 (EUR 381) |
 
-Each evaluation fee buys roughly a one-in-five chance. The bot does not
-change those odds; it only executes the rule faithfully.
+What this means: the bot rarely loses an account in a good regime (the
+cap keeps every open stop above FTMO's lines; the lock keeps a reached
+target) and still loses 41% of attempts in a hard one (gaps through the
+stops), but it is slow either way: about 2 years to pass both phases,
+and only about one attempt in six passes within 18 months. The
+evaluation has no time limit, so a slow attempt keeps running at no
+extra cost; only a breach costs a new fee. Funded, the median return is
++3.9% to +6.6% a year on the account size, of which the trader keeps
+80%. The bot executes the rule faithfully; it does not change these
+odds.
 
 **Why two positions could fail the account in one day, and the cap.**
 FTMO's daily line is day-start *balance* minus 5%, and balance ignores
@@ -30,7 +45,7 @@ both loss lines: the first position risks 3%, a second one gets what is
 left (about 1.8%). On the 2025-2026 replay this widened the closest
 approach to the daily line from 43 to 177 and delayed Phase 1 from 204
 to 236 weekdays. What it cannot stop: a gap that opens beyond the stops.
-The research odds above were computed without the cap.
+The right-hand column above includes the cap; the left one does not.
 
 ## What it does
 
@@ -42,7 +57,7 @@ The research odds above were computed without the cap.
   5-day average or after 10 sessions.
 * At the next US open (09:31–10:30 New York) it sends exits first, then
   entries: 3% of balance at risk, stop at entry − 3 × ATR(14) resting in
-  MT5, at most two positions, notional at most 5× balance. Each plan is
+  MT5, at most two positions, notional at most 3× balance. Each plan is
   executed at most once: it is marked done and saved before any order
   is sent, so a crash or restart can miss a trade but never double it.
   A plan older than the previous session is thrown away.
@@ -54,17 +69,59 @@ The research odds above were computed without the cap.
   line (day-start balance − 5%) or the max-loss line (90% of initial),
   it closes everything and blocks entries until the next FTMO day (for
   good after the max-loss line).
-* **Target:** when the phase target is reached with at least 4 trading
-  days, it closes everything and stops, so you can confirm the phase on
-  FTMO's dashboard.
-* **Keep-alive:** in an evaluation, if 25 days pass without a trade, it
-  opens and closes the minimum lot on US500 (FTMO closes accounts
-  inactive for 30 days).
+* **Target lock:** the moment equity is 0.3% of the account above the
+  phase target (room for closing costs), it closes everything and stops
+  taking FAST-4 entries, so a reached target cannot be given back. If
+  FTMO's 4 minimum trading days are not met yet, it opens and closes the
+  minimum lot on US500 once per FTMO day until they are. Then it halts
+  with "profit target reached", so you can confirm the phase on FTMO's
+  dashboard. If equity falls back under the target before that, the lock
+  is released and normal trading resumes.
+* **Trading days** are counted the way FTMO counts them: a Prague
+  calendar day on which a position was opened. Closes count for nothing.
+* **Keep-alive:** if 25 days pass without an opened position, it opens
+  and closes the minimum lot on US500, in every phase (FTMO ends an
+  account with no new trade for 30 days, funded accounts too).
+* **One account per state file.** When the terminal is logged into a
+  different account (the next phase), the bot starts fresh and keeps the
+  old state under the old login's name. Nothing to delete by hand.
+* **Server clock:** MT5 stamps bars in the server's local time. The bot
+  fits the rule (New York + 7 h, EET, CET or UTC) to a fresh tick at
+  start-up, checks it before every bar read, and refuses to plan while a
+  reading fits no rule, so a wrong session boundary never becomes a plan.
 * **Dry run by default.** Orders are only logged unless the config says
   `dry_run: false` **and** you start it with `--execute`.
+* `python -m ftmo_bot flat` closes every bot position and drops the
+  pending plan: FTMO pays out only on a flat account.
 
 It never sees your password. You log the terminal in; the bot attaches
 to it.
+
+## FTMO's rules the bot implements (checked 2026-11-02)
+
+Read on ftmo.com (trading objectives, FAQ, the terms dated 2026-10-12).
+Re-read them before buying; FTMO changes them.
+
+| FTMO rule (2-Step, Swing) | what the bot does |
+|---|---|
+| Maximum Daily Loss: equity may not fall below the balance at 00:00 Prague time minus 5% of the initial balance; floating P&L counts | the FTMO day rolls at Prague midnight on the PC's clock; the guard flattens 0.2% above the line; every open stop together stays above it (`cap_combined_risk`) |
+| Maximum Loss: equity may not fall below 90% of the initial balance, static | the same guard on the 90% line; entries stop for good after it |
+| Profit target 10% (Phase 1), 5% (Verification), none on the funded account | `profit_target`; the target lock above |
+| 4 minimum trading days per phase, a trading day being a Prague calendar day on which a position is opened; none on the funded account | Prague dates of opened positions only; the lock adds missing days with minimum-lot round trips |
+| No time limit | none assumed |
+| Inactivity: no new trade for 30 consecutive days ends the account, in every phase | keep-alive after 25 days, in every phase |
+| Swing account: overnight and weekend holding allowed in every phase, no news restriction; leverage 1:15 on indices, 1:9 on US2000 | FAST-4 holds up to 10 sessions, so buy **Swing** (a Standard funded account ends on the first weekend hold, and Standard cannot be changed to Swing later); notional capped at 3× balance per position |
+| Forbidden: opening a trade within 2 hours of a market close of 2 hours or more, opposite positions across accounts, more than 2,000 server requests a day, letting a third party trade the account | entries only 09:31–10:30 New York; long only; a handful of orders a week; you run the bot yourself |
+| Server clock GMT+2 in winter and GMT+3 in summer, changing with the US clocks (New York + 7 h); the daily reset is Prague midnight | fitted and checked at run time; the preflight prints it |
+| Funded account: payouts from day 14, only with no open positions; 80% split, scaling every 4 months | `python -m ftmo_bot flat` before you request one |
+| Profit in a currency other than the account's costs 0.7% | choose a **USD** account; the indices settle in USD |
+
+Sources: ftmo.com/en/trading-objectives, /en/2-step-challenge,
+/en/faq/ftmo-swing-account-type, /en/faq/do-i-have-to-close-my-positions-overnight-or-before-the-weekend,
+/en/forbidden-trading-practices, /en/faq/how-many-accounts-can-i-have,
+/en/reward-growth-and-scaling-plan, /en/faq/how-do-i-withdraw-my-profits,
+/en/ftmo-free-trial, /en/trading-updates (2026-10-29 and 2026-10-15),
+cdn.ftmo.com terms and conditions (2026-10-12).
 
 ## Paper validation (2026-10-04 to 2026-10-18)
 
@@ -206,11 +263,24 @@ time stop or a stop-loss exit can be seen as well.
 
 ## Setup (Windows PC or Windows VPS outside the US)
 
-1. Buy the FTMO 2-Step challenge yourself (CAD 15,000 is the account the
-   research modelled). Choose **MetaTrader 5** and the **Swing** account
-   type (overnight and weekend holding).
-2. Install FTMO's MT5 terminal and log in with the credentials FTMO
-   emails you. You type them; they never go in this repo.
+1. **Free trial first.** FTMO offers a free 14-day trial on MT5 with
+   the 2-Step rules at half target (5%, 2 trading days, the same loss
+   lines; it ends if nothing is traded in the first 7 days). Do steps
+   3–6 on it, then run the bot **with real orders on the trial** (step
+   8): it is free, and real fills, stops and order routing are what
+   paper cannot test. Use `profit_target: 0.05`, `min_trading_days: 2`
+   and `keepalive_days: 5`, so the bot opens a trade inside the first
+   week even without a FAST-4 signal. If FTMO asks for payment for the
+   trial, use any MT5 demo account instead (the bot only needs a
+   logged-in terminal; put that broker's index symbol names in
+   `symbols`). The trial's login differs from the challenge's, so the
+   bot keeps a separate state for it automatically.
+2. **Buy the FTMO 2-Step challenge yourself:** **MetaTrader 5**, the
+   **Swing** account type, **USD**. The research was done at 3% risk per
+   trade; the account size only sets the fee (the $10k account is EUR 89,
+   the $25k one EUR 250) and the minimum-lot rounding. The fee comes
+   back with the first payout. FTMO emails the login; you type it into
+   the terminal, it never goes in this repo.
 3. In MT5: Tools → Options → Expert Advisors → tick **Allow algorithmic
    trading**, then press the **Algo Trading** button so it is green.
    Add the four symbols to Market Watch.
@@ -226,8 +296,9 @@ time stop or a stop-loss exit can be seen as well.
    copy deploy\ftmo\config.example.yaml state\ftmo_config.yaml
    ```
 
-   Set `initial_balance` to the account size you bought (15000 for the
-   CAD 15,000 account): FTMO's loss lines are percentages of it. Set
+   Set `initial_balance` to the account size you bought (10000 for the
+   $10k account): FTMO's loss lines are percentages of it, and the bot
+   warns at start-up if the account balance disagrees. Set
    `profit_target` to `0.10` for Phase 1. Set `mt5_path` if the
    terminal is not found automatically.
 6. Preflight (read-only):
@@ -237,10 +308,12 @@ time stop or a stop-loss exit can be seen as well.
    ```
 
    Every symbol must print PASS with 205+ sessions (if not, raise
-   Tools → Options → Charts → Max bars in chart and restart the terminal). Compare the printed
-   last close with the index on a chart: if the session date or close is
-   off, the server-time offset (New York + 7 h, `broker_mt5.py`) does not
-   match your server and must be fixed before anything else.
+   Tools → Options → Charts → Max bars in chart and restart the
+   terminal). The `server clock:` line should read `UTC+2` (`UTC+3` in
+   summer) with `rule NY+7`. If it says `unverified`, run it again while
+   the index CFDs are trading; if it says the reading fits no known
+   rule, stop and report it. Compare the printed last session date and
+   close with the index on a chart before going further.
 
    Any time, to see what the bot will do at the next open (read-only):
 
@@ -271,17 +344,30 @@ time stop or a stop-loss exit can be seen as well.
 
    Keep the PC (or VPS) and the terminal running on weekdays.
 9. When the bot halts with "profit target reached", check FTMO's
-   dashboard. For Phase 2 set `profit_target: 0.05` (and
-   `initial_balance` to the new account's size), delete
-   `state\ftmo_state.json`, and restart on the new account. On the funded
-   account set `profit_target: null` (keep-alive is then off).
+   dashboard: the phase shows as passed once FTMO's own check runs
+   (within a day). FTMO then emails the Verification account's login.
+   Log the terminal into it, set `profit_target: 0.05`, and start step 8
+   again: the bot sees the new login, starts fresh, and keeps the old
+   state file under the old login's name.
+10. On the funded account set `profit_target: null`. Keep-alive stays
+    on. To request a payout (from day 14, only on a flat account):
+
+    ```powershell
+    py -m ftmo_bot flat --config state\ftmo_config.yaml --execute
+    ```
+
+    then request it on FTMO's dashboard, and start step 8 again once it
+    is processed. The payout itself is your decision, never the bot's.
 
 ## Things that could not be verified from here
 
-* The exact FTMO symbol names, contract sizes and filling mode (the
-  adapter picks FOK, IOC or RETURN from the symbol's settings).
-* FTMO's server clock (assumed New York + 7 hours all year).
-* That FTMO counts a keep-alive open/close as trading activity.
+* The exact FTMO symbol names, contract sizes, minimum lots and filling
+  mode (the adapter picks FOK, IOC or RETURN from the symbol's
+  settings). The preflight prints them.
+* The server clock on FTMO's own server (the bot fits it at run time;
+  the preflight shows the reading).
+* That a minimum-lot round trip counts as an opened position for FTMO's
+  trading days and inactivity rule. By FTMO's definition it does.
 * FTMO's current rules: re-read them on ftmo.com before buying.
 
-The preflight and the dry-run week exist to catch the first two.
+The free trial and the dry-run week exist to catch the first two.

@@ -10,6 +10,8 @@ from typing import Dict, Optional
 
 import yaml
 
+from .server_clock import RULES
+
 #: FAST-4 universe: strategy name -> default FTMO MT5 symbol. Check the
 #: names in the terminal's Market Watch; `python -m ftmo_bot preflight`
 #: reports any that do not exist.
@@ -26,7 +28,7 @@ class FtmoConfig:
     symbols: Dict[str, str] = field(default_factory=lambda: dict(DEFAULT_SYMBOLS))
     risk_per_trade: float = 0.03          # operator's order: 3%
     max_positions: int = 2
-    notional_cap: float = 5.0             # x balance, per position
+    notional_cap: float = 3.0             # x balance, per position (Swing leverage 1:15, US2000 1:9)
     atr_stop_mult: float = 3.0
     max_hold_sessions: int = 10
     initial_balance: Optional[float] = None   # set at first start, in account currency
@@ -36,17 +38,23 @@ class FtmoConfig:
     daily_loss: float = 0.05
     guard_buffer: float = 0.002           # flatten this close to a limit
     cap_combined_risk: bool = True        # all open stops together never cross a loss line
-    keepalive_days: int = 25              # evaluation only; null-equivalent: 0
+    target_margin: float = 0.003          # lock the target this far above it (closing costs)
+    keepalive_days: int = 25              # every phase (FTMO closes inactive accounts); 0 = off
     keepalive_symbol: str = "US500"
     magic: int = 404040
     dry_run: bool = True                  # orders are only logged unless False
     state_path: str = "state/ftmo_state.json"
     log_path: str = "state/ftmo_bot.log"
     mt5_path: Optional[str] = None        # terminal64.exe path if not default
+    server_clock: Optional[str] = None    # NY+7, EET, CET or UTC; null = fit it to the terminal
 
     def validate(self) -> None:
         if not 0 < self.risk_per_trade <= 0.05:
             raise ValueError("risk_per_trade must be in (0, 5%]")
+        if not 0 <= self.target_margin <= 0.02:
+            raise ValueError("target_margin must be in [0, 2%]")
+        if self.server_clock is not None and self.server_clock not in RULES:
+            raise ValueError(f"server_clock must be one of {list(RULES)} or null")
         if self.max_positions < 1:
             raise ValueError("max_positions must be >= 1")
         if self.profit_target is not None and self.profit_target <= 0:
