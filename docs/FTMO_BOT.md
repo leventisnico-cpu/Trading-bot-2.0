@@ -7,8 +7,8 @@ Built 2026-10-04 on the operator's order: "build the FTMO connection at
 ## Read this first
 
 The research verdict for FAST-4 is **NO-GO** for a fast pass
-(`research/ftmo_fast_pass.md`; re-run 2026-11-02 on data to 2026-10-29
-with the same verdict). The bot's risk controls change how attempts end,
+(`research/ftmo_fast_pass.md`; re-run unchanged 2026-11-02 on data to
+2026-10-29 with the same verdict, `reports/ftmo_fast_pass_rerun_2026-10-29.md`). The bot's risk controls change how attempts end,
 not the speed (`research/ftmo_bot_policy.md`,
 `reports/ftmo_bot_policy.md`). At 3% risk per trade, by the start date
 of the attempt; each bot cell is a range between a lock that fills at
@@ -24,7 +24,7 @@ the day's high (optimistic) and one that waits for the next open
 | days to pass, median | 670–699 | 858–870 | 392 |
 | funded account survives 1 year | 85% | 99% | 36% |
 | funded 1-year return, median of survivors | +3.9% | +6.6% | +10.1% |
-| fees per funded account (EUR 89 per attempt) | 2.4–2.8 (EUR 214–249) | 1.02 (EUR 90) | 4.3 (EUR 381) |
+| fees per funded account (EUR 89 per attempt) | 2.4–2.8 (EUR 214–249) | 1.02 (EUR 90–91) | 4.3 (EUR 381) |
 
 What this means: the bot rarely loses an account in a good regime (the
 cap keeps every open stop above FTMO's lines; the lock keeps a reached
@@ -93,16 +93,22 @@ The two bot columns above include the cap; the bare-rule column does not.
   login and resumes the new one's, or starts fresh for a new phase.
   Switching back and forth (the free trial, a phase review) loses
   nothing. Nothing to delete by hand. The state files are git-ignored.
+  **Stop `run` before you log the terminal into another account:** a
+  running bot that sees the login change does nothing and logs an error
+  every minute until it is restarted.
 * **One bot process at a time.** `run` and `flat` hold a lock on the
   state file; a second copy refuses to start, so two windows can never
   send the same plan twice.
 * **Server clock:** MT5 stamps bars in the server's local time. FTMO's
   server runs New York + 7 hours (GMT+2, GMT+3 in summer); the example
-  config pins that rule, and the bot checks it against a fresh tick
-  before every bar read. It refuses to plan on a reading that does not
-  fit, and stale ticks (market closed, holidays) never count. If today's
-  session cannot be read, it still runs the exits planned the evening
-  before, and skips the entries.
+  config pins that rule, and the bot checks it against a fresh tick every
+  minute and before every bar read. It refuses to plan on a reading that
+  does not fit, and stale ticks (market closed, holidays) never count.
+  Starting the bot on a weekend is fine: the clock is verified when the
+  index CFDs reopen on Sunday evening. If today's session still cannot
+  be read at the open, the exits planned the evening before run anyway,
+  and the entries wait until 10:30 New York for the clock, then are
+  skipped for the day.
 * **Dry run by default.** Orders are only logged unless the config says
   `dry_run: false` **and** you start it with `--execute`.
 * `python -m ftmo_bot flat` closes every bot position and drops the
@@ -231,8 +237,8 @@ prepared but not sent. Details are in `research/air3_daily_log.md`.
 2. Run the preflight and a dry-run week on FTMO's MT5 terminal: first a
    free trial or demo account if FTMO offers one, otherwise the paid
    account in dry-run. Live orders only after that week looks right.
-3. The odds above have not changed. Each evaluation fee buys about a
-   one-in-five chance of passing within 18 months.
+3. The odds above have not changed. (Revised 2026-11-02 with the bot's
+   risk controls: see "Read this first" at the top.)
 
 ### Round trip (2026-10-21 and 10-22): both exits ran
 

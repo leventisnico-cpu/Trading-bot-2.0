@@ -51,7 +51,10 @@ over the regular one). Full table in `reports/ftmo_bot_policy.md`.
 * The control row reproduces the pre-registered table on the same data
   (test period: 200 trades, 70% win rate, profit factor 1.41, 18% pass
   within 18 months, median 392 days, main failure the daily line in 41%,
-  funded survival 36%).
+  funded survival 36%). That re-run of the unchanged pre-registered
+  script is saved as `reports/ftmo_fast_pass_rerun_2026-10-29.md`
+  (sha256 `d507cc22…`); `reports/ftmo_fast_pass.md` keeps the original
+  run on data to 2026-09-30.
 
 Bot cells give the intraday lock, then the next-open lock.
 

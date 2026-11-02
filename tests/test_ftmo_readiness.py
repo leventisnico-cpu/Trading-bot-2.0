@@ -389,6 +389,7 @@ def test_legacy_state_without_a_login(tmp_path):
         {"trading_days": ["2026-10-01"], "pending_entries": ["US100"]}))
     r2 = Runner(cfg(plain, dry_run=False), b)          # e.g. the shadow's state
     assert r2.st.pending_entries == ["US100"] and r2.st.login == 1
+    assert r2.st.trading_days == []                    # counted by the older rule: dropped
 
 
 def test_state_load_ignores_unknown_keys(tmp_path):
@@ -403,22 +404,111 @@ def test_initial_balance_must_be_positive():
         FtmoConfig(initial_balance=0).validate()
 
 
-def test_clock_refusal_still_runs_the_planned_exits(tmp_path):
+def clock_refusing(tmp_path):
+    """A plan with one exit (US500) and one entry (US100), the next open,
+    and a broker whose bars are refused (the server clock is unverified)."""
     r, b, bars, ds = planned(tmp_path, dry_run=False)
     b.pos = [Position(5, "US500.cash", 1.0, 100, 90)]
     r.st.held = {"US500": {"ticket": 5, "entry_day": ds[-1].isoformat()}}
     r.st.pending_exits = ["US500"]
     nxt = next_day(ds[-1])
     open_session(bars, nxt)
-    b.clock = ny(nxt, 9, 35)
+    working = b.bars
 
     def refuse(*a, **k):
         raise RuntimeError("server clock unverified")
     b.bars = refuse
+    return r, b, nxt, working
+
+
+def test_clock_refusal_runs_the_exits_and_entries_wait_for_the_clock(tmp_path):
+    r, b, nxt, working = clock_refusing(tmp_path)
+    b.clock = ny(nxt, 9, 35)
     r.tick()
     assert ("close", "US500.cash", 1.0, "FAST4 exit") in b.sent
-    assert not [x for x in b.sent if x[0] == "buy"]             # entries skipped
+    assert not [x for x in b.sent if x[0] == "buy"]             # entries wait
+    assert r.st.pending_exits == [] and r.st.pending_entries == ["US100"]
+    assert r.st.executed_day != nxt.isoformat()
+    b.bars = working                                            # the clock verifies
+    b.clock = ny(nxt, 9, 36)
+    r.tick()
+    assert [x[1] for x in b.sent if x[0] == "buy" and x[3]] == ["US100.cash"]
+    assert len([x for x in b.sent if x[0] == "close"]) == 1     # the exit went once
+
+
+def test_clock_refusal_past_the_entry_deadline_drops_the_entries(tmp_path):
+    r, b, nxt, _ = clock_refusing(tmp_path)
+    b.clock = ny(nxt, 10, 31)
+    r.tick()
+    assert ("close", "US500.cash", 1.0, "FAST4 exit") in b.sent
+    assert not [x for x in b.sent if x[0] == "buy" and x[3]]
     assert r.st.pending_entries == [] and r.st.executed_day == nxt.isoformat()
+
+
+def test_tick_refuses_after_the_terminal_switches_account(tmp_path):
+    bars, ds = history()
+    b = Switchable(bars)
+    b.clock = ny(ds[-1], 12, 0)
+    b.pos = [Position(5, "US500.cash", 1.0, 100, 90)]
+    r = Runner(cfg(tmp_path, dry_run=False), b)
+    r.st.held = {"US500": {"ticket": 5, "entry_day": ds[-1].isoformat()}}
+    r.save()
+    b.login = 2                                         # re-logged mid-run
+    b.equity = 10000                                    # would trip every guard
+    with pytest.raises(RuntimeError, match="switched"):
+        r.tick()
+    assert b.sent == [] and b.pos
+    assert State.load(tmp_path / "st.json").held == {"US500": {"ticket": 5,
+                                                               "entry_day": ds[-1].isoformat()}}
+
+
+def test_target_lock_closes_a_position_adopted_after_it(tmp_path):
+    r, b, d0 = locked_runner(tmp_path)
+    r.st.trading_days = ["a", "b", "c"]
+    b.balance = b.equity = 16560
+    r.tick()                                            # lock + finish-line trade
+    assert r.st.target_locked and b.pos == []
+    b.pos = [Position(9, "US100.cash", 1.0, 100, 95)]   # a late fill turns up
+    b.sent.clear()
+    r.tick()
+    assert ("close", "US100.cash", 1.0, "FAST4 target") in b.sent and b.pos == []
+
+
+def test_dry_run_round_trip_leaves_the_inactivity_clock_alone(tmp_path):
+    bars, ds = history()
+    b = FakeBroker(bars)
+    b.clock = ny(ds[-1], 10, 15)
+    r = Runner(cfg(tmp_path), b)                        # dry run (the default)
+    r.tick()
+    assert b.sent == [] and r.st.last_fill is None and r.st.trading_days == []
+
+
+def test_funded_config_clears_a_stale_target_lock(tmp_path):
+    r, b, d0 = locked_runner(tmp_path, profit_target=None)
+    r.st.target_locked = "2026-10-01"
+    r.tick()
+    assert r.st.target_locked is None
+
+
+def test_windows_lock_branch(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    from ftmo_bot import lock
+    held = set()
+
+    def locking(fd, mode, nbytes):
+        assert mode == 2 and nbytes == 1
+        key = __import__("os").fstat(fd).st_ino
+        if key in held:
+            raise OSError(36, "Resource deadlock avoided")
+        held.add(key)
+    monkeypatch.setitem(sys.modules, "msvcrt", SimpleNamespace(LK_NBLCK=2, locking=locking))
+    with open(tmp_path / "x.lock", "a+", encoding="utf-8") as f1, \
+            open(tmp_path / "x.lock", "a+", encoding="utf-8") as f2:
+        f1.write("x")
+        lock._lock_nt(f1)
+        assert f1.tell() == 0                           # locks from the first byte
+        with pytest.raises(OSError):
+            lock._lock_nt(f2)
 
 
 class RuleFlip(FakeBroker):
@@ -526,3 +616,114 @@ def test_mt5_clock_reports_a_skewed_pc_clock(clock_mt5):
     clock_mt5.lag = timedelta(minutes=5)    # moving ticks, 5 minutes off the grid
     b = MT5Broker(probe="US500.cash")
     assert b.verified_at is None and "PC clock" in b.clock_status()
+
+
+# ------------------------------------------ end to end: a weekend start
+
+class WeekendMT5:
+    """MetaTrader5 stand-in for the whole MT5Broker + Runner path. The
+    server runs New York + 7 h (UTC+3 in August); ticks move only while
+    the CFDs trade (closed Friday 22:00 to Sunday 23:00 UTC and 22:00-23:00
+    UTC daily); bars come from ``history()``."""
+    TRADE_RETCODE_DONE = 10009
+    TIMEFRAME_M30, TIMEFRAME_M15, TIMEFRAME_H1 = 30, 15, 60
+    ORDER_TYPE_BUY, ORDER_TYPE_SELL, TRADE_ACTION_DEAL, ORDER_TIME_GTC = 0, 1, 1, 0
+    ORDER_FILLING_FOK, ORDER_FILLING_IOC, ORDER_FILLING_RETURN = 0, 1, 2
+
+    def __init__(self, bars, now):
+        self.bars, self.now, self.k, self.orders, self.ps = bars, now, 0, [], []
+
+    @staticmethod
+    def trading(t):
+        wd, h = t.weekday(), t.hour
+        return not (wd == 5 or (wd == 4 and h >= 22) or (wd == 6 and h < 23) or h == 22)
+
+    def initialize(self, *a):
+        return True
+
+    def last_error(self):
+        return (1, "ok")
+
+    def symbol_select(self, s, f):
+        return True
+
+    def symbol_info_tick(self, s):
+        if self.trading(self.now):
+            self.k += 1
+            t = self.now - timedelta(milliseconds=50)
+        else:                                       # frozen at the last close
+            t = self.now.replace(second=0, microsecond=0)
+            while not self.trading(t):
+                t -= timedelta(minutes=1)
+        stamp = (t + timedelta(hours=3)).timestamp() + self.k / 1e6
+        last = [b for b in self.bars[s] if b[0] <= self.now][-1][4]
+        return SimpleNamespace(time=int(stamp), time_msc=int(stamp * 1000),
+                               bid=last - 0.5, ask=last + 0.5)
+
+    def account_info(self):
+        return SimpleNamespace(login=77, server="T", currency="USD", balance=15000.0,
+                               equity=15000.0, trade_allowed=True)
+
+    def terminal_info(self):
+        return SimpleNamespace(trade_allowed=True)
+
+    def positions_get(self):
+        return tuple(self.ps)
+
+    def symbol_info(self, s):
+        return SimpleNamespace(filling_mode=1, trade_tick_size=0.01, digits=2,
+                               volume_min=0.01, volume_step=0.01, volume_max=500)
+
+    def order_calc_profit(self, typ, s, vol, entry, stop):
+        return (stop - entry) * vol
+
+    def copy_rates_from_pos(self, s, tf, pos, n):
+        out = []
+        for t, o, h, l, c in [b for b in self.bars[s] if b[0] <= self.now][-n:]:
+            wall = t.astimezone(NY).replace(tzinfo=UTC)          # NY wall clock as if UTC
+            out.append({"time": int((wall + timedelta(hours=7)).timestamp()),
+                        "open": o, "high": h, "low": l, "close": c})
+        return out
+
+    def order_send(self, req):
+        self.orders.append(req)
+        if "position" in req:
+            self.ps = [p for p in self.ps if p.ticket != req["position"]]
+        else:
+            self.ps.append(SimpleNamespace(ticket=len(self.orders), symbol=req["symbol"],
+                                           volume=req["volume"], price_open=req["price"],
+                                           sl=req.get("sl", 0.0), magic=req["magic"]))
+        return SimpleNamespace(retcode=10009, price=req["price"], order=len(self.orders),
+                               comment="done")
+
+
+@pytest.mark.parametrize("rule", ["NY+7", None])
+def test_weekend_start_still_trades_the_monday_plan(tmp_path, monkeypatch, rule):
+    from ftmo_bot import broker_mt5
+    bars, ds = history()
+    fri, mon = ds[-1], next_day(ds[-1])
+    open_session(bars, mon, n=3)
+    start = datetime(fri.year, fri.month, fri.day, tzinfo=UTC) + timedelta(days=1, hours=12)
+    fake = WeekendMT5(bars, start)                       # Saturday noon UTC
+    monkeypatch.setitem(sys.modules, "MetaTrader5", fake)
+    monkeypatch.setattr(broker_mt5, "SLEEP",
+                        lambda s: setattr(fake, "now", fake.now + timedelta(seconds=s)))
+    monkeypatch.setattr(broker_mt5.MT5Broker, "now", lambda self: fake.now)
+    c = cfg(tmp_path, dry_run=False, initial_balance=15000, server_clock=rule)
+    State(login=77, plan_day=fri.isoformat(), plan_checked=fri.isoformat(),
+          pending_entries=["US100"], pending_atr={"US100": 5.0}, initial_balance=15000.0,
+          last_fill=(start - timedelta(days=2)).isoformat()).save(tmp_path / "st.json")
+    b = broker_mt5.MT5Broker(probe="US500.cash", strict=True, rule=rule)
+    assert b.verified_at is None                         # closed market: unverified
+    r = Runner(c, b)
+    t, end = start, ny(mon, 9, 40).astimezone(UTC)
+    while t <= end:                                      # like run(): one tick a minute
+        fake.now = t
+        try:
+            r.tick(t)
+        except RuntimeError:
+            pass                                         # run() logs and carries on
+        t += timedelta(minutes=1 if t.astimezone(NY).date() == mon else 30)
+    entries = [o for o in fake.orders if o["type"] == 0 and o.get("sl")]
+    assert [o["symbol"] for o in entries] == ["US100.cash"]
+    assert r.st.pending_entries == [] and b.verified_at is not None

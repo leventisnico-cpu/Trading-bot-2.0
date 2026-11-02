@@ -90,6 +90,17 @@ class MT5Broker:
             log.warning("server clock: %s", problem)
             self._warned_at = now
 
+    def refresh_clock(self) -> None:
+        """Called on every loop tick: keeps the freshness looks warm, so
+        the clock is verified as soon as the market trades (a weekend
+        start is verified when the CFDs reopen, long before the US open)
+        and every bar read finds a recent look. Never raises."""
+        if self.probe:
+            try:
+                self.check(self.probe, strict=False)
+            except Exception as e:                    # a terminal hiccup: next tick
+                log.warning("server clock refresh failed: %s", e)
+
     def verify(self, symbol: str, tries: int = 10) -> None:
         """Start-up: poll ``symbol`` about once a second for a moving tick."""
         for _ in range(tries):

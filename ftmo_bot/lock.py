@@ -13,6 +13,19 @@ from pathlib import Path
 from typing import IO, Optional
 
 
+def _lock_nt(fh: IO[str]) -> None:
+    """Windows: a non-blocking lock on the file's first byte (locking past
+    the end of an empty file is allowed). Raises OSError if held."""
+    import msvcrt
+    fh.seek(0)
+    msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+
+
+def _lock_posix(fh: IO[str]) -> None:
+    import fcntl
+    fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+
 class InstanceLock:
     def __init__(self, path: Path) -> None:
         self.path = path
@@ -23,13 +36,7 @@ class InstanceLock:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         fh = open(self.path, "a+", encoding="utf-8")
         try:
-            if os.name == "nt":                      # Windows: lock one byte
-                import msvcrt
-                fh.seek(0)
-                msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
-            else:
-                import fcntl
-                fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            (_lock_nt if os.name == "nt" else _lock_posix)(fh)
         except OSError:
             fh.close()
             return False

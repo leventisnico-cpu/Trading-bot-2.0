@@ -134,6 +134,11 @@ class Runner:
             if not readonly and self.path.exists():
                 self.path.replace(legacy)
             self.st = State()
+        elif self.st.login is None and self.st.trading_days:
+            log.warning("state without an account login: its %d trading days were "
+                        "counted by an older rule (closes included, New York dates) "
+                        "and are dropped", len(self.st.trading_days))
+            self.st.trading_days = []
         self.st.login = acct.login
         if self.st.initial_balance is None:
             if cfg.initial_balance is None:
@@ -290,7 +295,11 @@ class Runner:
         resumes); otherwise one minimum-lot round trip per FTMO day adds
         any missing minimum trading days, then the bot halts for the
         phase review. Nothing is judged while a close is still pending."""
-        if self.cfg.profit_target is None:
+        if self.cfg.profit_target is None:              # the funded account
+            if self.st.target_locked:
+                log.warning("no profit target configured: target lock of %s cleared",
+                            self.st.target_locked)
+                self.st.target_locked = None
             return False
         goal = self.st.initial_balance * (1 + self.cfg.profit_target)
         a = self.b.account()
@@ -302,9 +311,14 @@ class Runner:
                         "to lock it in (trading days %d/%d)", a.equity, goal, days, need)
             self.flatten("target", now, live)
             self.st.target_locked = self._prague(now)
-        if not self.cfg.dry_run and self.b.positions(self.cfg.magic):
-            log.info("target lock: waiting for the closes to go through")
-            return True                              # retry_closes keeps trying
+        if not self.cfg.dry_run:
+            left = self.b.positions(self.cfg.magic)
+            if left:                                 # a failed close, or a late fill adopted
+                fresh = [p for p in left if p.ticket not in self.st.to_close]
+                if fresh:                            # queued ones are retried by retry_closes
+                    log.info("target lock: closing %d position(s) still open", len(fresh))
+                    self.flatten("target", now, fresh)
+                return True                          # judge only a flat account
         a = self.b.account()
         if a.balance < goal:
             log.warning("balance %.2f is under the target %.2f after the lock: "
@@ -493,9 +507,9 @@ class Runner:
         if not spec.exists:
             log.error("%s skipped: %s unavailable", why, sym)
             return
-        if self.cfg.dry_run:                       # no trading day: none was opened
-            log.info("DRY-RUN %s: buy+close %s %.2f", why, sym, spec.volume_min)
-            self.st.last_fill = now.isoformat()
+        if self.cfg.dry_run:                       # nothing opened: no trading day, and
+            log.info("DRY-RUN %s: buy+close %s %.2f",  # the inactivity clock stays put
+                     why, sym, spec.volume_min)
             return
         try:
             f = self.b.buy(sym, spec.volume_min, None, self.cfg.magic, f"FAST4 {why}")
@@ -537,6 +551,15 @@ class Runner:
     # ------------------------------------------------------------ tick
     def tick(self, now: Optional[datetime] = None) -> None:
         now = now or self.b.now()
+        refresh = getattr(self.b, "refresh_clock", None)
+        if refresh is not None:                      # MT5: keep the clock verified
+            refresh()
+        login = self.b.account().login
+        if login != self.st.login:                   # never act on another account
+            raise RuntimeError(
+                f"the terminal switched from account {self.st.login} to {login} "
+                "while the bot was running; nothing done. Stop the bot and start "
+                "it again on the account you want.")
         live = self.b.positions(self.cfg.magic)      # raises on a broker error
         self.roll_day(now)
         self.reconcile(now, live)
@@ -561,20 +584,43 @@ class Runner:
             try:
                 status = self.plan_status(now)
             except Exception as e:                   # e.g. the clock refuses bars
-                status = "exits-only" if self._plan_is_recent(local.date()) else "wait"
-                log.error("cannot read today's session (%s): %s", e,
-                          "running the planned exits only" if status == "exits-only"
-                          else "waiting")
+                status = "unreadable"
+                if not self._plan_is_recent(local.date()):
+                    log.error("cannot read today's session (%s); waiting", e)
+                else:
+                    log.error("cannot read today's session (%s): planned exits run "
+                              "now, entries wait until %s", e,
+                              ENTRY_DEADLINE.strftime("%H:%M"))
+                    self._run_exits(now, live)
+                    if local.time() > ENTRY_DEADLINE:
+                        log.warning("entries %s dropped: today's session was not "
+                                    "readable before the entry deadline",
+                                    self.st.pending_entries)
+                        self.st.executed_day = today
+                        self._clear_plan()
             if status == "current":
                 self.execute(now, live,
                              entries_ok=local.time() <= ENTRY_DEADLINE)
-            elif status == "exits-only":
-                self.execute(now, live, entries_ok=False)
             elif status == "stale":
                 log.warning("plan from %s is stale; discarded", self.st.plan_day)
                 self._clear_plan()
         self.keepalive(now, live)
         self.save()
+
+    def _run_exits(self, now: datetime, live: List[Position]) -> None:
+        """The plan's exits alone (never blocked). They are dropped from
+        the plan before anything is sent, so they go out at most once; the
+        entries stay pending for a later tick."""
+        exits = list(self.st.pending_exits)
+        if not exits:
+            return
+        self.st.pending_exits = []
+        self.save()
+        by_ticket = {p.ticket: p for p in live}
+        for s in exits:
+            p = by_ticket.get(self.st.held.get(s, {}).get("ticket"))
+            if p is not None:
+                self._close(p, "exit", now)
 
     def _plan_is_recent(self, today: date) -> bool:
         """The plan was made on the weekday before ``today`` (made on a
