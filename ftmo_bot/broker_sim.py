@@ -26,7 +26,7 @@ BAR = timedelta(minutes=30)
 def load_csv(path: Path) -> List[Bar]:
     """Astral price export: timestamp (bar start, UTC), open, high, low, close."""
     out = []
-    with open(path, newline="") as f:
+    with open(path, newline="", encoding="utf-8") as f:
         for r in csv.DictReader(f):
             t = datetime.strptime(r["timestamp"], "%Y-%m-%dT%H:%M:%S%z")
             out.append((t.astimezone(timezone.utc), float(r["open"]),
@@ -150,5 +150,5 @@ class SimBroker:
 def save_json(path: Path, obj: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(obj, indent=2))
+    tmp.write_text(json.dumps(obj, indent=2), encoding="utf-8")
     tmp.replace(path)

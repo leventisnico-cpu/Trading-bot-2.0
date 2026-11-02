@@ -31,7 +31,7 @@ class FtmoConfig:
     notional_cap: float = 3.0             # x balance, per position (Swing leverage 1:15, US2000 1:9)
     atr_stop_mult: float = 3.0
     max_hold_sessions: int = 10
-    initial_balance: Optional[float] = None   # set at first start, in account currency
+    initial_balance: Optional[float] = None   # null: a new account's balance (FTMO accounts start at their size)
     profit_target: Optional[float] = 0.10     # 0.10 phase 1, 0.05 phase 2, null funded
     min_trading_days: int = 4
     max_loss: float = 0.10
@@ -47,6 +47,7 @@ class FtmoConfig:
     log_path: str = "state/ftmo_bot.log"
     mt5_path: Optional[str] = None        # terminal64.exe path if not default
     server_clock: Optional[str] = None    # NY+7, EET, CET or UTC; null = fit it to the terminal
+    login: Optional[int] = None           # the only account orders may go to (its number, not a password)
 
     def validate(self) -> None:
         if not 0 < self.risk_per_trade <= 0.05:
@@ -65,6 +66,11 @@ class FtmoConfig:
             raise ValueError(f"unknown strategy symbols: {set(self.symbols) - set(DEFAULT_SYMBOLS)}")
         if self.keepalive_symbol not in self.symbols:
             raise ValueError("keepalive_symbol must be one of the symbols")
+        if self.login is not None and (isinstance(self.login, bool)
+                                       or not isinstance(self.login, int)
+                                       or self.login <= 0):
+            raise ValueError("login must be the account number from FTMO's email "
+                             "(digits only, no quotes) or null")
 
 
 SECRET_KEYS = {"password", "login_password", "investor_password", "token",
@@ -72,7 +78,8 @@ SECRET_KEYS = {"password", "login_password", "investor_password", "token",
 
 
 def load(path: str | Path) -> FtmoConfig:
-    raw = yaml.safe_load(Path(path).read_text()) or {}
+    # utf-8-sig: Windows Notepad may save a byte-order mark
+    raw = yaml.safe_load(Path(path).read_text(encoding="utf-8-sig")) or {}
     bad = SECRET_KEYS & {k.lower() for k in raw}
     if bad:
         raise ValueError(f"credentials do not belong in the config: {sorted(bad)}")

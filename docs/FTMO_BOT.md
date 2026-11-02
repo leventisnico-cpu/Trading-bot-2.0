@@ -109,8 +109,11 @@ The two bot columns above include the cap; the bare-rule column does not.
   be read at the open, the exits planned the evening before run anyway,
   and the entries wait until 10:30 New York for the clock, then are
   skipped for the day.
-* **Dry run by default.** Orders are only logged unless the config says
-  `dry_run: false` **and** you start it with `--execute`.
+* **Two opt-ins, one account.** Orders are only logged unless the config
+  says `dry_run: false` **and** you start it with `--execute`
+  (`run.ps1 -Live`), and they go only to the account the config names
+  in `login` (the bot refuses to start otherwise). The challenge config
+  starts in dry-run; the free-trial config sends orders (demo money).
 * `python -m ftmo_bot flat` closes every bot position and drops the
   pending plan: FTMO pays out only on a flat account. Stop `run` first.
   In dry-run it only reports what it would close and changes nothing.
@@ -184,12 +187,12 @@ than 205.
 
 What paper cannot test: FTMO's symbol names, contract sizes, server
 clock and order filling. Those are covered only by the preflight and the
-dry-run week on FTMO's own MT5 terminal.
+free trial (real orders, demo money) on FTMO's own MT5 terminal.
 
 ### Result (2026-10-16, last session of the two-week test)
 
-**Verdict: the bot is ready for the next step, the preflight and
-dry-run week on FTMO's MT5 terminal (setup steps 6–7). It is not proven
+**Verdict: the bot is ready for the next step, the preflight and a
+first run on FTMO's MT5 terminal (now the free trial: Setup below). It is not proven
 for live money yet. FAST-4 itself is still NO-GO for a fast pass.**
 
 **The bot (shadow run, 2026-10-05 to 2026-10-16, ten sessions):**
@@ -234,9 +237,10 @@ prepared but not sent. Details are in `research/air3_daily_log.md`.
 **Next steps:**
 1. Done 2026-10-22: the shadow kept running until the QQQ and SPY
    trades closed, so the exit path has been seen once.
-2. Run the preflight and a dry-run week on FTMO's MT5 terminal: first a
-   free trial or demo account if FTMO offers one, otherwise the paid
-   account in dry-run. Live orders only after that week looks right.
+2. Run the preflight and then the free trial with real orders (demo
+   money) on FTMO's MT5 terminal (Setup, steps 6–10; another broker's
+   MT5 demo if FTMO charges for the trial). Then the paid challenge, in
+   dry-run for at least one session first (steps 11–14).
 3. The odds above have not changed. (Revised 2026-11-02 with the bot's
    risk controls: see "Read this first" at the top.)
 
@@ -284,112 +288,185 @@ time stop or a stop-loss exit can be seen as well.
 
 ## Setup (Windows PC or Windows VPS outside the US)
 
-1. **Free trial first.** FTMO offers a free 14-day trial on MT5 with
-   the 2-Step rules at half target (5%, 2 trading days, the same loss
-   lines; it ends if nothing is traded in the first 7 days). Do steps
-   3–6 on it, then run the bot **with real orders on the trial** (step
-   8): it is free, and real fills, stops and order routing are what
-   paper cannot test. Use `profit_target: 0.05`, `min_trading_days: 2`
-   and `keepalive_days: 5`, so the bot opens a trade inside the first
-   week even without a FAST-4 signal. If FTMO asks for payment for the
-   trial, use any MT5 demo account instead (the bot only needs a
-   logged-in terminal; put that broker's index symbol names in
-   `symbols`). The trial's login differs from the challenge's, so the
-   bot keeps a separate state for it automatically.
-2. **Buy the FTMO 2-Step challenge yourself:** **MetaTrader 5**, the
-   **Swing** account type, **USD**. The research was done at 3% risk per
-   trade; the account size only sets the fee (the $10k account is EUR 89,
-   the $25k one EUR 250) and the minimum-lot rounding. The fee comes
-   back with the first payout. FTMO emails the login; you type it into
-   the terminal, it never goes in this repo.
-3. In MT5: Tools → Options → Expert Advisors → tick **Allow algorithmic
-   trading**, then press the **Algo Trading** button so it is green.
-   Add the four symbols to Market Watch.
-4. Install Python 3.11+ and the dependencies:
+The bot runs on Windows next to FTMO's MetaTrader 5 terminal and
+attaches to it. It never asks for or stores a password: you log the
+terminal in yourself. Two scripts do the work, both run from the repo
+folder in PowerShell:
+
+* `deploy\ftmo\setup.ps1`: one-time setup (Python environment, packages,
+  the config at `state\ftmo_config.yaml`);
+* `deploy\ftmo\run.ps1`: `-Preflight` (checks, sends nothing), `-Plan`
+  (what it does at the next open), `-DryRun` (orders only logged),
+  `-Live` (real orders), `-Flat` (close every bot position).
+
+### Once per PC
+
+1. Install **Python 3.12, 64-bit**, from python.org and tick **Add
+   python.exe to PATH** in the installer. 3.11 to 3.14 also work; 3.15
+   (python.org's newest) does not yet, because the MetaTrader5 package has
+   no build for it.
+2. Install Git (git-scm.com), open PowerShell and get the bot (sign in to
+   GitHub if asked):
 
    ```powershell
-   py -m pip install -r deploy\ftmo\requirements.txt
+   git clone -b claude/mini-prop-os-trading-zmm4ym https://github.com/leventisnico-cpu/Trading-bot-2.0.git
+   cd Trading-bot-2.0
    ```
 
-5. Copy the config and leave it in dry-run:
+   (Until PR #4 is merged the bot lives on that branch. Without Git: on
+   GitHub pick the branch, Code → Download ZIP, unzip, and open
+   PowerShell in the folder.)
+3. Run the setup:
 
    ```powershell
-   copy deploy\ftmo\config.example.yaml state\ftmo_config.yaml
+   powershell -ExecutionPolicy Bypass -File deploy\ftmo\setup.ps1
    ```
 
-   Set `initial_balance` to the account size you bought (10000 for the
-   $10k account): FTMO's loss lines are percentages of it, and the bot
-   warns at start-up if the account balance disagrees. Set
-   `profit_target` to `0.10` for Phase 1. Set `mt5_path` if the
-   terminal is not found automatically.
-6. Preflight (read-only):
+   It finds Python, creates `.venv`, installs MetaTrader5, PyYAML and
+   tzdata, installs the free-trial config as `state\ftmo_config.yaml`,
+   checks that the bot loads, and ends with `Setup done`. Run again, it
+   keeps your config.
+4. Keep the PC awake on weekdays: Settings → System → Power → Screen
+   and sleep → Never (when plugged in). Set Windows Update's active
+   hours to cover the US session (09:30–16:00 New York). After a restart
+   the bot resumes from its state file once you start it again.
+5. To update the bot later: stop it (Ctrl+C), then `git pull` and step 3
+   again (your config is kept), and start it.
+
+### The free trial (first)
+
+FTMO's free 14-day trial has the 2-Step rules at half target: 5% profit
+target, 2 trading days, the same 5% daily and 10% maximum loss lines; it
+ends if nothing is traded in its first 7 days. The bot runs on it with
+**real orders** (demo money): real fills, stops, lot sizes and the
+server clock are what paper cannot test.
+
+6. Sign up for the free trial yourself on ftmo.com: **MetaTrader 5**,
+   **USD**, the **Swing** type if offered (the challenge's), any size.
+   FTMO emails the MT5 login and server.
+7. Install FTMO's MetaTrader 5 (link in FTMO's client area) and log in
+   to the trial (you type the password; tick "Save password" so it
+   reconnects after a restart). Then:
+   * Tools → Options → Expert Advisors → tick **Allow algorithmic
+     trading**, and press the **Algo Trading** button so it is green;
+   * Market Watch (Ctrl+M) → right-click → Symbols: show `US30.cash`,
+     `US100.cash`, `US500.cash` and `US2000.cash`.
+8. Preflight (reads only, sends nothing):
 
    ```powershell
-   py -m ftmo_bot preflight --config state\ftmo_config.yaml
+   powershell -ExecutionPolicy Bypass -File deploy\ftmo\run.ps1 -Preflight
    ```
 
-   Every symbol must print PASS with 205+ sessions (if not, raise
-   Tools → Options → Charts → Max bars in chart and restart the
-   terminal). The `server clock:` line should read `UTC+2` (`UTC+3` in
-   summer) with `rule NY+7 [pinned]`. If it says `unverified`, run it
-   again while the index CFDs are trading; if it mentions the PC clock,
-   sync the PC's clock (Windows: Settings → Time → Sync now); if it
-   says the reading fits no known rule, stop and report it. Compare the
-   printed last session date and close with the index on a chart before
-   going further.
+   Check, line by line:
+   * `account`: the trial's login, USD, `algo trading ON`;
+   * `rules:`: the initial balance is the account size (`from the
+     account` on a new account), the max-loss line 10% under it and the
+     profit target 5% over it, as on FTMO's dashboard;
+   * `WARN: login not set` with the line to add: that is step 9;
+   * every symbol prints PASS with 205+ sessions. If one does not, open
+     its M30 chart, press Home to load older bars (or raise Tools →
+     Options → Charts → Max bars in chart and restart the terminal),
+     and run the preflight again. Compare one printed last close with
+     the chart;
+   * `server clock:` reads `UTC+2` (`UTC+3` in summer) with
+     `rule NY+7 [pinned]`. If it says `unverified`, run it again while
+     the index CFDs are trading; if it mentions the PC clock, sync the
+     PC's clock (Settings → Time & language → Date & time → Sync now);
+     if the reading fits no known rule, stop and report it.
 
-   Any time, to see what the bot will do at the next open (read-only):
+   Any time, `run.ps1 -Plan` prints what the bot will do at the next
+   open (read-only).
+9. Name the account the bot may trade: open `state\ftmo_config.yaml`
+   in Notepad, set `login:` to the trial's login number (in FTMO's
+   email; the preflight's WARN line shows it), for example
+   `login: 1234567`, and save. It is the account number, not the
+   password. Orders go only to that account: `-Live` refuses to start
+   without it, or with the terminal on another account. Then start the
+   bot:
 
    ```powershell
-   py -m ftmo_bot plan --config state\ftmo_config.yaml
+   powershell -ExecutionPolicy Bypass -File deploy\ftmo\run.ps1 -Live
    ```
 
-   It prints the exits and entries from the last completed session, with
-   the approximate entry price and stop.
-7. **Dry-run for at least one full week:**
+   It prints the `rules:` line again as it starts. Leave the window
+   open (Ctrl+C stops it; starting again resumes). In
+   its first session (10:00–10:45 New York, weekdays) it opens and
+   closes the minimum lot of `US500.cash` so the trial gets a trading
+   day, and again whenever 5 days pass without a trade. FAST-4 itself
+   trades only on a signal, about twice a month, so a quiet trial is
+   normal. Read `state\ftmo_bot.log` each day: the plan after 16:05 New
+   York, then the orders at the next open with lots and stops.
+10. Before buying the challenge, the trial must show: the round trip
+    filled and FTMO's dashboard counted the trading day; any FAST-4
+    entry filled with a stop-loss at about 3 ATR and a lot size risking
+    about 3% (a second entry is cut so both stops stay above FTMO's
+    lines, "cut from X to Y lots" in the log, as intended); no ERROR
+    lines in the log.
 
-   ```powershell
-   py -m ftmo_bot run --config state\ftmo_config.yaml
-   ```
+**No free trial?** If FTMO asks for payment for the trial, use any
+broker's free MT5 demo: in `state\ftmo_config.yaml` put that broker's
+names for the four indices under `symbols` and set `server_clock: null`.
+The trial's rule lines do not apply there; the orders get tested.
 
-   Read `state\ftmo_bot.log` each day: the plan after 16:05 New York, the
-   "DRY-RUN buy" lines at the next open, lot sizes and stops. A second
-   entry while one position is open is cut by `cap_combined_risk` (the
-   log says "cut from X to Y lots"): that is intended, so both stops
-   together stay above FTMO's loss lines. Set it to `false` only if you
-   accept that two stops in one day can fail the account.
-8. Go live on the evaluation only after the dry-run week looks right:
-   set `dry_run: false` in `state\ftmo_config.yaml`, then
+### The challenge
 
-   ```powershell
-   py -m ftmo_bot run --config state\ftmo_config.yaml --execute
-   ```
-
-   Keep the PC (or VPS) and the terminal running on weekdays.
-9. When the bot halts with "profit target reached", check FTMO's
-   dashboard: the phase shows as passed once FTMO's own check runs
-   (within a day). FTMO then emails the Verification account's login.
-   Log the terminal into it, set `profit_target: 0.05`, and start step 8
-   again: the bot sees the new login, starts fresh, and keeps the old
-   state file under the old login's name.
-10. On the funded account set `profit_target: null`. Keep-alive stays
-    on. To request a payout (from day 14, only on a flat account), stop
-    the `run` window first (Ctrl+C; `flat` refuses while it runs), then:
+11. Buy the FTMO 2-Step challenge yourself: **MetaTrader 5**, the
+    **Swing** account type (the bot holds over weekends; Standard cannot
+    be changed to Swing later), **USD**. The research was done at 3% risk
+    per trade; the account size only sets the fee (the $10k account is
+    EUR 89, the $25k one EUR 250) and the minimum-lot rounding. The fee
+    comes back with the first payout.
+12. Stop the trial bot (Ctrl+C), switch to the challenge config and log
+    the terminal into the challenge account:
 
     ```powershell
-    py -m ftmo_bot flat --config state\ftmo_config.yaml --execute
+    powershell -ExecutionPolicy Bypass -File deploy\ftmo\setup.ps1 -Account challenge -Force
+    ```
+
+    It sets the 10% target, 4 minimum trading days, `dry_run: true` and
+    an empty `login:`. The bot sees the new login and starts a fresh
+    state; the trial's is kept under its login.
+13. Preflight again (step 8): `rules:` must show the challenge's size,
+    the 10% target and `of 4` trading days. Then dry-run, orders only
+    logged ("DRY-RUN buy ..."): at least one session after a clean
+    trial, a full week without one:
+
+    ```powershell
+    powershell -ExecutionPolicy Bypass -File deploy\ftmo\run.ps1 -DryRun
+    ```
+
+14. Go live: open `state\ftmo_config.yaml` in Notepad, set
+    `dry_run: false` and `login:` to the challenge account's number,
+    save, and start `run.ps1 -Live`. Keep the PC and the terminal running
+    on weekdays.
+15. When the bot halts with "profit target reached", check FTMO's
+    dashboard: the phase shows as passed once FTMO's own check runs
+    (within a day). FTMO then emails the Verification account's login.
+    Log the terminal into it, set `profit_target: 0.05` and `login:` to
+    the Verification account's number in `state\ftmo_config.yaml`, and
+    start `run.ps1 -Live` again: the bot sees the new login, starts
+    fresh, and keeps the old state file under the old login's name.
+16. On the funded account set `profit_target: null` and `login:` to the
+    funded account's number. Keep-alive stays
+    on. To request a payout (from day 14, only on a flat account), stop
+    the `-Live` window first (Ctrl+C; `-Flat` refuses while it runs),
+    then:
+
+    ```powershell
+    powershell -ExecutionPolicy Bypass -File deploy\ftmo\run.ps1 -Flat
     ```
 
     It prints `flat` when nothing is left open. Request the payout on
-    FTMO's dashboard, and start step 8 again once it is processed. The
-    payout itself is your decision, never the bot's.
-11. **A halt you disagree with.** The bot halts after the target or the
+    FTMO's dashboard, and start `run.ps1 -Live` again once it is
+    processed. The payout itself is your decision, never the bot's.
+17. **A halt you disagree with.** The bot halts after the target or the
     max-loss line, and stays halted across restarts. If FTMO's dashboard
     says the phase is not passed (for example, a trading day FTMO did not
     count), stop the bot and open `state\ftmo_state.json` in Notepad:
     set `"halted": null` and `"target_locked": null`, and remove any
     date from `"trading_days"` that FTMO does not show. Save, and start
-    step 8 again. Never clear a max-loss halt: that account has failed.
+    `run.ps1 -Live` again. Never clear a max-loss halt: that account has
+    failed.
 
 ## Things that could not be verified from here
 
@@ -401,5 +478,13 @@ time stop or a stop-loss exit can be seen as well.
 * That a minimum-lot round trip counts as an opened position for FTMO's
   trading days and inactivity rule. By FTMO's definition it does.
 * FTMO's current rules: re-read them on ftmo.com before buying.
+* `setup.ps1` and `run.ps1` on Windows itself: they were parsed and run
+  under PowerShell 7 (Linux) with stand-ins for Python, pip and the bot
+  (34 cases: both configs, an existing config kept, the `py` launcher
+  and plain `python`, 32-bit, 3.10, 3.15 and Microsoft Store Pythons
+  refused, an existing `.venv` checked, a `py` install prompt that must
+  not hang it, a folder name with brackets, a pip failure, every
+  `run.ps1` switch), not under Windows PowerShell 5.1 with the real
+  MetaTrader5 package. The first setup on the PC is that test.
 
-The free trial and the dry-run week exist to catch the first two.
+The free trial exists to catch the first two.

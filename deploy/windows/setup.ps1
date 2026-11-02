@@ -1,4 +1,4 @@
-# Mini-Prop OS — one-time Windows setup (run from the repo root):
+# Mini-Prop OS - one-time Windows setup (run from the repo root):
 #   powershell -ExecutionPolicy Bypass -File deploy\windows\setup.ps1
 #
 # Creates .venv, installs the runtime dependencies, and installs the PAPER
@@ -32,7 +32,7 @@ Write-Host "installed paper config: $target (from deploy\config.tfsa-paper.yaml)
 
 if (-not (Test-Path ".env")) {
     Copy-Item "deploy\.env.example" ".env"
-    Write-Host "created .env from deploy\.env.example — fill in TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID yourself (never commit it)"
+    Write-Host "created .env from deploy\.env.example - fill in TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID yourself (never commit it)"
 }
 
 & $venvPython -c "from mini_prop_os.core.config import load_config; c = load_config('state/config.yaml'); assert c.connection.port in (4002, 7497), 'not a paper port'; print('config OK: port', c.connection.port, c.contract.symbol, c.contract.sec_type, 'market data', c.connection.market_data_type)"

@@ -1,4 +1,4 @@
-# Mini-Prop OS — run on Windows against IB Gateway (paper).
+# Mini-Prop OS - run on Windows against IB Gateway (paper).
 #   .\deploy\windows\run.ps1 -Preflight     read-only go/no-go check
 #   .\deploy\windows\run.ps1                run the bot
 #   .\deploy\windows\run.ps1 -ResetKillSwitch <your-name>

@@ -102,7 +102,13 @@ class State:
         with a warning, so a rollback still starts."""
         if not path.exists():
             return cls()
-        raw = json.loads(path.read_text())
+        try:            # utf-8-sig: the runbook has the operator fix it in Notepad
+            raw = json.loads(path.read_text(encoding="utf-8-sig"))
+        except ValueError as e:
+            raise RuntimeError(f"state file {path} could not be read ({e}). Fix it in "
+                               "Notepad (quotes, commas, brackets) and start again.") from e
+        if not isinstance(raw, dict):
+            raise RuntimeError(f"state file {path} does not hold a state (a JSON object)")
         known = {f.name for f in fields(cls)}
         extra = sorted(set(raw) - known)
         if extra:
@@ -112,27 +118,29 @@ class State:
     def save(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(asdict(self), indent=2))
+        tmp.write_text(json.dumps(asdict(self), indent=2), encoding="utf-8")
         tmp.replace(path)
 
 
 class Runner:
     def __init__(self, cfg: FtmoConfig, broker: Broker, readonly: bool = False) -> None:
-        """``readonly``: never move or write a state file (the ``plan``
-        command)."""
+        """``readonly``: never move or write a state file (``plan`` and
+        ``preflight``). The start-up checks run before any state file is
+        moved, so a refused start leaves the files as they were."""
         self.cfg, self.b = cfg, broker
         self.path = Path(cfg.state_path)
         self.st = State.load(self.path)
         acct = self.b.account()
+        moves: List[Tuple[Path, Path]] = []      # applied once the checks pass
         if self.st.login is not None and self.st.login != acct.login:
-            self._switch_account(self.st.login, acct.login, readonly)
+            moves = self._switch_account(self.st.login, acct.login)
         elif self.st.login is None and (self.st.halted or self.st.target_locked):
             legacy = self.path.with_name(f"{self.path.stem}.legacy{self.path.suffix}")
             log.warning("state without an account login holds a halt or a target "
                         "lock: not carried over to account %s (kept as %s)",
                         acct.login, legacy)
-            if not readonly and self.path.exists():
-                self.path.replace(legacy)
+            if self.path.exists():
+                moves = [(self.path, legacy)]
             self.st = State()
         elif self.st.login is None and self.st.trading_days:
             log.warning("state without an account login: its %d trading days were "
@@ -140,15 +148,18 @@ class Runner:
                         "and are dropped", len(self.st.trading_days))
             self.st.trading_days = []
         self.st.login = acct.login
-        if self.st.initial_balance is None:
-            if cfg.initial_balance is None:
-                log.warning("initial_balance not set; using the current balance "
-                            "%.2f. Set it to the FTMO account size.", acct.balance)
-            elif abs(acct.balance / cfg.initial_balance - 1) > 0.01:
-                log.warning("initial_balance %.2f in the config but the account "
-                            "balance is %.2f: check the account size and currency",
-                            cfg.initial_balance, acct.balance)
+        self.balance_source = "the bot's state"
+        if self.st.initial_balance is None:              # a new account
+            if cfg.initial_balance is None:              # FTMO accounts start at their size
+                self._note_balance_from_account(acct.balance, acct.login)
+                self.balance_source = "the account"
+            else:
+                self._check_initial_balance(cfg, acct.balance, acct.login)
+                self.balance_source = "the config"
             self.st.initial_balance = cfg.initial_balance or acct.balance
+        if not readonly:
+            for src, dst in moves:
+                src.replace(dst)
         self.limits = rules.Limits(self.st.initial_balance, cfg.max_loss,
                                    cfg.daily_loss, cfg.guard_buffer)
         self.by_broker = {v: k for k, v in cfg.symbols.items()}
@@ -156,27 +167,62 @@ class Runner:
         # account was opened, not from the bot's start, so the keep-alive
         # is due in the first session.
 
+    @staticmethod
+    def _check_initial_balance(cfg: FtmoConfig, balance: float, login: int) -> None:
+        """A configured account size that this account's balance cannot
+        have (at or under the max-loss line, or at or over the target)
+        would draw every loss line and the target in the wrong place: an
+        instant permanent halt, or a target 'reached' on the first tick.
+        Refuse to start; a small difference only warns."""
+        size = cfg.initial_balance
+        assert size is not None
+        low = size * (1 - cfg.max_loss)
+        high = size * (1 + cfg.profit_target) if cfg.profit_target is not None else None
+        if balance <= low or (high is not None and balance >= high):
+            raise RuntimeError(
+                f"initial_balance {size:,.2f} in the config does not fit account "
+                f"{login} (balance {balance:,.2f}). FTMO accounts start at their size: "
+                "set initial_balance to it, or to null to take it from the account.")
+        if abs(balance / size - 1) > 0.01:
+            log.warning("initial_balance %.2f in the config but the account balance "
+                        "is %.2f: check the account size and currency", size, balance)
+
+    @staticmethod
+    def _note_balance_from_account(balance: float, login: int) -> None:
+        """A new FTMO account starts at a round size (10,000, 25,000, ...).
+        Any other balance means it traded before the bot first saw it (or
+        the bot's state was lost), and the loss lines drawn from it would
+        sit in the wrong place: warn, so the operator sets the size."""
+        if round(balance, 2) % 1000:
+            log.warning("account %s: initial balance %.2f taken from the account, but a "
+                        "new FTMO account starts at a round size. If it traded before the "
+                        "bot, stop and set initial_balance to the account size",
+                        login, balance)
+        else:
+            log.info("account %s: initial balance %.2f taken from the account",
+                     login, balance)
+
     def _parked(self, login: int) -> Path:
         return self.path.with_name(f"{self.path.stem}.{login}{self.path.suffix}")
 
-    def _switch_account(self, old: int, new: int, readonly: bool) -> None:
+    def _switch_account(self, old: int, new: int) -> List[Tuple[Path, Path]]:
         """The terminal is on another account than the state file. Park
         the old account's state under its login and resume the new
-        account's parked state, or start fresh (the next phase). Switching
-        back and forth (a trial, a phase review) loses nothing, so the
-        inactivity clock and the trading days survive."""
+        account's parked state, or start fresh (the next phase). Returns
+        the file moves, which the caller makes once the start-up checks
+        pass. Switching back and forth (a trial, a phase review) loses
+        nothing, so the inactivity clock and the trading days survive."""
         mine = self._parked(new)
         log.warning("state file belongs to account %s but the terminal is on %s: "
                     "%s", old, new, f"resuming {mine}" if mine.exists()
                     else "starting fresh (a new phase)")
-        if not readonly and self.path.exists():
-            self.path.replace(self._parked(old))
+        moves = [(self.path, self._parked(old))] if self.path.exists() else []
         if mine.exists():
             self.st = State.load(mine)
-            if not readonly:
-                mine.replace(self.path)
+            moves.append((mine, self.path))
         else:
             self.st = State()
+        return moves
 
     def save(self) -> None:
         self.st.save(self.path)

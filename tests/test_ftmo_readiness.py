@@ -4,9 +4,12 @@ keep-alive on every phase."""
 
 from __future__ import annotations
 
+import ast
 import dataclasses
 import json
+import logging
 import pathlib
+import re
 import sys
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
@@ -19,9 +22,10 @@ from test_ftmo_bot import FakeBroker, cfg, history, next_day, ny, open_session, 
 
 from ftmo_bot import server_clock  # noqa: E402
 from ftmo_bot.broker import Position  # noqa: E402
-from ftmo_bot.config import FtmoConfig  # noqa: E402
+from ftmo_bot.config import FtmoConfig, load  # noqa: E402
 from ftmo_bot.runner import Runner, State  # noqa: E402
 
+ROOT = pathlib.Path(__file__).resolve().parent.parent
 NY = ZoneInfo("America/New_York")
 PRAGUE = ZoneInfo("Europe/Prague")
 UTC = timezone.utc
@@ -572,10 +576,13 @@ class MainBroker(FakeBroker):
         return "UTC+2 (test)"
 
 
-def cli_config(tmp_path, dry_run: bool) -> str:
+def cli_config(tmp_path, dry_run: bool, login=1, extra: str = "") -> str:
+    """``login=1``: the account MainBroker's terminal is on."""
     p = tmp_path / "c.yaml"
     p.write_text(f"dry_run: {'true' if dry_run else 'false'}\n"
-                 f"state_path: {tmp_path / 'st.json'}\nlog_path: {tmp_path / 'log'}\n")
+                 f"state_path: {tmp_path / 'st.json'}\nlog_path: {tmp_path / 'log'}\n"
+                 + (f"login: {login}\n" if login is not None else "") + extra,
+                 encoding="utf-8")
     return str(p)
 
 
@@ -748,3 +755,335 @@ def test_weekend_start_still_trades_the_monday_plan(tmp_path, monkeypatch, rule)
     entries = [o for o in fake.orders if o["type"] == 0 and o.get("sl")]
     assert [o["symbol"] for o in entries] == ["US100.cash"]
     assert r.st.pending_entries == [] and b.verified_at is not None
+
+
+# ---------------------------------------- the account size, and Windows
+
+@pytest.mark.parametrize("size,balance,target,fits", [
+    (15000, 15000, 0.10, True),
+    (15000, 15100, 0.10, True),          # within 1%: quiet
+    (15000, 15300, 0.10, True),          # 2% off: a warning, and it starts
+    (15000, 10000, 0.10, False),         # a $10k account under a $15k config
+    (15000, 13500, 0.10, False),         # on the max-loss line: an instant halt
+    (15000, 16500, 0.10, False),         # on the target: "reached" at the first tick
+    (10000, 15000, 0.05, False),         # a $15k account under a $10k config
+    (15000, 16600, None, True),          # funded: no target, so no upper bound
+])
+def test_a_configured_size_the_account_cannot_have_is_refused(
+        tmp_path, caplog, size, balance, target, fits):
+    bars, ds = history()
+    b = FakeBroker(bars, balance=balance)
+    b.clock = ny(ds[-1], 12, 0)
+    c = cfg(tmp_path, initial_balance=size, profit_target=target)
+    if not fits:
+        with pytest.raises(RuntimeError, match="does not fit account 1"):
+            Runner(c, b)
+        return
+    with caplog.at_level(logging.WARNING, logger="ftmo_bot"):
+        assert Runner(c, b).st.initial_balance == size
+    assert ("check the account size" in caplog.text) == (abs(balance / size - 1) > 0.01)
+
+
+def test_null_initial_balance_is_taken_from_a_new_account(tmp_path):
+    bars, ds = history()
+    b = FakeBroker(bars, balance=10000)
+    b.clock = ny(ds[-1], 12, 0)
+    assert Runner(cfg(tmp_path), b).st.initial_balance == 10000
+
+
+def test_a_started_account_keeps_its_initial_balance(tmp_path):
+    """The size check is for a new account only: after losses the balance
+    may sit far from any configured size, and the state's value rules."""
+    bars, ds = history()
+    b = FakeBroker(bars, balance=13600)
+    b.clock = ny(ds[-1], 12, 0)
+    State(login=1, initial_balance=15000.0).save(tmp_path / "st.json")
+    assert Runner(cfg(tmp_path, initial_balance=10000), b).st.initial_balance == 15000.0
+
+
+def test_trial_and_challenge_configs_differ_only_in_the_trial_rules():
+    trial = load(ROOT / "deploy/ftmo/config.trial.yaml")
+    chal = load(ROOT / "deploy/ftmo/config.example.yaml")
+    assert (trial.profit_target, trial.min_trading_days, trial.keepalive_days,
+            trial.dry_run) == (0.05, 2, 5, False)
+    assert (chal.profit_target, chal.min_trading_days, chal.keepalive_days,
+            chal.dry_run) == (0.10, 4, 25, True)
+    for c in (trial, chal):
+        assert c.initial_balance is None and c.server_clock == "NY+7" and c.login is None
+        assert c.risk_per_trade == 0.03 and c.cap_combined_risk is True
+    t, ch = dataclasses.asdict(trial), dataclasses.asdict(chal)
+    assert {k for k in t if t[k] != ch[k]} == {
+        "profit_target", "min_trading_days", "keepalive_days", "dry_run"}
+
+
+def test_config_edited_in_notepad_loads_on_windows(tmp_path, monkeypatch):
+    """Windows reads a text file without an explicit encoding as cp1252,
+    and Notepad may save a byte-order mark: both broke the config."""
+    real = pathlib.Path.read_text
+
+    def windows(self, encoding=None, *a, **k):
+        return real(self, encoding or "cp1252", *a, **k)
+    monkeypatch.setattr(pathlib.Path, "read_text", windows)
+    p = tmp_path / "c.yaml"
+    p.write_bytes("﻿# trial — my notes\nrisk_per_trade: 0.02\n".encode("utf-8"))
+    assert load(p).risk_per_trade == 0.02
+
+
+def test_bot_never_opens_a_text_file_without_an_encoding():
+    """The config, the state, the log and the instance lock all name their
+    encoding, so Windows' cp1252 default is never used."""
+    calls = ("open", "read_text", "write_text", "FileHandler")
+    found = 0
+    for src in sorted((ROOT / "ftmo_bot").glob("*.py")):
+        for node in ast.walk(ast.parse(src.read_text(encoding="utf-8"))):
+            if not isinstance(node, ast.Call):
+                continue
+            f = node.func
+            name = f.attr if isinstance(f, ast.Attribute) else getattr(f, "id", None)
+            if name not in calls:
+                continue
+            modes = [a.value for a in node.args
+                     if isinstance(a, ast.Constant) and isinstance(a.value, str)]
+            if any(set(m) <= set("rwaxbt+") and "b" in m for m in modes):
+                continue                                    # binary: no encoding
+            found += 1
+            assert any(k.arg == "encoding" for k in node.keywords), \
+                f"{src.name}:{node.lineno}: {name}() without encoding="
+    assert found >= 6
+
+
+def test_powershell_scripts_are_plain_ascii():
+    """Windows PowerShell 5.1 reads a .ps1 without a byte-order mark as
+    ANSI: one em dash becomes three characters and can break a string."""
+    scripts = sorted((ROOT / "deploy").rglob("*.ps1"))
+    assert len(scripts) >= 4
+    for p in scripts:
+        bad = [i for i, ch in enumerate(p.read_bytes()) if ch > 127]
+        assert not bad, f"{p.relative_to(ROOT)}: non-ASCII byte at offset {bad[0]}"
+
+
+def test_ftmo_scripts_point_at_files_that_exist():
+    for script in ("setup.ps1", "run.ps1"):
+        text = (ROOT / "deploy/ftmo" / script).read_text(encoding="ascii")
+        refs = set(re.findall(r"deploy\\ftmo\\[\w.]+", text))
+        assert refs
+        for ref in refs:
+            assert (ROOT / ref.replace("\\", "/")).is_file(), f"{script}: {ref}"
+
+
+def test_cli_preflight_prints_the_rules_and_passes(tmp_path, monkeypatch, capsys):
+    from ftmo_bot import __main__ as cli
+    before = seeded(tmp_path, monkeypatch)
+    assert cli.main(["preflight", "--config", cli_config(tmp_path, False)]) == 0
+    out = capsys.readouterr().out
+    assert ("rules: initial balance 15,000.00 (from the account), max-loss line "
+            "13,500.00, profit target 16,500.00, trading days 0 of 4\n") in out
+    assert out.count("PASS ") == 4 and "FAIL" not in out and "WARN" not in out
+    assert MainBroker.last.sent == [] and (tmp_path / "st.json").read_text() == before
+
+
+@pytest.mark.parametrize("state,cfg_extra,expect", [
+    (dict(initial_balance=15000.0, halted="profit target reached"), "profit_target: null\n",
+     "initial balance 15,000.00 (from the bot's state), max-loss line 13,500.00, "
+     "no profit target (funded), trading days 0 of 4; HALTED: profit target reached\n"),
+    (dict(initial_balance=15000.0, target_locked="2026-10-30", trading_days=["2026-10-29"]),
+     "", "profit target 16,500.00, trading days 1 of 4; target locked\n"),
+])
+def test_cli_preflight_rules_line_shows_funded_halted_and_locked(
+        tmp_path, monkeypatch, capsys, state, cfg_extra, expect):
+    from ftmo_bot import __main__ as cli, broker_mt5
+    monkeypatch.setattr(broker_mt5, "MT5Broker", MainBroker)
+    MainBroker.seed = []
+    State(login=1, **state).save(tmp_path / "st.json")
+    assert cli.main(["preflight", "--config", cli_config(tmp_path, False, extra=cfg_extra)]) == 0
+    assert expect in capsys.readouterr().out
+
+
+def snapshot(d: pathlib.Path) -> dict:
+    return {f.name: f.read_bytes() for f in sorted(d.iterdir()) if f.name != "log"}
+
+
+@pytest.mark.parametrize("files", [
+    {"st.json": State(login=2, halted="max loss", trading_days=["2026-10-01"]),
+     "st.1.json": State(login=1, initial_balance=15000.0, trading_days=["2026-10-02"])},
+    {"st.json": State(login=2, initial_balance=15000.0, halted="max loss")},
+    {"st.json": State(login=None, halted="profit target reached")},
+    {},
+], ids=["foreign-login-with-parked", "foreign-login", "legacy-halted", "no-state"])
+@pytest.mark.parametrize("command", ["preflight", "plan"])
+def test_cli_read_only_commands_never_move_or_write_state(
+        tmp_path, monkeypatch, capsys, files, command):
+    from ftmo_bot import __main__ as cli, broker_mt5
+    monkeypatch.setattr(broker_mt5, "MT5Broker", MainBroker)
+    MainBroker.seed = []
+    for name, st in files.items():
+        st.save(tmp_path / name)
+    config = cli_config(tmp_path, False)
+    before = snapshot(tmp_path)
+    assert cli.main([command, "--config", config]) == 0
+    assert snapshot(tmp_path) == before and MainBroker.last.sent == []
+
+
+def test_a_refused_start_on_a_new_account_moves_no_state(tmp_path):
+    """The size check runs before the old account's state is parked, so a
+    refused start strands nothing: back on the old account, its halt and
+    trading days are still there."""
+    bars, ds = history()
+    b = Switchable(bars)
+    b.clock = ny(ds[-1], 12, 0)
+    State(login=1, initial_balance=15000.0, halted="max loss",
+          trading_days=["2026-10-01"]).save(tmp_path / "st.json")
+    before = snapshot(tmp_path)
+    c = cfg(tmp_path, initial_balance=10000)                    # misfit for a 15,000 balance
+    b.login = 2
+    with pytest.raises(RuntimeError, match="does not fit account 2"):
+        Runner(c, b)
+    assert snapshot(tmp_path) == before
+    b.login = 1
+    r = Runner(c, b)
+    assert r.st.halted == "max loss" and r.st.trading_days == ["2026-10-01"]
+
+
+def test_state_saved_by_notepad_with_a_byte_order_mark_loads(tmp_path):
+    p = tmp_path / "st.json"
+    p.write_text("﻿" + json.dumps({"login": 7, "halted": None}), encoding="utf-8")
+    assert State.load(p).login == 7
+
+
+@pytest.mark.parametrize("text,msg", [
+    ('{"login": 7, "halted": null,}', "could not be read"),
+    ("[1, 2]", "does not hold a state"),
+])
+def test_unreadable_state_is_a_clear_refusal(tmp_path, monkeypatch, capsys, text, msg):
+    p = tmp_path / "st.json"
+    p.write_text(text, encoding="utf-8")
+    with pytest.raises(RuntimeError, match=msg):
+        State.load(p)
+    from ftmo_bot import __main__ as cli, broker_mt5
+    monkeypatch.setattr(broker_mt5, "MT5Broker", MainBroker)
+    MainBroker.seed = []
+    assert cli.main(["preflight", "--config", cli_config(tmp_path, False)]) == 1
+    assert f"FAIL state file {p}" in capsys.readouterr().out
+    assert p.read_text(encoding="utf-8") == text
+
+
+@pytest.mark.parametrize("balance,warns", [(10000, False), (10003.21, True)])
+def test_a_new_account_that_already_traded_is_flagged(tmp_path, caplog, balance, warns):
+    bars, ds = history()
+    b = FakeBroker(bars, balance=balance)
+    b.clock = ny(ds[-1], 12, 0)
+    with caplog.at_level(logging.INFO, logger="ftmo_bot"):
+        r = Runner(cfg(tmp_path), b)
+    assert r.st.initial_balance == balance and r.balance_source == "the account"
+    assert ("starts at a round size" in caplog.text) == warns
+
+
+def test_cli_preflight_fails_on_a_size_the_account_cannot_have(tmp_path, monkeypatch, capsys):
+    from ftmo_bot import __main__ as cli
+    seeded(tmp_path, monkeypatch)
+    p = cli_config(tmp_path, False, extra="initial_balance: 10000\n")
+    assert cli.main(["preflight", "--config", p]) == 1
+    out = capsys.readouterr().out
+    assert "FAIL initial_balance 10,000.00 in the config does not fit account 1" in out
+    assert "rules:" not in out
+
+
+def test_cli_plan_and_flat_refuse_a_misfit_size_without_a_traceback(
+        tmp_path, monkeypatch, capsys):
+    from ftmo_bot import __main__ as cli
+    before = seeded(tmp_path, monkeypatch)                     # a state without a size
+    p = cli_config(tmp_path, False, extra="initial_balance: 10000\n")
+    assert cli.main(["plan", "--config", p]) == 1
+    assert "FAIL initial_balance 10,000.00" in capsys.readouterr().out
+    assert cli.main(["flat", "--config", p, "--execute"]) == 1
+    out = capsys.readouterr().out
+    assert "FAIL initial_balance 10,000.00" in out and "nothing was closed" in out
+    assert MainBroker.last.sent == [] and MainBroker.last.pos
+    assert (tmp_path / "st.json").read_text() == before
+
+
+def test_cli_plan_reads_only(tmp_path, monkeypatch, capsys):
+    from ftmo_bot import __main__ as cli
+    before = seeded(tmp_path, monkeypatch)
+    assert cli.main(["plan", "--config", cli_config(tmp_path, False)]) == 0
+    out = capsys.readouterr().out
+    assert "held by the bot: {'US500'" in out and "plan from the" in out
+    assert MainBroker.last.sent == [] and (tmp_path / "st.json").read_text() == before
+
+
+# ------------------------------------------- orders go to one account only
+
+@pytest.fixture
+def started(monkeypatch):
+    """Runner.run replaced by a recorder (the real one never returns)."""
+    calls = []
+    monkeypatch.setattr(Runner, "run", lambda self: calls.append(self.cfg.dry_run))
+    return calls
+
+
+@pytest.mark.parametrize("command", ["run", "flat"])
+def test_orders_need_the_account_named_in_the_config(
+        tmp_path, monkeypatch, capsys, started, command):
+    from ftmo_bot import __main__ as cli
+    before = seeded(tmp_path, monkeypatch)
+    p = cli_config(tmp_path, False, login=None)
+    assert cli.main([command, "--config", p, "--execute"]) == 1
+    out = capsys.readouterr().out
+    assert "REFUSED" in out and "`login: 1`" in out
+    assert started == [] and MainBroker.last.sent == [] and MainBroker.last.pos
+    assert (tmp_path / "st.json").read_text() == before
+
+
+@pytest.mark.parametrize("command,args", [
+    ("run", ["--execute"]), ("flat", ["--execute"]), ("preflight", []), ("plan", []),
+])
+def test_a_terminal_on_another_account_is_refused(
+        tmp_path, monkeypatch, capsys, started, command, args):
+    from ftmo_bot import __main__ as cli
+    before = seeded(tmp_path, monkeypatch)
+    assert cli.main([command, "--config", cli_config(tmp_path, False, login=2)] + args) == 1
+    assert "FAIL the terminal is on account 1" in capsys.readouterr().out
+    assert started == [] and MainBroker.last.sent == []
+    assert (tmp_path / "st.json").read_text() == before
+
+
+def test_run_starts_on_the_named_account_and_prints_the_rules(
+        tmp_path, monkeypatch, capsys, started):
+    from ftmo_bot import __main__ as cli
+    seeded(tmp_path, monkeypatch)
+    assert cli.main(["run", "--config", cli_config(tmp_path, False), "--execute"]) == 0
+    assert started == [False]                                   # live: both opt-ins and the login
+    assert "rules: initial balance 15,000.00 (from the account)" in capsys.readouterr().out
+
+
+def test_dry_run_needs_no_login(tmp_path, monkeypatch, capsys, started):
+    from ftmo_bot import __main__ as cli
+    seeded(tmp_path, monkeypatch)
+    assert cli.main(["run", "--config", cli_config(tmp_path, False, login=None)]) == 0
+    assert started == [True]                                    # no --execute: dry run
+    assert cli.main(["preflight", "--config", cli_config(tmp_path, False, login=None)]) == 0
+    assert "WARN: login not set" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("login", ["12345", True, 0, -5, 12.5])
+def test_login_must_be_an_account_number(login):
+    with pytest.raises(ValueError, match="login"):
+        FtmoConfig(login=login).validate()
+
+
+def test_run_ps1_sends_orders_only_for_live_and_flat():
+    text = (ROOT / "deploy/ftmo/run.ps1").read_text(encoding="ascii")
+    cmds = dict(re.findall(r'^(?:if|elseif) \(\$(\w+)\) \{ \$cmd = @\(([^)]*)\) \}', text, re.M))
+    default = re.search(r'^else \{ \$cmd = @\(([^)]*)\) \}', text, re.M).group(1)
+    assert set(cmds) == {"Plan", "DryRun", "Live", "Flat"}
+    assert {k for k, v in cmds.items() if "--execute" in v} == {"Live", "Flat"}
+    assert '"preflight"' in default and "--execute" not in default
+    code = [line for line in text.splitlines() if not line.lstrip().startswith("#")]
+    assert sum(line.count("--execute") for line in code) == 2       # nowhere else
+
+
+def test_setup_ps1_installs_the_trial_config_by_default():
+    text = (ROOT / "deploy/ftmo/setup.ps1").read_text(encoding="ascii")
+    assert re.search(r'\[string\]\$Account = "trial"', text)
+    assert re.search(r'if \(\$Account -eq "trial"\) \{ \$source = "deploy\\ftmo\\config\.trial\.yaml" \}', text)
+    assert re.search(r'else \{ \$source = "deploy\\ftmo\\config\.example\.yaml" \}', text)

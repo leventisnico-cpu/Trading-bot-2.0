@@ -1,4 +1,7 @@
-# FTMO bot (FAST-4) — copy to state/ftmo_config.yaml (git-ignored) and edit.
+# FTMO bot (FAST-4): config for the paid FTMO 2-Step challenge.
+# deploy\ftmo\setup.ps1 -Account challenge -Force installs it as
+# state\ftmo_config.yaml (git-ignored; -Force replaces the trial's copy);
+# edit that copy, not this file.
 # NO credentials here, ever: log the FTMO MT5 terminal in by hand; the bot
 # attaches to the running terminal.
 #
@@ -17,8 +20,10 @@ max_positions: 2
 notional_cap: 3.0        # x balance per position; two positions fit the Swing account's 1:15 (US2000 1:9) leverage
 atr_stop_mult: 3.0
 max_hold_sessions: 10
-initial_balance: 15000   # the FTMO account size; the loss lines are % of this
-profit_target: 0.10      # Phase 1: 0.10, Phase 2: 0.05, funded account: null
+initial_balance: null    # null: the account's balance when the bot first sees it (FTMO accounts
+                         # start at their size). Set the size only if the bot first meets an
+                         # account that has already traded; a size the balance cannot have is refused.
+profit_target: 0.10      # Phase 1: 0.10, Phase 2 (Verification): 0.05, funded account: null
 min_trading_days: 4
 max_loss: 0.10
 daily_loss: 0.05
@@ -29,10 +34,13 @@ keepalive_days: 25       # minimum-lot round trip after this many days without a
                          # position, in every phase (FTMO closes inactive accounts); 0 = off
 keepalive_symbol: US500
 magic: 404040
-dry_run: true            # set false AND pass --execute to send orders
+dry_run: true            # set false (and login) AND start with run.ps1 -Live (--execute) to send orders
 state_path: state/ftmo_state.json
 log_path: state/ftmo_bot.log
 mt5_path: null           # e.g. C:/Program Files/FTMO MetaTrader 5/terminal64.exe
 server_clock: NY+7       # FTMO's server: GMT+2, GMT+3 in summer, changing with the US clocks
                          # (FTMO trading update 2026-10-29). Still checked against a live tick
                          # before every bar read. On another broker's demo set null to fit it.
+login: null              # the account's login number from FTMO's email (not the password),
+                         # e.g. login: 1234567; a new one for each phase. Orders go only to
+                         # this account; until it is set, run.ps1 -Live refuses.
