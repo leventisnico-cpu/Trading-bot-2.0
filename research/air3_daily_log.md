@@ -1071,3 +1071,73 @@ paper slot runs the FTMO bot test.
   - Not redeployed: a redeploy would cancel the scheduled DIA order,
     now the only live part of the comparison. Monday's morning check
     will look for a QQQ order and the DIA fill.
+
+## Weekly re-validation (2026-11-01, Sunday 23:11 UTC)
+
+**Method.** As on 10-25: `research/air3_replica.py`, the local replica
+of 41110 (AIR3) and 41122 (buy-and-hold). Astral's backtest tool still
+needs an approval in the app, so it was not called.
+* Data: Astral's SMH daily export, 3,729 bars, 2012-01-03 →
+  2026-10-30, sha256
+  `57b728885ca60e52c8769717d8764b63bc8d9e4bee89f621516a6f6d4e354e21`.
+  On all 3,724 dates it shares with last week's export, the opens,
+  highs, lows and closes are unchanged. It adds 10-26 → 10-30.
+* The first export today, at 23:12 UTC, was a stale copy. It ended on
+  10-29 with that day's first-posted volume, and it lacked the
+  2025-10-16 bar that last week's export had. A re-fetch at 23:15 UTC
+  was complete. Run through 10-29, both copies give the same table, so
+  only the missing 10-30 bar would have mattered.
+* Settings unchanged: $100k, 1 bp commission, 2 bp slippage, 220
+  warm-up bars inside each window.
+* Rerun on last week's export, the replica reproduces the 10-25 table
+  exactly, so every change below comes from the five new bars.
+
+| window | AIR3 return | AIR3 CAGR | AIR3 max DD | trades | win rate | B&H return | B&H max DD | AIR3 lower DD |
+|---|---|---|---|---|---|---|---|---|
+| full 2014-01 → 2026-10-30 | +936% | 21.6% | −27.7% | 5 closed + 1 open | 80% | +1,803% | −44.9% | yes |
+| fold 1 2013-03 → 2018-06 | +121% | 19.5% | −18.0% | 1 + 1 open | 100% | +134% | −22.9% | yes |
+| fold 2 2017-06 → 2022-08 | +58% | 11.1% | −27.7% | 3 | 67% | +97% | −37.4% | yes |
+| fold 3 2021-08 → 2026-10-30 | +249% | 33.1% | −24.1% | 1 + 1 open | 100% | +363% | −35.3% | yes |
+
+Closed trades on equity in the full sample are unchanged: −0.5%, +72%,
++8%, +61% and +90%. The open trade, bought at the 2025-07-01 open
+(276.80), is +84% on equity, against +85% at 10-23.
+
+**Against 10-25:**
+* The full sample fell from +945% to +936% (−9 points) and fold 3 from
+  +252% to +249% (−3 points). Buy-and-hold fell from +1,820% to
+  +1,803% and from +367% to +363%.
+* SMH slipped 0.9%, from 527.20 (10-23) to 522.49 (10-30), while the
+  rule held its open trade.
+* Folds 1 and 2 are closed windows and did not change. No window
+  changed its trade counts, win rates or drawdowns.
+
+**Flags:**
+* Win rate 80% (≥ 70%): no flag.
+* AIR3's drawdown is lower than buy-and-hold's in every fold: no flag.
+* No wide move: −9 points on the full sample and −3 on fold 3.
+* To watch:
+  - AIR3's equity is 21.4% below its 2026-06-22 peak (SMH −21.9% from
+    668.91).
+  - A close below 503.60, 3.6% under Friday's, would set a new fold-3
+    drawdown (worse than −24.1%). That would still be well short of
+    buy-and-hold's −35.3%.
+  - A close at the sell level, 493.53, would put the drawdown at about
+    −25.6% before the exit at the next open. The full-sample −27.7%
+    would need a close below 479.20, which is under the sell level.
+
+**Paper deployment 1924** ($870, saved 6422) has been undeployed since
+2026-10-04 23:10 UTC and is absent from today's deployment list, so
+there is no paper position to report. Astral's paper slot runs the FTMO
+bot test (deployment 1999):
+* It has reported healthy and ready to trade since Saturday 12:45 UTC,
+  after a week of degraded health.
+* Its DIA buy (14.16 shares) is still scheduled for Monday's open,
+  14:30 UTC (09:30 ET). There is still no QQQ order.
+
+**TFSA position** (the operator follows the rule by hand):
+* Held since the 10-06 open at 638.38.
+* At Friday's close of 522.49 it is −18.2%, or −$115.89 per share.
+* The sell level is 493.53 (0.95 × SMA200 519.50). The close is $28.96
+  (5.9%) above it.
+* SMA50 (572.62) is still above SMA200.
