@@ -151,6 +151,26 @@ def test_mt5_clock_ignores_stale_ticks(clock_mt5):
     assert b.candidates == ["NY+7", "EET"]
 
 
+def test_mt5_clock_misfit_keeps_refusing_after_the_refresh_took_the_look(clock_mt5):
+    from ftmo_bot.broker_mt5 import MT5Broker
+    fake = clock_mt5
+    b = MT5Broker(probe="US500.cash", rule="NY+7")      # verified at UTC+2 (November)
+    fake.offset = timedelta(hours=5)                     # the server clock jumps
+    fake.now += timedelta(seconds=60)
+    b.refresh_clock()                                    # the tick's first look sees it
+    assert b.misfit is not None
+    fake.moving = False                                  # same tick: no newer tick yet
+    with pytest.raises(RuntimeError, match="fits"):
+        b.check("US500.cash", strict=True)               # the bar read still refuses
+    fake.moving, fake.offset = True, timedelta(hours=2)  # the reading fits again; the
+    fake.now += timedelta(seconds=60)                    # stamps step back 3 h, so the
+    b.refresh_clock()                                    # next look only re-anchors (it
+    assert b.misfit is not None                          # cannot tell fresh from stale)
+    fake.now += timedelta(seconds=60)
+    b.check("US500.cash", strict=True)                   # and the one after verifies
+    assert b.misfit is None
+
+
 def test_mt5_clock_pinned_rule(clock_mt5):
     from ftmo_bot.broker_mt5 import MT5Broker
     fake = clock_mt5

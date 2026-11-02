@@ -9,8 +9,10 @@ moved since a look taken at most two minutes earlier, so a stale stamp
 (market closed, daily break, holiday) can never date the clock; it just
 leaves the last verified rule in place. In strict mode (the trading
 loop) the bot refuses to serve bars before a first verification, and
-whenever a fresh reading fits no candidate rule, so a wrong session
-boundary can never turn into a plan; the planning tick simply retries."""
+for as long as the latest fresh reading (taken within the last 10
+minutes, by the bar read itself or by the per-tick refresh) fits no
+candidate rule, so a wrong session boundary can never turn into a plan;
+the planning tick simply retries."""
 
 from __future__ import annotations
 
@@ -45,6 +47,7 @@ class MT5Broker:
         self.offset: Optional[timedelta] = None
         self.verified_at: Optional[datetime] = None
         self.problem: Optional[str] = None       # the last reason a reading was refused
+        self.misfit: Optional[Tuple[datetime, str]] = None   # last fresh reading that fit no rule
         self._warned_at: Optional[datetime] = None
         self._looks: Dict[str, Tuple[float, datetime]] = {}
         ok = mt5.initialize(path) if path else mt5.initialize()
@@ -128,6 +131,10 @@ class MT5Broker:
                     "server clock unverified: "
                     + (self.problem or f"no moving {symbol} tick yet (market closed?)")
                     + "; retrying")
+            # the per-tick refresh may have taken the fresh look a moment
+            # ago: a misfit it saw keeps refusing until a reading fits again
+            if strict and self.misfit and now - self.misfit[0] < timedelta(minutes=10):
+                raise RuntimeError(self.misfit[1])
             return
         fits = server_clock.matching(off, now)
         common = [r for r in self.candidates if r in fits]
@@ -136,10 +143,11 @@ class MT5Broker:
                    f"fits {fits or 'no known rule'}, not {self.candidates}; set "
                    "server_clock in the config to the right rule")
             self._report(now, msg, quiet)
+            self.misfit = (now, msg)
             if strict:
                 raise RuntimeError(msg)
             return
-        self.problem = None
+        self.problem = self.misfit = None
         if common[0] != self.rule:
             log.warning("server clock rule %s -> %s (reads %s now)", self.rule,
                         common[0], server_clock.describe(off))
