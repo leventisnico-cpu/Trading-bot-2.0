@@ -8,6 +8,8 @@
              ``dry_run: false`` AND ``--execute`` is given (two opt-ins).
 * flat:      close every bot position and drop the pending plan (FTMO pays
              out only on a flat account); same two opt-ins as ``run``.
+             Stop ``run`` first: only one of them may hold the state file
+             (``lock.py``), so ``flat`` refuses while ``run`` is going.
 """
 
 from __future__ import annotations
@@ -17,7 +19,7 @@ import logging
 import sys
 from pathlib import Path
 
-from . import fast4, sessions
+from . import fast4, lock, sessions
 from .runner import BAR_COUNT, MIN_SESSIONS
 from .config import load
 
@@ -100,17 +102,30 @@ def main(argv=None) -> int:
             print("WARN: enable Algo Trading in the terminal before `run --execute`")
         return 0 if ok else 1
     from .runner import Runner
-    r = Runner(cfg, b)
-    if a.command == "flat":
-        live = b.positions(cfg.magic)
-        print(f"closing {len(live)} bot position(s)"
-              + (" (DRY-RUN: nothing is sent)" if cfg.dry_run else ""))
-        r.stand_down(b.now(), live)
-        left = b.positions(cfg.magic) if not cfg.dry_run else []
-        print("flat" if not left else f"{len(left)} position(s) still open; run flat again")
-        return 0 if not left else 1
-    r.run()
-    return 0
+    guard = lock.for_state(cfg.state_path)
+    if not guard.acquire():
+        print("another ftmo_bot process holds this state file (is `run` still "
+              "going?). Stop it first (Ctrl+C in its window), then try again.")
+        return 1
+    try:
+        if a.command == "flat":
+            r = Runner(cfg, b, readonly=cfg.dry_run)
+            live = b.positions(cfg.magic)
+            if cfg.dry_run:
+                print(f"DRY-RUN: {len(live)} bot position(s) would be closed; "
+                      "nothing sent, state unchanged")
+                r.stand_down(b.now(), live)          # logs only
+                return 1 if live else 0
+            print(f"closing {len(live)} bot position(s)")
+            r.stand_down(b.now(), live)
+            left = b.positions(cfg.magic)
+            print("flat" if not left else
+                  f"{len(left)} position(s) still open; run flat again")
+            return 0 if not left else 1
+        Runner(cfg, b).run()
+        return 0
+    finally:
+        guard.release()
 
 
 if __name__ == "__main__":

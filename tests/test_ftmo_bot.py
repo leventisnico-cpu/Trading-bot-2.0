@@ -313,7 +313,9 @@ def test_entry_window(tmp_path, hh, mm, bought):
     open_session(bars, nxt)
     b.clock = ny(nxt, hh, mm)
     r.tick()
-    assert len([x for x in b.sent if x[0] == "buy"]) == bought
+    # FAST-4 entries carry a stop; a keep-alive round trip (sl None) may
+    # also run in a new account's first session and is not counted here
+    assert len([x for x in b.sent if x[0] == "buy" and x[3]]) == bought
     if (hh, mm) == (9, 30):
         assert r.st.pending_entries == ["US100"]   # not yet; still pending
 
@@ -444,7 +446,7 @@ def test_target_flattens_and_halts(tmp_path):
     b.pos = [Position(5, "US500.cash", 1.0, 100, 90)]
     r = Runner(cfg(tmp_path, dry_run=False), b)
     r.st.trading_days = ["a", "b", "c", "d"]
-    b.equity = 16600
+    b.balance = b.equity = 16600            # the fake realises nothing on close
     r.tick()
     assert b.pos == [] and r.st.halted
 
@@ -452,7 +454,7 @@ def test_target_flattens_and_halts(tmp_path):
 def test_keepalive_after_25_days_in_every_phase(tmp_path):
     bars, ds = history()
     b = FakeBroker(bars)
-    b.clock = ny(ds[-1], 11, 0)
+    b.clock = ny(ds[-1], 10, 15)
     r = Runner(cfg(tmp_path, dry_run=False), b)
     r.roll_day(b.clock)
     r.st.last_fill = (b.clock - timedelta(days=26)).isoformat()
@@ -469,7 +471,7 @@ def test_keepalive_after_25_days_in_every_phase(tmp_path):
 def test_keepalive_refused_while_blocked(tmp_path):
     bars, ds = history()
     b = FakeBroker(bars)
-    b.clock = ny(ds[-1], 11, 0)
+    b.clock = ny(ds[-1], 10, 15)
     r = Runner(cfg(tmp_path, dry_run=False), b)
     r.roll_day(b.clock)
     r.st.blocked_until = "2999-01-01"
@@ -553,7 +555,7 @@ def test_stopless_bot_position_is_closed_not_adopted(tmp_path):
 def test_keepalive_buy_exception_waits_for_the_next_day(tmp_path):
     bars, ds = history()
     b = FakeBroker(bars)
-    b.clock = ny(ds[-1], 11, 0)
+    b.clock = ny(ds[-1], 10, 15)
     r = Runner(cfg(tmp_path, dry_run=False), b)
     r.roll_day(b.clock)
     r.st.last_fill = (b.clock - timedelta(days=26)).isoformat()

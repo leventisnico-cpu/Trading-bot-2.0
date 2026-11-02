@@ -53,6 +53,7 @@ class Policy:
     risk: float = 0.03
     cap_buffer: Optional[float] = 0.002    # None: no combined-risk cap
     lock_margin: Optional[float] = 0.003   # None: no target lock
+    lock_on_close: bool = False            # True: decide on the close, flatten at the next open
     open_days_only: bool = True            # False: any fill counts a trading day
     notional_cap: float = 3.0
 
@@ -61,9 +62,10 @@ PRE_REGISTERED = Policy("pre-registered 3% (no cap, no lock)", cap_buffer=None,
                         lock_margin=None, open_days_only=False, notional_cap=5.0)
 VARIANTS = [
     PRE_REGISTERED,
-    Policy("bot 3%: cap 0.2%, lock"),
-    Policy("bot 3%: cap 1.0%, lock", cap_buffer=0.01),
-    Policy("bot 2%: cap 0.2%, lock", risk=0.02),
+    Policy("bot 3%: cap 0.2%, lock (intraday, upper bound)"),
+    Policy("bot 3%: cap 0.2%, lock (next open, lower bound)", lock_on_close=True),
+    Policy("bot 3%: cap 1.0%, lock (intraday)", cap_buffer=0.01),
+    Policy("bot 2%: cap 0.2%, lock (intraday)", risk=0.02),
 ]
 
 
@@ -159,8 +161,19 @@ class Acct(base.Acct):
 def phase(dates, inst, pol: Policy, start: int, target: float):
     a = Acct(dates, inst, pol)
     t0 = dates[start]
-    locked = False
+    locked = pending_lock = False
     for i in range(start, len(dates)):
+        if pending_lock:                  # decided at the last close: flatten at this open
+            pending_lock = False
+            for s in list(a.pos):
+                a._close(s, inst[s]["o"][i], i)
+            a.pend_in, a.pend_out = [], set()
+            if a.balance() >= 1 + target:
+                if a.fill_days >= MIN_DAYS:
+                    return "pass", i
+                locked = True
+                continue
+            # under the target at the open: released, trading goes on
         bal0 = a.balance()
         a.day_start = bal0
         if locked:                        # flat; one min-lot round trip per session
@@ -184,6 +197,8 @@ def phase(dates, inst, pol: Policy, start: int, target: float):
         if pol.lock_margin is None:
             if close_eq >= 1 + target and a.fill_days >= MIN_DAYS:
                 return "pass", i
+        elif pol.lock_on_close:
+            pending_lock = close_eq >= 1 + target + pol.lock_margin
         elif high_eq >= 1 + target + pol.lock_margin:
             a.flatten_at(1 + target + pol.lock_margin, i)
             if a.fill_days >= MIN_DAYS:
@@ -264,7 +279,10 @@ def main(argv=None) -> int:
            f"{pd.Timestamp(SPLIT).date()}, test starts from it; {len(tst_eval)} test "
            "start dates. Cap: every open stop together stays the buffer above both "
            "loss lines. Lock: flatten at target + 0.3%, add missing trading days "
-           "with minimum-lot round trips. 'Both, ever' counts passes within the "
+           "with minimum-lot round trips; 'intraday' triggers on the sum of the "
+           "day's highs and fills there (optimistic: the highs come at different "
+           "times), 'next open' decides on the close and flattens at the next open "
+           "(pessimistic: the bot checks every minute). 'Both, ever' counts passes within the "
            "data, however long they took; late start dates have less room. "
            "'Breached': a daily-loss, max-loss or inactivity breach ended the "
            "attempt. 'Still running': no pass and no breach when the data ends.", "",

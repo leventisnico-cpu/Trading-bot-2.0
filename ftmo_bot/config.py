@@ -51,6 +51,8 @@ class FtmoConfig:
     def validate(self) -> None:
         if not 0 < self.risk_per_trade <= 0.05:
             raise ValueError("risk_per_trade must be in (0, 5%]")
+        if self.initial_balance is not None and not self.initial_balance > 0:
+            raise ValueError("initial_balance must be positive (the account size) or null")
         if not 0 <= self.target_margin <= 0.02:
             raise ValueError("target_margin must be in [0, 2%]")
         if self.server_clock is not None and self.server_clock not in RULES:

@@ -3,7 +3,7 @@
 The research verdict for FAST-4 is NO-GO for a fast pass (about one
 start date in six passes both phases within 18 months at 3% risk). With
 this bot's risk controls attempts rarely breach in 2019-2026 (1%) and
-often in 2011-2018 (41%), and take about two years to pass
+often in 2011-2018 (41-43%), and take two years or more to pass
 (research/ftmo_bot_policy.md). The operator ordered it built
 (2026-10-04). This package does not change those odds.
 

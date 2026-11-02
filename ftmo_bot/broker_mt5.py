@@ -44,6 +44,8 @@ class MT5Broker:
         self.candidates = [self.rule] if self.pinned else list(server_clock.ORDER)
         self.offset: Optional[timedelta] = None
         self.verified_at: Optional[datetime] = None
+        self.problem: Optional[str] = None       # the last reason a reading was refused
+        self._warned_at: Optional[datetime] = None
         self._looks: Dict[str, Tuple[float, datetime]] = {}
         ok = mt5.initialize(path) if path else mt5.initialize()
         if not ok:
@@ -70,7 +72,23 @@ class MT5Broker:
             return None
         if (now - prev[1]).total_seconds() > server_clock.TOLERANCE:
             return None
-        return server_clock.measure(stamp, now)
+        off = server_clock.measure(stamp, now)
+        if off is None:                     # a fresh tick off the quarter-hour grid
+            skew = stamp - now.timestamp()
+            skew -= round(skew / server_clock.QUANTUM) * server_clock.QUANTUM
+            self._report(now, f"a fresh {symbol} tick is {skew:+.0f} s off the server "
+                              "clock's quarter-hour grid: the PC clock (or the feed) "
+                              "is off; sync the PC clock")
+        return off
+
+    def _report(self, now: datetime, problem: str, quiet: bool = False) -> None:
+        """Remember why a reading was refused; warn at most every 10 minutes."""
+        self.problem = problem
+        if quiet:
+            return
+        if self._warned_at is None or now - self._warned_at >= timedelta(minutes=10):
+            log.warning("server clock: %s", problem)
+            self._warned_at = now
 
     def verify(self, symbol: str, tries: int = 10) -> None:
         """Start-up: poll ``symbol`` about once a second for a moving tick."""
@@ -79,9 +97,9 @@ class MT5Broker:
             if self.verified_at is not None:
                 return
             SLEEP(1)
-        log.warning("server clock unverified: no moving %s tick (market closed, "
-                    "or the PC clock is more than 2 minutes off); assuming rule %s",
-                    symbol, self.rule)
+        log.warning("server clock unverified (%s); assuming rule %s",
+                    self.problem or f"no moving {symbol} tick: market closed?",
+                    self.rule)
 
     def check(self, symbol: str, strict: bool, quiet: bool = False) -> None:
         """Fit the clock rule to a fresh tick of ``symbol`` (or the probe).
@@ -96,8 +114,9 @@ class MT5Broker:
         if off is None:
             if strict and self.verified_at is None:
                 raise RuntimeError(
-                    f"server clock unverified: no moving {symbol} tick yet "
-                    f"(market closed, or the PC clock is off); retrying")
+                    "server clock unverified: "
+                    + (self.problem or f"no moving {symbol} tick yet (market closed?)")
+                    + "; retrying")
             return
         fits = server_clock.matching(off, now)
         common = [r for r in self.candidates if r in fits]
@@ -105,11 +124,11 @@ class MT5Broker:
             msg = (f"server clock reads {server_clock.describe(off)} now, which "
                    f"fits {fits or 'no known rule'}, not {self.candidates}; set "
                    "server_clock in the config to the right rule")
+            self._report(now, msg, quiet)
             if strict:
                 raise RuntimeError(msg)
-            if not quiet:
-                log.warning(msg)
             return
+        self.problem = None
         if common[0] != self.rule:
             log.warning("server clock rule %s -> %s (reads %s now)", self.rule,
                         common[0], server_clock.describe(off))
@@ -118,7 +137,8 @@ class MT5Broker:
 
     def clock_status(self) -> str:
         if self.verified_at is None or self.offset is None:
-            return f"unverified (no fresh tick); assuming rule {self.rule}"
+            return (f"unverified ({self.problem or 'no moving tick: market closed?'}); "
+                    f"assuming rule {self.rule}")
         also = [r for r in self.candidates if r != self.rule]
         return (f"{server_clock.describe(self.offset)} at "
                 f"{self.verified_at:%Y-%m-%d %H:%M} UTC, rule {self.rule}"

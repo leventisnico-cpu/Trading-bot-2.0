@@ -4,8 +4,8 @@
 #
 # Research verdict for FAST-4 at 3% risk (research/ftmo_fast_pass.md):
 # NO-GO for a fast pass. With these risk controls (research/ftmo_bot_policy.md):
-# about 2 years to pass both phases; attempts breached 1% of the time in
-# 2019-2026 and 41% in 2011-2018. Run it knowing that.
+# two years or more to pass both phases; attempts breached 1% of the time
+# in 2019-2026 and 41-43% in 2011-2018. Run it knowing that.
 
 symbols:                 # strategy name -> FTMO MT5 symbol (check Market Watch)
   US100: US100.cash
@@ -33,4 +33,6 @@ dry_run: true            # set false AND pass --execute to send orders
 state_path: state/ftmo_state.json
 log_path: state/ftmo_bot.log
 mt5_path: null           # e.g. C:/Program Files/FTMO MetaTrader 5/terminal64.exe
-server_clock: null       # fitted to the terminal's ticks; pin NY+7, EET, CET or UTC if preflight says so
+server_clock: NY+7       # FTMO's server: GMT+2, GMT+3 in summer, changing with the US clocks
+                         # (FTMO trading update 2026-10-29). Still checked against a live tick
+                         # before every bar read. On another broker's demo set null to fit it.
