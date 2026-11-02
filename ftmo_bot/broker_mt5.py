@@ -9,10 +9,10 @@ moved since a look taken at most two minutes earlier, so a stale stamp
 (market closed, daily break, holiday) can never date the clock; it just
 leaves the last verified rule in place. In strict mode (the trading
 loop) the bot refuses to serve bars before a first verification, and
-for as long as the latest fresh reading (taken within the last 10
-minutes, by the bar read itself or by the per-tick refresh) fits no
-candidate rule, so a wrong session boundary can never turn into a plan;
-the planning tick simply retries."""
+for as long as the latest fresh reading (taken by the bar read itself or
+by the per-tick refresh, however long ago: a closed market keeps the
+refusal) fits no candidate rule, so a wrong session boundary can never
+turn into a plan; the planning tick simply retries."""
 
 from __future__ import annotations
 
@@ -132,9 +132,11 @@ class MT5Broker:
                     + (self.problem or f"no moving {symbol} tick yet (market closed?)")
                     + "; retrying")
             # the per-tick refresh may have taken the fresh look a moment
-            # ago: a misfit it saw keeps refusing until a reading fits again
-            if strict and self.misfit and now - self.misfit[0] < timedelta(minutes=10):
-                raise RuntimeError(self.misfit[1])
+            # ago, or the market has closed since: a misfit keeps refusing
+            # until a fresh reading fits again (only a trading market can
+            # set or clear it, and the refresh clears it within a minute)
+            if strict and self.misfit:
+                raise RuntimeError(f"{self.misfit[1]} (seen {self.misfit[0]:%Y-%m-%d %H:%M} UTC)")
             return
         fits = server_clock.matching(off, now)
         common = [r for r in self.candidates if r in fits]

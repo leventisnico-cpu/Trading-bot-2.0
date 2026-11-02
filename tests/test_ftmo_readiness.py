@@ -162,13 +162,14 @@ def test_mt5_clock_misfit_keeps_refusing_after_the_refresh_took_the_look(clock_m
     fake.moving = False                                  # same tick: no newer tick yet
     with pytest.raises(RuntimeError, match="fits"):
         b.check("US500.cash", strict=True)               # the bar read still refuses
-    fake.moving, fake.offset = True, timedelta(hours=2)  # the reading fits again; the
-    fake.now += timedelta(seconds=60)                    # stamps step back 3 h, so the
-    b.refresh_clock()                                    # next look only re-anchors (it
-    assert b.misfit is not None                          # cannot tell fresh from stale)
-    fake.now += timedelta(seconds=60)
-    b.check("US500.cash", strict=True)                   # and the one after verifies
+    fake.now += timedelta(hours=3)                       # an early close: market shut
+    with pytest.raises(RuntimeError, match="fits"):
+        b.check("US500.cash", strict=True)               # still refused hours later
+    fake.moving, fake.offset = True, timedelta(hours=2)  # the market reopens and the
+    fake.now += timedelta(seconds=60)                    # reading fits again: the next
+    b.refresh_clock()                                    # tick's look clears the misfit
     assert b.misfit is None
+    b.check("US500.cash", strict=True)                   # and bars are served again
 
 
 def test_mt5_clock_pinned_rule(clock_mt5):
