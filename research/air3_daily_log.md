@@ -1191,5 +1191,76 @@ bot test (deployment 1999):
     stands.
   - At 21:26 UTC the deployment reads lifecycle "paused", runtime
     degraded, not ready to trade (blocking reason: lifecycle_paused).
-    The DIA position keeps its stop protection. Not redeployed: that
-    needs the operator's approval in the app.
+    ~~The DIA position keeps its stop protection.~~ Corrected 11-03:
+    it did not; the DIA stop-loss feed had failed at 15:06 UTC (see
+    11-03). Not redeployed: that needs the operator's approval in the
+    app.
+
+### 2026-11-03 (Tuesday, after the close)
+
+* **SMH:** close 518.42 from the last 30-minute bar (today's daily bar
+  has not posted), +2.0% on the day against Monday's posted close of
+  508.31 (the 30-minute bar showed 507.82). SMA50 571.01, SMA200
+  520.65. Buy level 546.68, sell level 494.62.
+* **Position:** held. **No order.** The close is $23.80 (4.8%) above
+  the sell level and 0.4% below SMA200. SMH is 18.8% below the
+  2026-10-06 open (638.38). A close below 494.62, 4.6% under today's,
+  would be a SELL for the next open. Monday's and today's closes both
+  stayed above 503.60, the close that would set a new fold-3 drawdown
+  (Sunday's flag).
+* **ETF scan** (1Y / 6M / YTD %):
+  - SOXX 50.8 / −0.2 / 54.4;
+  - SMH 41.6 / 1.7 / 44.0;
+  - XSD 30.9 / −8.7 / 41.6;
+  - SMHX 25.5 / 1.0 / 36.2;
+  - THNQ 23.1 / 14.7 / 32.9;
+  - XLK 16.9 / 9.0 / 22.6;
+  - FTEC 15.9 / 9.9 / 22.4;
+  - VGT 15.9 / 9.9 / 22.4;
+  - IYW 14.6 / 8.3 / 19.9;
+  - WTAI 11.4 / −1.1 / 23.0;
+  - AIQ 11.2 / 4.8 / 17.1;
+  - CHAT 10.2 / −6.5 / 25.7;
+  - QQQ 8.4 / 1.7 / 11.6;
+  - context only: USD (2×) 12.3 / −11.4 / 31.8 and SOXL (3×) 50.5 /
+    −43.9 / 74.0.
+
+  Top 3 unleveraged by 1Y: SOXX, SMH, XSD. No unswept ETF beats SMH on
+  all three (THNQ leads on 6M only), so there is no backtest.
+* **FTMO bot shadow: bought US30 and US100 on Monday's replay.**
+  - Astral's export now has Monday's morning bars (13 a day for all
+    four ETFs), so the run replayed 11-02 from the restored 10-30
+    state, then 11-03. Exit 0, no tick errors.
+  - 11-02 10:05 ET: bought DIA (US30) 29.75 at 522.86, stop 507.71
+    (3×ATR), $450.84 at risk (3%). QQQ (US100) was cut from 11.82 to
+    7.05 by the combined-risk cap, with $269.16 of room left above the
+    daily-loss line less the guard: 7.05 at 694.69, stop 656.57. The
+    two stops together risk $719.6 of the $720 allowed, so hitting both
+    would not breach the daily limit unless prices gap through them.
+  - 11-03 close: DIA 517.06, QQQ 685.36; equity 14,794.02 (−1.37% vs
+    15,000), lowest 14,727.78, $445 above the daily floor (14,282.51);
+    max-loss floor 13,500. Both closes are under SMA5 (520.17 and
+    699.57), so there is no exit and no entry for Wednesday's open.
+  - A one-time migration, as designed: the 10-30 state predates the
+    account pin, so its 3 trading days (counted by the old rule:
+    closes included, New York dates) were dropped and the count
+    restarted at 1 (11-02). Only the shadow is affected: new accounts
+    start with the pin, and undercounting only makes the bot wait
+    longer for the minimum days.
+* **Astral 1999: paused, and DIA has no working stop.**
+  - Holds DIA 14.16 at 520.797 since Monday's open. No new orders or
+    fills. Still paused, runtime degraded, not ready to trade (21:16
+    UTC). Its mark is stuck at the entry price (unrealized P&L 0); at
+    today's 517.06 the position is about −$53.
+  - Correction to Monday's entry: the DIA stop-loss was not in place.
+    The event log shows `protection_source_failed` (critical, action
+    required) for the DIA stop from 15:06 UTC Monday, 35 minutes after
+    the fill, repeated through today (latest 20:23 UTC). The pause came
+    at 19:15 UTC Monday ("canonical strategy accounting could not be
+    restored"; existing exposure needs reconciliation before the
+    deployment can resume).
+  - Divergence vs the shadow: no QQQ (as on 10-30 and 11-02), and DIA
+    entered at 520.80 at 09:31 ET versus the shadow's 522.86 at 10:05.
+    While paused, Astral will not take the FAST-4 exit either, so it no
+    longer tracks the bot. Only the operator can reconcile and resume
+    it, or undeploy and redeploy, in the app.

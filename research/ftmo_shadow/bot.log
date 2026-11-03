@@ -43,3 +43,11 @@ INFO FTMO day 2026-10-29: day-start balance 15032.51
 INFO plan for the next open: exits [], entries []
 INFO FTMO day 2026-10-30: day-start balance 15032.51
 INFO plan for the next open: exits [], entries ['US30', 'US100']
+WARNING state without an account login: its 3 trading days were counted by an older rule (closes included, New York dates) and are dropped
+INFO FTMO day 2026-11-02: day-start balance 15032.51
+INFO buy DIA 29.75 lots stop 507.71: Fill(ok=True, price=522.8600416950001, ticket=3, message='done')
+INFO entry US100 cut from 11.82 to 7.05 lots: open stops already risk 450.84, room 269.16
+INFO buy QQQ 7.05 lots stop 656.57: Fill(ok=True, price=694.694733, ticket=4, message='done')
+INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-11-03: day-start balance 15032.51
+INFO plan for the next open: exits [], entries []

@@ -1,27 +1,31 @@
 {
   "initial_balance": 15000.0,
-  "day": "2026-10-30",
+  "day": "2026-11-03",
   "day_start_balance": 15032.506021062,
-  "plan_day": "2026-10-30",
-  "plan_checked": "2026-10-30",
+  "plan_day": "2026-11-03",
+  "plan_checked": "2026-11-03",
   "pending_exits": [],
-  "pending_entries": [
-    "US30",
-    "US100"
-  ],
-  "pending_atr": {
-    "US30": 5.051421248812646,
-    "US100": 12.709824381508481
+  "pending_entries": [],
+  "pending_atr": {},
+  "executed_day": "2026-11-02",
+  "held": {
+    "US30": {
+      "ticket": 3,
+      "entry_day": "2026-11-02"
+    },
+    "US100": {
+      "ticket": 4,
+      "entry_day": "2026-11-02"
+    }
   },
-  "executed_day": "2026-10-22",
-  "held": {},
   "to_close": [],
-  "last_fill": "2026-10-22T10:05:00-04:00",
+  "last_fill": "2026-11-02T10:05:00-05:00",
   "trading_days": [
-    "2026-10-15",
-    "2026-10-21",
-    "2026-10-22"
+    "2026-11-02"
   ],
   "blocked_until": null,
-  "halted": null
+  "halted": null,
+  "login": 0,
+  "target_locked": null,
+  "last_roundtrip": null
 }
