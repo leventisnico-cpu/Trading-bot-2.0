@@ -1264,3 +1264,54 @@ bot test (deployment 1999):
     While paused, Astral will not take the FAST-4 exit either, so it no
     longer tracks the bot. Only the operator can reconcile and resume
     it, or undeploy and redeploy, in the app.
+
+### 2026-11-04 (Wednesday, after the close)
+
+* **SMH:** close 504.46 (today's daily bar, equal to the last 30-minute
+  bar), −2.7% on the day against Tuesday's posted close of 518.52 (the
+  30-minute bar showed 518.42). SMA50 569.98, SMA200 521.22. Buy level
+  547.28, sell level 495.16.
+  - Data: today's Astral daily export has no 10-28 bar, a normal
+    trading day. The levels use the saved series, which has it (567.67);
+    no other close differs.
+* **Position:** held. **No order.** The close is $9.30 (1.9%) above
+  the sell level and 3.2% below SMA200. SMH is 21.0% below the
+  2026-10-06 open (638.38). Today's low, 497.76, came within $2.60 of
+  the sell level, but the rule acts on the close. A close below 495.61
+  tomorrow, 1.8% under today's (SMA200 moves with the new bar), would
+  be a SELL for Friday's open. The close is $0.86 above 503.60, the
+  close that would set a new fold-3 drawdown (Sunday's flag).
+* **ETF scan** (1Y / 6M / YTD %):
+  - SOXX 52.0 / −2.5 / 49.6;
+  - SMH 42.9 / −0.5 / 40.0;
+  - XSD 34.7 / −10.8 / 37.7;
+  - SMHX 27.1 / −1.0 / 32.2;
+  - THNQ 26.6 / 12.3 / 31.6;
+  - XLK 20.1 / 8.9 / 22.6;
+  - FTEC 19.4 / 10.1 / 22.7;
+  - VGT 19.4 / 10.1 / 22.6;
+  - IYW 18.3 / 8.9 / 20.6;
+  - AIQ 16.1 / 4.8 / 17.7;
+  - CHAT 13.0 / −9.5 / 23.5;
+  - WTAI 12.8 / −5.7 / 19.0;
+  - QQQ 11.7 / 2.8 / 12.6;
+  - context only: USD (2×) 14.5 / −15.9 / 24.3 and SOXL (3×) 55.9 /
+    −47.7 / 58.8.
+
+  Top 3 unleveraged by 1Y: SOXX, SMH, XSD. No unswept ETF beats SMH on
+  all three (THNQ leads on 6M only), so there is no backtest.
+* **FTMO bot shadow: exit US30 planned for Thursday's open.**
+  - Exit 0, no tick errors; 13 bars a day for all four ETFs.
+  - DIA closed at 532.97 (+3.1%), above its SMA5 (521.83), so the bot
+    plans to close US30 at Thursday's open: about +$300 at today's
+    close (29.75 from 522.86). QQQ closed at 691.79, just under its SMA5
+    (692.83), and stays open (−$20.5).
+  - Equity 15,312.70 (+2.08% vs 15,000); lowest 14,794.02; daily floor
+    14,282.51, max-loss floor 13,500. Balance 15,032.51; trading days 1.
+* **Astral 1999: still paused, no orders.**
+  - At 21:02 UTC: lifecycle paused, runtime degraded, not ready to
+    trade. No orders or fills since Monday's DIA buy, which it still
+    holds (14.16 at 520.797, no working stop).
+  - Divergence: the bot exits US30 tomorrow; paused, Astral cannot. Not
+    fixable from here: Astral's undeploy only takes a flat strategy, and
+    a redeploy needs the operator's approval of a preview.

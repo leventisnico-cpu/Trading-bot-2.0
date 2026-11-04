@@ -314,5 +314,21 @@
     "trading_days": 1,
     "flags": [],
     "errors": 0
+  },
+  {
+    "day": "2026-11-04",
+    "balance": 15032.506021062,
+    "equity": 15312.695562985748,
+    "min_equity": 14794.017312985745,
+    "daily_floor": 14282.506021062,
+    "open": [
+      "DIA 29.75@522.86 sl 507.71",
+      "QQQ 7.05@694.69 sl 656.57"
+    ],
+    "plan": "exit US30",
+    "deals": [],
+    "trading_days": 1,
+    "flags": [],
+    "errors": 0
   }
 ]
