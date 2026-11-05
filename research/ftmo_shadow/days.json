@@ -330,5 +330,21 @@
     "trading_days": 1,
     "flags": [],
     "errors": 0
+  },
+  {
+    "day": "2026-11-05",
+    "balance": 14945.956838129343,
+    "equity": 14945.956838129343,
+    "min_equity": 14945.956838129343,
+    "daily_floor": 14282.506021062,
+    "open": [],
+    "plan": "",
+    "deals": [
+      "sell DIA 29.75@528.9865 +182.26 (FAST4 exit)",
+      "sell QQQ 7.05@656.5653 -268.81 (stop)"
+    ],
+    "trading_days": 1,
+    "flags": [],
+    "errors": 0
   }
 ]

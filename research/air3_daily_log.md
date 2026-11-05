@@ -1315,3 +1315,55 @@ bot test (deployment 1999):
   - Divergence: the bot exits US30 tomorrow; paused, Astral cannot. Not
     fixable from here: Astral's undeploy only takes a flat strategy, and
     a redeploy needs the operator's approval of a preview.
+
+### 2026-11-05 (Thursday, after the close)
+
+* **SMH: SELL for Friday's open.** Close 446.19 from the last 30-minute
+  bar (today's daily bar has not posted), −11.5% on the day against
+  Wednesday's posted close of 504.27 (the 30-minute bar showed 504.46).
+  SMA50 567.79, SMA200 521.44. Buy level 547.51, sell level 495.37.
+  - The close is $49.18 (9.9%) below the sell level and 14.4% below
+    SMA200.
+  - Confirmed outside Astral: SOXX fell close to 11%, its worst day since
+    March 2020, after the midterms' Democratic sweep raised fears of
+    curbs on the AI build-out; the Dow fell about 1,800 points and the
+    Nasdaq entered a correction (CNBC, Yahoo Finance).
+* **Position: SELL at Friday's open; the operator places it by hand.**
+  Alerted by push at about 21:45 UTC.
+  - From the 2026-10-06 open (638.38) the position is down 30.1% at this
+    close. That is deeper than AIR3's worst drawdown in the backtests
+    (−27.6% full sample, −24.1% fold 3) and far past Sunday's flag
+    (503.60). Sunday's re-validation should record it.
+* **ETF scan** (1Y / 6M / YTD %):
+  - SOXX 29.5 / −18.0 / 31.4;
+  - SMH 24.5 / −14.3 / 24.3;
+  - XSD 16.0 / −24.2 / 22.2;
+  - THNQ 12.0 / −1.3 / 18.2;
+  - SMHX 11.8 / −14.3 / 17.7;
+  - FTEC 10.1 / 0.1 / 13.6;
+  - VGT 10.1 / 0.2 / 13.6;
+  - XLK 10.0 / −2.0 / 12.7;
+  - IYW 9.8 / −0.5 / 12.2;
+  - AIQ 7.7 / −3.9 / 10.4;
+  - QQQ 3.8 / −5.1 / 5.3;
+  - CHAT 0.9 / −20.7 / 10.8;
+  - WTAI −1.9 / −20.2 / 4.9;
+  - context only: USD (2×) −12.6 / −38.0 / −4.3 and SOXL (3×) −12.6 /
+    −71.6 / −2.7.
+
+  Top 3 unleveraged by 1Y: SOXX, SMH, XSD. No unswept ETF beats SMH on
+  all three, so there is no backtest.
+* **FTMO bot shadow: both positions closed; flat.**
+  - US30: the planned exit filled at 10:05 ET, 29.75 at 528.99,
+    **+$182.26**.
+  - US100: QQQ fell 6.3% and hit its stop at 656.57 during the session,
+    7.05 lots, **−$268.81**. This is the shadow run's first stop-loss
+    exit; it filled at the stop price (no gap through it).
+  - Balance 14,945.96 (−0.36% vs 15,000), flat. Lowest equity 14,945.96;
+    the daily floor (14,282.51) was never approached. No plan for Friday.
+* **Astral 1999: still paused, still holds DIA.**
+  - No orders or fills. DIA closed at 514.57, about −$88 on its 14.16
+    shares, with no working stop. The bot closed its DIA today; Astral
+    cannot.
+  - Bug report 25fd4b5f filed with Astral today, at the operator's
+    request.
