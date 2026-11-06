@@ -1367,3 +1367,44 @@ bot test (deployment 1999):
     cannot.
   - Bug report 25fd4b5f filed with Astral today, at the operator's
     request.
+
+### 2026-11-06 (Friday, after the close)
+
+* **SMH:** close 463.73 from the last 30-minute bar (today's daily bar
+  has not posted), +3.6% on the day against Thursday's posted close of
+  447.73 (the 30-minute bar showed 446.19). SMA50 565.63, SMA200 521.75.
+  Buy level 547.84, sell level 495.67.
+* **The rule's exit:** Thursday's SELL was for today's open. SMH opened
+  at 472.64 (first 30-minute bar), 5.6% above Thursday's close. At that
+  price the trade from the 2026-10-06 open (638.38) closes at **−26.0%**.
+  - The operator has not confirmed the TFSA fill yet; record it here
+    when he does.
+  - If the position is still held, the SELL stands: the close is $31.93
+    (6.4%) below the sell level.
+* **Flat from here:** the next BUY needs a close above 547.84 (18.1%
+  above today's) with SMA50 above SMA200 (true today).
+* **ETF scan** (1Y / 6M / YTD %):
+  - SOXX 37.7 / −19.2 / 36.0;
+  - SMH 32.1 / −15.6 / 28.8;
+  - XSD 25.1 / −21.8 / 29.3;
+  - SMHX 19.5 / −13.9 / 23.3;
+  - THNQ 18.4 / 0.1 / 23.1;
+  - XLK 13.9 / −3.1 / 14.4;
+  - VGT 13.9 / −0.9 / 15.2;
+  - FTEC 13.8 / −1.1 / 15.1;
+  - IYW 13.5 / −2.2 / 13.7;
+  - AIQ 11.3 / −5.7 / 11.9;
+  - CHAT 7.4 / −21.3 / 14.6;
+  - QQQ 7.3 / −5.7 / 6.8;
+  - WTAI 3.6 / −20.3 / 8.2;
+  - context only: USD (2×) −0.9 / −39.3 / 2.5 and SOXL (3×) 6.9 /
+    −72.3 / 9.4.
+
+  Top 3 unleveraged by 1Y: SOXX, SMH, XSD. No unswept ETF beats SMH on
+  all three, so there is no backtest.
+* **FTMO bot shadow: flat, nothing planned.** Exit 0, no tick errors.
+  Balance 14,945.96 (−0.36%); the daily floor resets to 14,195.96 from
+  the new day-start balance. No entry signal for Monday's open.
+* **Astral 1999:** no orders or fills; still paused, still holds DIA
+  (closed at 512.23, about −$121 on its 14.16 shares, with no working
+  stop).

@@ -57,3 +57,5 @@ INFO FTMO day 2026-11-05: day-start balance 15032.51
 INFO close DIA 29.75 lots (exit): Fill(ok=True, price=528.98654935, ticket=3, message='done')
 INFO US100 no longer open (stop hit or closed outside the bot)
 INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-11-06: day-start balance 14945.96
+INFO plan for the next open: exits [], entries []
