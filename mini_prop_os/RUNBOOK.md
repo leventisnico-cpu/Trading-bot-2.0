@@ -5,6 +5,52 @@ Gateway or TWS logged into **your** IBKR account. Nothing here runs
 server-side at IBKR, and nobody else can start it for you — treat the
 machine that runs it like a trading terminal.
 
+## Windows quick path (IBKR paper account with TFSA permissions)
+
+The account can trade stocks/ETFs only. Use IB Gateway (not TWS, not
+IBKR Desktop — only TWS and Gateway serve the API), logged into the
+**paper** username. In Gateway → Configure → Settings → API → Settings:
+*Enable ActiveX and Socket Clients* ✔ · *Read-Only API* ✘ · socket port
+`4002` · trusted IP `127.0.0.1` · master API client id blank.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy\windows\setup.ps1   # venv, deps, state\config.yaml (SPY, paper)
+.\deploy\windows\run.ps1 -Preflight                                  # read-only go/no-go
+.\deploy\windows\run.ps1                                             # adaptive_ema on SPY, paper
+.\deploy\windows\run.ps1 -Config deploy\config.tfsa-paper-dca.yaml   # weekly DCA, paper
+```
+
+`setup.ps1` creates `.env` from `deploy/.env.example`; put the Telegram
+token and chat id there (never in a config file, never in git). With no
+market-data subscription keep `connection.market_data_type: delayed`.
+Expected preflight on a fresh paper login: every line PASS, market data
+"delayed". Save the first real preflight output to
+`reports/preflight_first_socket.md`.
+
+## AIR3 on SMH (the rule on Astral paper, rehearsed on IBKR paper)
+
+The same trend rule that runs on Astral paper (saved strategy 6422) is
+registered here as `air3_trend` with its own paper config. It trades one
+share of SMH on daily bars and is marked `DEPLOYABLE: no` under the
+expectancy gate (see `docs/LIVE_READINESS.md` for why and for the
+decision that leaves you).
+
+```powershell
+.\deploy\windows\run.ps1 -Preflight -Config deploy\config.tfsa-paper-air3.yaml
+.\deploy\windows\run.ps1 -Config deploy\config.tfsa-paper-air3.yaml
+```
+
+Expected startup: connect → qualify SMH → load about two years of daily
+bars → warm up on 200 → "Mini-Prop OS running". It then does nothing
+until the 16:00 ET daily bar completes. A BUY of one share is emitted
+when the close is more than 5% above the 200-day average with the 50-day
+above the 200-day; a SELL of the whole position when the close is more
+than 5% below the 200-day. A market order sent after the close rests at
+IBKR until the next 09:30 ET open, which is the fill the backtests
+assume. The daily-loss breaker in that config is deliberately loose
+($130 / 15%): the rule has no stop by design, and SMH moves 3-5% on an
+ordinary day.
+
 ## First night: paper trading against the live market
 
 1. **Install IB Gateway** (lighter than TWS; either works) and log in
@@ -45,6 +91,15 @@ machine that runs it like a trading terminal.
    cancelled; set `execution.flatten_on_shutdown: true` if you want the
    position closed on every stop.
 
+## Running it from your phone
+
+Once the bot is on an always-on host, Telegram is the control surface:
+`/status` for the book and regime, `/pause` to stop new entries while
+exits keep working, `/resume` to lift that, and `/halt CONFIRM` to cancel
+everything and stop until you clear the marker at the keyboard. Alerts
+arrive without asking: every fill, every risk reject, trading enabled /
+disabled, kill switch. Only the configured chat id is answered.
+
 ## If the kill switch fires
 
 A daily-loss breach cancels all orders, flattens the book, and writes
@@ -61,6 +116,12 @@ supervisor or reboot — **refuses to trade** while that file exists.
 
 ## Going live (real money) — deliberate, not default
 
+- Read `docs/LIVE_READINESS.md` first: it holds the Monday checklist and
+  the one decision only the operator can make. The expectancy gate passes
+  `air3_trend` on SPY and fails it on SMH, so it is marked not deployable
+  and `main.py` exits 4 on a live port with it. The two routes (AIR3 on
+  SPY, or SMH after the operator amends the review rule) are in that
+  doc.
 - Log Gateway/TWS into the **live** account; set `port: 4001` (Gateway)
   or `7496` (TWS). The bot logs a loud warning on live ports.
 - Re-run `--preflight` against the live setup.
