@@ -73,3 +73,5 @@
 {"equity": 877.9262256973267, "halted": false, "traded": false, "ts": "2026-11-04T01:29:57.366282+00:00", "type": "cycle_done"}
 {"daily_return": 0.00476116397000359, "decision": "OK", "drawdown": 0.019882026209513317, "reason": "ok", "ts": "2026-11-05T01:31:53.155784+00:00", "type": "pre_trade"}
 {"equity": 882.106176411438, "halted": false, "traded": false, "ts": "2026-11-05T01:31:53.158216+00:00", "type": "cycle_done"}
+{"daily_return": -0.04394022619074467, "decision": "OK", "drawdown": 0.06294863167148164, "reason": "ok", "ts": "2026-11-06T01:40:15.109457+00:00", "type": "pre_trade"}
+{"equity": 843.3462314956665, "halted": false, "traded": false, "ts": "2026-11-06T01:40:15.111466+00:00", "type": "cycle_done"}
