@@ -1408,3 +1408,81 @@ bot test (deployment 1999):
 * **Astral 1999:** no orders or fills; still paused, still holds DIA
   (closed at 512.23, about −$121 on its 14.16 shares, with no working
   stop).
+
+## Weekly re-validation (2026-11-08, Sunday 23:11 UTC)
+
+**Method.** As on 10-25 and 11-01: `research/air3_replica.py`, the
+local replica of 41110 (AIR3) and 41122 (buy-and-hold). Astral's
+backtest tool still needs an approval in the app, so it was not called.
+* Data: Astral's SMH daily export, 3,733 bars, 2012-01-03 → 2026-11-06,
+  sha256
+  `3ffa23c442fcf803da9dabf697754aa87b89304f9a3e7d0f9d6feb0ce42d40b7`.
+  On every date it shares with last week's export the opens, highs, lows
+  and closes are unchanged. It adds 11-02 → 11-06.
+* It lacks the 2025-08-14 bar that last week's export had. Run with
+  that bar restored from last week's copy (3,734 bars) or without it,
+  the table is identical.
+* Settings unchanged: $100k, 1 bp commission, 2 bp slippage, 220
+  warm-up bars inside each window.
+* Rerun on last week's export, the replica reproduces the 11-01 table
+  exactly, so every change below comes from the five new bars.
+
+| window | AIR3 return | AIR3 CAGR | AIR3 max DD | trades | win rate | B&H return | B&H max DD | AIR3 lower DD |
+|---|---|---|---|---|---|---|---|---|
+| full 2014-01 → 2026-11-06 | +842% | 20.6% | −32.3% | 6 | 83% | +1,591% | −44.9% | yes |
+| fold 1 2013-03 → 2018-06 | +121% | 19.5% | −18.0% | 1 + 1 open | 100% | +134% | −22.9% | yes |
+| fold 2 2017-06 → 2022-08 | +58% | 11.1% | −27.7% | 3 | 67% | +97% | −37.4% | yes |
+| fold 3 2021-08 → 2026-11-06 | +217% | 30.1% | −32.3% | 2 | 100% | +312% | −35.3% | yes |
+
+The rule's open trade closed: bought at the 2025-07-01 open (276.80),
+sold at the 2026-11-06 open (473.41) after the 11-05 close fell below
+the sell level. It made **+66.9%** on equity. Closed trades in the full
+sample: −0.5%, +72%, +8%, +61%, +90% and +67%.
+
+**Against 11-01:**
+* The full sample fell from +936% to +842% (−94 points) and fold 3 from
+  +249% to +217% (−32 points). Buy-and-hold fell from +1,803% to
+  +1,591% and from +363% to +312%.
+* SMH fell 11.2% from 522.49 (10-30) to 463.96 (11-06), including the
+  −11.2% day on 11-05.
+* AIR3's max drawdown went from −27.7% to **−32.3%** in the full sample
+  and from −24.1% to −32.3% in fold 3. It is the deepest drawdown in the
+  12-year backtest; the earlier record was −27.7% (fold 2, 2018–22).
+* Folds 1 and 2 are closed windows and did not change. The win rate
+  rose from 80% to 83% because the closed trade was a winner in the
+  backtest.
+
+**Flags:**
+* Win rate 83% (≥ 70%): no flag.
+* AIR3's drawdown is still lower than buy-and-hold's in every fold, but
+  in fold 3 the margin shrank from 11 points to 3 (−32.3% against
+  −35.3%).
+* **Wide move: flagged.** The full-sample drawdown is 4.6 points worse
+  than any before, and the full-sample return is down 94 points in a
+  week.
+  - The cause is the sell rule itself: it waits for a close under 0.95 ×
+    SMA200. SMH topped at 668.91 (06-22) and closed at 447.73 on 11-05,
+    −33.1%, before the rule could sell.
+  - This is the known cost of the 5% band, not a fault in the replica.
+
+**Paper deployment 1924** ($870, saved 6422) has been undeployed since
+2026-10-04 and is absent from today's deployment list, so there is no
+paper position to report. Astral's paper slot holds the FTMO bot test
+(deployment 1999):
+* It is still paused and degraded.
+* Its stop feed now fails for DIA, IWM and QQQ.
+* It holds DIA with no working stop. Bug report 25fd4b5f was filed on
+  11-05.
+
+**TFSA position** (the operator follows the rule by hand):
+* By the rule, sold at the 11-06 open, 473.41 (Friday's entry above
+  used 472.64, the first 30-minute bar; the posted daily open is
+  473.41).
+* From the 10-06 entry at 638.38, that is **−25.8%**, or −$164.97 per
+  share. The operator has not confirmed his fill yet.
+* Flat now. The next BUY needs a close above 547.84 (1.05 × SMA200
+  521.76), 18.1% over Friday's close of 463.96, with SMA50 (565.64)
+  above SMA200 (true today).
+* The backtest's trade was a winner because it entered at 276.80 in
+  July 2025. The live entry came 15 months into that trade, near the
+  top, so the same exit gave a loss.
