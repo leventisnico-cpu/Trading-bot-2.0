@@ -270,12 +270,25 @@ class MT5Broker:
             req["sl"] = self._round(symbol, sl)
         return self._send(req)
 
-    def close(self, position: Position, magic: int, comment: str) -> Fill:
+    def close(self, position: Position, magic: int, comment: str,
+              volume: Optional[float] = None) -> Fill:
+        """Sell ``volume`` lots of the position (all of it if None). A part
+        close keeps the ticket open with the rest, on hedging and netting
+        accounts alike."""
         bid, _ = self.quote(position.symbol)
         req = dict(action=self.mt5.TRADE_ACTION_DEAL, symbol=position.symbol,
-                   volume=position.volume, type=self.mt5.ORDER_TYPE_SELL,
+                   volume=position.volume if volume is None else volume,
+                   type=self.mt5.ORDER_TYPE_SELL,
                    position=position.ticket, price=bid, deviation=20,
                    magic=magic, comment=comment[:31],
                    type_time=self.mt5.ORDER_TIME_GTC,
                    type_filling=self._filling(position.symbol))
+        return self._send(req)
+
+    def modify_sl(self, position: Position, sl: float, magic: int) -> Fill:
+        """Move the position's stop-loss (the bot never sets a take-profit,
+        so none is kept). Goes through the account pin like every order."""
+        req = dict(action=self.mt5.TRADE_ACTION_SLTP, symbol=position.symbol,
+                   position=position.ticket, sl=self._round(position.symbol, sl),
+                   tp=0.0, magic=magic)
         return self._send(req)

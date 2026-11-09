@@ -10,6 +10,8 @@
 # opens and closes the minimum lot in its first session (10:00-10:45 New
 # York) and again whenever 5 days pass without a trade. FAST-4 itself trades
 # only when it signals (about twice a month), so a quiet trial is normal.
+# Exits: the 5-step scale-out (operator's order, 2026-11-08): a trade is
+# held until its stop or its trail is hit, often for weeks.
 # If FTMO asks for payment for the trial, use any broker's free MT5 demo and
 # change `symbols` to that broker's index names, and `server_clock` to null.
 
@@ -21,8 +23,11 @@ symbols:                 # strategy name -> FTMO MT5 symbol (check Market Watch)
 risk_per_trade: 0.03     # as on the challenge
 max_positions: 2
 notional_cap: 3.0
-atr_stop_mult: 3.0
-max_hold_sessions: 10
+atr_stop_mult: 3.0       # the first stop, entry - 3 x ATR(14); this distance is 1R
+exit_mode: scale_out     # the 5 steps: 1/2 at +1R, stop to entry; 1/4 at +1.5R, stop to +1R;
+                         # the last 1/4 trails 1R under the highest close. fast4 = close over
+                         # SMA5 or max_hold_sessions. An open position keeps the rule it was opened with.
+max_hold_sessions: 10    # fast4 exits only
 initial_balance: null    # taken from the trial account's balance when the bot first sees it
 profit_target: 0.05      # the trial's target
 min_trading_days: 2      # the trial's minimum

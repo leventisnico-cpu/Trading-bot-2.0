@@ -24,6 +24,9 @@ DEFAULT_SYMBOLS = {
     "US2000": "US2000.cash",
 }
 
+#: exit rules a new position can get (``exit_mode``); see scale_out.py and fast4.py
+EXIT_MODES = ("scale_out", "fast4")
+
 #: annotation -> (accepted Python types, what to write in the YAML)
 TYPE_KINDS = {
     "bool": ((bool,), "true or false"),
@@ -50,7 +53,10 @@ class FtmoConfig:
     max_positions: int = 2
     notional_cap: float = 3.0             # x balance, per position (Swing leverage 1:15, US2000 1:9)
     atr_stop_mult: float = 3.0
-    max_hold_sessions: int = 10
+    # operator's order (2026-11-08): the 5-step trade management. A position
+    # keeps the exit rule it was opened with, so switching never strands one.
+    exit_mode: str = "scale_out"          # scale_out (the 5 steps) or fast4 (SMA5 / 10 sessions)
+    max_hold_sessions: int = 10           # fast4 exits only
     initial_balance: Optional[float] = None   # null: a new account's balance (FTMO accounts start at their size)
     profit_target: Optional[float] = 0.10     # 0.10 phase 1, 0.05 phase 2, null funded
     min_trading_days: int = 4
@@ -102,6 +108,9 @@ class FtmoConfig:
             raise ValueError("notional_cap must be in (0, 30] x balance")
         if not 0 < self.atr_stop_mult <= 10:
             raise ValueError("atr_stop_mult must be in (0, 10]")
+        if self.exit_mode not in EXIT_MODES:
+            raise ValueError("exit_mode must be scale_out (the 5-step exits) or fast4 "
+                             "(close over SMA5 or 10 sessions)")
         if self.max_hold_sessions < 1 or self.magic <= 0:
             raise ValueError("max_hold_sessions must be >= 1 and magic positive")
         if self.min_trading_days < 0 or self.keepalive_days < 0:

@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 
 from . import fast4, lock, sessions
-from .runner import BAR_COUNT, MIN_SESSIONS, Runner
+from .runner import BAR_COUNT, MIN_SESSIONS, Runner, exit_rule
 from .config import load
 
 
@@ -95,6 +95,7 @@ def main(argv=None) -> int:
             return 1
         held = r.st.held
         print(f"held by the bot: {held or 'nothing'}")
+        print(f"exits for new positions: {exit_rule(cfg)}")
         res = r.compute_plan(b.now())
         if res is None:
             print("no plan: symbols do not share a completed session (see log)")
@@ -120,6 +121,7 @@ def main(argv=None) -> int:
             ok = False
         else:                                       # compare with FTMO's dashboard
             print(rules_line(r))
+            print(f"exits for new positions: {exit_rule(cfg)}")
         if cfg.login is None:
             print(f"WARN: login not set; run.ps1 -Live and -Flat need `login: "
                   f"{acct.login}` in {a.config} (replace the `login: null` line; "

@@ -1,12 +1,14 @@
 """FAST-4 signals, identical to research/ftmo_fast_pass.py: long when
 close > SMA200 and RSI(2) < 10; stop entry - 3 x ATR(14); exit when
 close > SMA5 or after 10 sessions; at most 2 positions, lowest RSI(2)
-first. Pure functions over completed sessions."""
+first. Pure functions over completed sessions. With the 5-step exits
+(``scale_out.py``) the entry and the stop are the same and these exits are
+not used."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Sequence
+from typing import Collection, Dict, List, Optional, Sequence
 
 from .sessions import Session
 
@@ -53,10 +55,13 @@ class Plan:
 
 
 def plan(ind: Dict[str, Indicators], held: Dict[str, int],
-         max_positions: int = 2, max_hold: int = 10) -> Plan:
-    """``held``: symbol -> sessions held so far (entry session counts 1)."""
+         max_positions: int = 2, max_hold: int = 10,
+         keep: Collection[str] = ()) -> Plan:
+    """``held``: symbol -> sessions held so far (entry session counts 1).
+    ``keep``: held symbols whose exits FAST-4 does not decide (the 5-step
+    scale-out manages them); they still take their slot."""
     exits = [s for s, n in held.items()
-             if s in ind and ind[s].sma5 is not None
+             if s not in keep and s in ind and ind[s].sma5 is not None
              and (ind[s].close > ind[s].sma5 or n >= max_hold)]
     slots = max_positions - (len(held) - len(exits))
     cands = sorted((x.rsi2, s) for s, x in ind.items()

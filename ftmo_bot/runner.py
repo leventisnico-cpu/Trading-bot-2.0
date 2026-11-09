@@ -13,7 +13,12 @@ Every minute (``tick``):
    closing costs, flatten to lock the gain and stop FAST-4 entries; if
    FTMO's minimum trading days are not met yet, add one minimum-lot
    round trip per FTMO day, then halt so the phase can be reviewed;
-6. after 16:05 New York, plan from the session that just completed;
+5b. the 5-step scale-out (``exit_mode: scale_out``, ``scale_out.py``) on
+   the positions opened under it, weekdays 09:31-17:00 New York: at +1R
+   close 1/2 and move the stop to the entry, at +1.5R close 1/4 and move
+   it to +1R, then trail the last 1/4 1R under the highest session close;
+6. after 16:05 New York, plan from the session that just completed (the
+   FAST-4 exits apply only to positions opened under ``exit_mode: fast4``);
 7. 09:31-16:00 New York on the next session, execute that plan once:
    exits first (never blocked), then entries (until 10:30 only), each
    through ``rules.check_entry`` and never for a symbol already held.
@@ -49,13 +54,13 @@ import json
 import logging
 import math
 import time as _time
-from dataclasses import asdict, dataclass, field, fields
+from dataclasses import asdict, dataclass, field, fields, replace
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 from zoneinfo import ZoneInfo
 
-from . import fast4, rules, sessions
+from . import fast4, rules, scale_out, sessions
 from .broker import Broker, Fill, Position
 from .config import FtmoConfig
 
@@ -66,6 +71,11 @@ OPEN_AT = time(9, 31)
 ENTRY_DEADLINE = time(10, 30)   # entries only near the open, as tested
 SESSION_END = time(16, 0)
 ROUNDTRIP_FROM, ROUNDTRIP_TO = time(10, 0), time(10, 45)   # >2 h before a 13:00 early close
+# the 5-step's partial closes and stop moves: the cash session, plus the
+# hour after it in which the trail is raised from the session's close
+MANAGE_FROM, MANAGE_TO = time(9, 31), time(17, 0)
+MANAGE_RETRY = timedelta(minutes=5)       # after a refused part close or stop move
+CLOSE_RETRY_MAX = timedelta(minutes=15)   # the slowest pace of a queued close's retries
 BAR_MINUTES = 30
 # FTMO's index CFDs trade ~23 h a day: ~46 half-hour bars per session.
 # 15,000 bars is ~320 sessions, enough for the 200-session average plus
@@ -73,6 +83,14 @@ BAR_MINUTES = 30
 BAR_COUNT = 15000
 MIN_SESSIONS = 205
 log = logging.getLogger("ftmo_bot")
+
+
+def exit_rule(cfg: FtmoConfig) -> str:
+    """The exit rule new positions get, in words (logs, plan, preflight)."""
+    if cfg.exit_mode == "scale_out":
+        return scale_out.DESCRIPTION
+    return (f"FAST-4: close over the 5-day average or {cfg.max_hold_sessions} "
+            "sessions, at the next open")
 
 
 @dataclass
@@ -170,6 +188,11 @@ class Runner:
         self.limits = rules.Limits(self.st.initial_balance, cfg.max_loss,
                                    cfg.daily_loss, cfg.guard_buffer)
         self.by_broker = {v: k for k, v in cfg.symbols.items()}
+        self.highs: Dict[str, float] = {}     # last plan pass: highest close since entry
+        self._retry_at: Dict[int, datetime] = {}   # ticket -> next scale-out attempt
+        self._close_wait: Dict[int, Tuple[int, datetime]] = {}   # ticket -> (fails, next retry)
+        self._urgent: Set[int] = set()        # queued closes retried every tick (guard, lock, halt)
+        self._warned: Set[int] = set()
         # last_fill None (a new account): FTMO's 30 days run from when the
         # account was opened, not from the bot's start, so the keep-alive
         # is due in the first session.
@@ -270,7 +293,7 @@ class Runner:
                 del self.st.held[s]
         elif pos.ticket not in self.st.to_close:
             self.st.to_close.append(pos.ticket)
-            log.error("close of ticket %d FAILED; will retry every tick", pos.ticket)
+            log.error("close of ticket %d FAILED; will retry until it closes", pos.ticket)
         self.save()
         return f.ok
 
@@ -319,13 +342,42 @@ class Runner:
             else:
                 log.warning("adopting open %s position (ticket %d) into state",
                             s, p.ticket)
-                self.st.held[s] = {"ticket": p.ticket,
-                                   "entry_day": now.astimezone(NY).date().isoformat()}
+                info = {"ticket": p.ticket,
+                        "entry_day": now.astimezone(NY).date().isoformat()}
+                if self.cfg.exit_mode == "scale_out":
+                    if p.sl < p.price_open:          # its stop is the first stop
+                        info.update(exit="scale_out", stop0=p.sl, stage=0)
+                    else:
+                        log.warning("%s: stop %.2f at or over the entry %.2f, so its "
+                                    "first stop is unknown: the FAST-4 exits manage it",
+                                    s, p.sl, p.price_open)
+                self.st.held[s] = info
 
     def retry_closes(self, now: datetime, live: List[Position]) -> None:
+        """Retry every queued close. While a target lock, a guard block or
+        a halt is in force, every tick, and a close seen queued then stays
+        on every tick until it closes (the guard's block ends at the next
+        FTMO day; its closes must not slow down). Otherwise (a planned
+        exit, a 5-step stop level) at once, then after 1, 2, 4 and 8
+        minutes, then every 15: a closed market refuses every attempt, and
+        FTMO counts server requests (at most 2,000 a day)."""
+        urgent = bool(self.st.target_locked or self.st.halted or self.st.blocked_until)
+        for t in [t for t in self._close_wait if t not in self.st.to_close]:
+            del self._close_wait[t]                  # closed (or dropped) since
+        self._urgent &= set(self.st.to_close)
         for p in live:
-            if p.ticket in self.st.to_close:
-                self._close(p, "retry", now)
+            if p.ticket not in self.st.to_close:
+                continue
+            if urgent:
+                self._urgent.add(p.ticket)
+            n, at = self._close_wait.get(p.ticket, (0, now))
+            if now < at and p.ticket not in self._urgent:
+                continue
+            if self._close(p, "retry", now):
+                self._close_wait.pop(p.ticket, None)
+            else:
+                self._close_wait[p.ticket] = (
+                    n + 1, now + min(timedelta(minutes=2 ** n), CLOSE_RETRY_MAX))
 
     def guard(self, now: datetime, live: List[Position]) -> bool:
         a = self.b.account()
@@ -401,7 +453,9 @@ class Runner:
     def compute_plan(self, now: datetime, day: Optional[date] = None
                      ) -> Optional[Tuple[date, fast4.Plan]]:
         """FAST-4 plan from the last completed session (which must be
-        ``day`` when given, and the same day for every symbol). Read-only.
+        ``day`` when given, and the same day for every symbol). Read-only
+        (the state is not touched; ``self.highs`` gets each 5-step
+        position's highest session close since entry, from the same pass).
         If the broker's server-clock rule changes while the symbols are
         read (its first narrowing), the pass is repeated so that every
         symbol's sessions come from the same rule; a second change raises,
@@ -417,7 +471,8 @@ class Runner:
 
     def _compute_once(self, now: datetime, day: Optional[date]
                       ) -> Optional[Tuple[date, fast4.Plan]]:
-        ind, held_n, days = {}, {}, set()
+        ind, held_n, days, highs = {}, {}, set(), {}
+        keep = {s for s, h in self.st.held.items() if h.get("exit") == "scale_out"}
         for s in self.cfg.symbols:
             done = [x for x in self._sessions(s, now) if x.complete]
             if not done or (day is not None and done[-1].day != day):
@@ -432,12 +487,16 @@ class Runner:
             ind[s] = fast4.indicators(done)
             if s in self.st.held:
                 entry = date.fromisoformat(self.st.held[s]["entry_day"])
-                held_n[s] = sum(1 for x in done if x.day >= entry)
+                since = [x.close for x in done if x.day >= entry]
+                held_n[s] = len(since)
+                if s in keep and since:
+                    highs[s] = max(since)
         if len(days) != 1:
             log.warning("symbols end on different sessions %s; no plan", sorted(days))
             return None
+        self.highs = highs
         return days.pop(), fast4.plan(ind, held_n, self.cfg.max_positions,
-                                      self.cfg.max_hold_sessions)
+                                      self.cfg.max_hold_sessions, keep)
 
     def make_plan(self, now: datetime) -> None:
         today = now.astimezone(NY).date()
@@ -449,6 +508,9 @@ class Runner:
         self.st.plan_day = today.isoformat()
         self.st.pending_exits, self.st.pending_entries = p.exits, p.entries
         self.st.pending_atr = p.atr
+        for s, hc in self.highs.items():             # the 5-step trail's reference
+            if s in self.st.held:
+                self.st.held[s]["high_close"] = hc
         log.info("plan for the next open: exits %s, entries %s", p.exits, p.entries)
 
     def _clear_plan(self) -> None:
@@ -518,7 +580,9 @@ class Runner:
                 continue
             if self.cfg.cap_combined_risk:
                 lpl = self.b.loss_per_lot(sym, ask, stop)
-                committed = sum(self.b.loss_per_lot(p.symbol, p.price_open, p.sl)
+                # a stop at or over its entry risks nothing (the 5-step moves
+                # stops there); never let it count as negative risk
+                committed = sum(max(0.0, self.b.loss_per_lot(p.symbol, p.price_open, p.sl))
                                 * p.volume for p in current if p.sl)
                 room = rules.risk_room(a.balance, self.st.day_start_balance,
                                        committed, self.limits)
@@ -542,7 +606,10 @@ class Runner:
                 continue
             log.info("buy %s %.2f lots stop %.2f: %s", sym, vol, stop, f)
             if f.ok:
-                self.st.held[s] = {"ticket": f.ticket, "entry_day": today}
+                info = {"ticket": f.ticket, "entry_day": today}
+                if self.cfg.exit_mode == "scale_out":    # R = fill - stop0
+                    info.update(exit="scale_out", stop0=stop, stage=0)
+                self.st.held[s] = info
                 self._note_open(now)
             self.save()
 
@@ -593,13 +660,148 @@ class Runner:
         if self.st.last_roundtrip == self._prague(now):
             return
         a = self.b.account()
+        # the round trip closes at once, so it never makes a third holding:
+        # full slots must not starve FTMO's 30-day clock (5-step positions
+        # are held for weeks; the research model keeps the account alive
+        # whatever is open)
         why = rules.check_entry(a.equity, self.st.day_start_balance, self.limits,
-                                len(live), self.cfg.max_positions,
+                                len(live), self.cfg.max_positions + 1,
                                 bool(self.st.blocked_until or self.st.halted))
         if why:
             log.info("keep-alive refused: %s", why)
             return
         self._roundtrip(now, "keepalive")
+
+    # ------------------------------------------------------ the 5 steps
+    def manage(self, now: datetime, live: List[Position],
+               after_plan: bool = False) -> bool:
+        """The 5-step scale-out (``scale_out.py``) on the positions opened
+        under it: at +1R close 1/2 and move the stop to the entry; at +1.5R
+        close 1/4 and move it to +1R; then the last 1/4's stop trails 1R
+        under the highest session close (``make_plan`` updates it after
+        each session). Weekdays 09:31-17:00 New York, at the bid, polled
+        every minute like the rest of the bot; the stop itself rests at the
+        broker around the clock. A stage once reached is kept, so every
+        step is retried until done. If the bid is already at or under the
+        level the stop was due to move to, the rest is closed at once (a
+        resting stop would have filled). A refused part close or stop move,
+        or a broker error, makes that position wait ``MANAGE_RETRY``; the
+        others go on. ``after_plan``: right after a plan, at any hour, only
+        raise stops (the trail of the session just closed). Nothing in
+        dry-run (no position is ever opened there; no step is recorded as
+        done). True if any order was sent."""
+        if self.cfg.dry_run:
+            return False
+        local = now.astimezone(NY)
+        if local.weekday() >= 5 or not (after_plan
+                                        or MANAGE_FROM <= local.time() < MANAGE_TO):
+            return False
+        by_ticket = {p.ticket: p for p in live}
+        sent = False
+        for s, h in list(self.st.held.items()):
+            if h.get("exit") != "scale_out":
+                continue
+            p = by_ticket.get(h.get("ticket"))
+            if p is None or p.ticket in self.st.to_close:
+                continue
+            if now < self._retry_at.get(p.ticket, now):
+                continue
+            try:
+                sent = self._manage_one(s, h, p, now, after_plan) or sent
+            except Exception:                        # one symbol's trouble stops nothing else
+                log.exception("5-step management of %s (ticket %d) failed; retrying "
+                              "in %d minutes", s, p.ticket, MANAGE_RETRY.seconds // 60)
+                self._retry_at[p.ticket] = now + MANAGE_RETRY
+            self.save()
+        return sent
+
+    def _manage_one(self, s: str, h: Dict, p: Position, now: datetime,
+                    after_plan: bool) -> bool:
+        stop0 = h.get("stop0")
+        r = p.price_open - stop0 if isinstance(stop0, (int, float)) else 0.0
+        if r <= 0:
+            if p.ticket not in self._warned:
+                self._warned.add(p.ticket)
+                log.error("%s (ticket %d): no first stop under the entry on record, "
+                          "so the 5 steps cannot run; its stop %.2f stays", s,
+                          p.ticket, p.sl)
+            return False
+        reached = int(h.get("stage", 0))
+        if after_plan:                               # the trail only; no targets now
+            floor = scale_out.stop_floor(reached, p.price_open, r, h.get("high_close"))
+            if floor is None or floor <= max(p.sl, float(h.get("sl_set") or 0.0)):
+                return False
+            bid, _ = self.b.quote(p.symbol)
+            if bid <= floor:                         # the window's check closes it
+                return False
+            if self._move_stop(p, floor):
+                h["sl_set"] = floor
+                return True
+            self._retry_at[p.ticket] = now + MANAGE_RETRY
+            return False
+        if reached == 0:
+            h["vol0"] = p.volume                     # nothing closed yet: what filled
+        bid, _ = self.b.quote(p.symbol)
+        st = scale_out.stage(bid, p.price_open, r, reached)
+        if st != reached:
+            h["stage"] = st
+            log.info("%s: bid %.2f reached %+.1fR (entry %.2f, R %.2f): step %d",
+                     s, bid, scale_out.TP2_R if st == 2 else scale_out.TP1_R,
+                     p.price_open, r, st + 2)
+            self.save()
+        ok, sent = True, False
+        spec = self.b.spec(p.symbol)
+        x = scale_out.to_close(float(h.get("vol0", p.volume)), p.volume, st,
+                               spec.volume_step, spec.volume_min)
+        if x > 0:
+            sent = True
+            if self._part_close(p, x, f"TP{st}"):
+                p = replace(p, volume=round(p.volume - x, 8))
+            else:
+                ok = False
+        floor = scale_out.stop_floor(st, p.price_open, r, h.get("high_close"))
+        if floor is not None and bid <= floor:
+            log.warning("%s: bid %.2f is at or under its stop level %.2f; closing "
+                        "the rest", s, bid, floor)
+            self._close(p, "stop level", now)       # a failure is queued and retried
+            return True
+        if floor is not None and floor > max(p.sl, float(h.get("sl_set") or 0.0)):
+            sent = True
+            if self._move_stop(p, floor):            # MT5 may round it under the floor:
+                h["sl_set"] = floor                  # sl_set keeps it from being resent
+            else:
+                ok = False
+        if not ok:
+            self._retry_at[p.ticket] = now + MANAGE_RETRY
+        return sent
+
+    def _part_close(self, p: Position, volume: float, why: str) -> bool:
+        """Sell ``volume`` lots of ``p``; the ticket stays open with the
+        rest. A raised error may or may not have filled: the next attempt
+        recomputes from the volume the broker then shows."""
+        if self.cfg.dry_run:
+            log.info("DRY-RUN %s: close %.2f of %.2f lots of %s", why, volume,
+                     p.volume, p.symbol)
+            return True
+        try:
+            f = self.b.close(p, self.cfg.magic, f"FAST4 {why}", volume=volume)
+        except Exception as e:
+            f = Fill(False, message=f"error: {e}")
+        log.info("%s: close %.2f of %.2f lots of %s: %s", why, volume, p.volume,
+                 p.symbol, f)
+        return f.ok
+
+    def _move_stop(self, p: Position, sl: float) -> bool:
+        if self.cfg.dry_run:
+            log.info("DRY-RUN move the stop of %s from %.2f to %.2f", p.symbol, p.sl, sl)
+            return True
+        try:
+            f = self.b.modify_sl(p, sl, self.cfg.magic)
+        except Exception as e:
+            f = Fill(False, message=f"error: {e}")
+        log.info("stop of %s (ticket %d) %.2f -> %.2f: %s", p.symbol, p.ticket,
+                 p.sl, sl, f)
+        return f.ok
 
     # ------------------------------------------------------------ tick
     def tick(self, now: Optional[datetime] = None) -> None:
@@ -626,11 +828,15 @@ class Runner:
         if self.guard(now, live) or self.target(now, live):
             self.save()
             return
+        if self.manage(now, live):
+            live = self.b.positions(self.cfg.magic)
         local = now.astimezone(NY)
         today = local.date().isoformat()
         weekday = local.weekday() < 5
         if weekday and local.time() >= CLOSE_AT and self.st.plan_checked != today:
             self.make_plan(now)
+            if self.manage(now, live, after_plan=True):   # the trail, even after 17:00
+                live = self.b.positions(self.cfg.magic)
         if (weekday and OPEN_AT <= local.time() < SESSION_END
                 and self.st.executed_day != today
                 and (self.st.pending_exits or self.st.pending_entries)):
@@ -696,6 +902,7 @@ class Runner:
         log.info("FTMO bot running (%s), risk %.1f%% per trade, symbols %s",
                  "DRY-RUN" if self.cfg.dry_run else "LIVE ORDERS",
                  self.cfg.risk_per_trade * 100, self.cfg.symbols)
+        log.info("exits for new positions: %s", exit_rule(self.cfg))
         while True:
             try:
                 self.tick()

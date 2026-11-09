@@ -188,15 +188,30 @@ class FakeBroker:
         self.sent.append(("buy", symbol, volume, sl))
         return Fill(True, ask, t, "done")
 
-    def close(self, position, magic, comment):
+    def close(self, position, magic, comment, volume=None):
         if self.fail_close == "raise":
             raise RuntimeError("no quote")
         if self.fail_close:
             self.sent.append(("close-failed", position.symbol))
             return Fill(False, message="10004 requote")
+        if volume is not None and volume < position.volume - 1e-9:   # part close
+            self.pos = [Position(p.ticket, p.symbol, round(p.volume - volume, 8),
+                                 p.price_open, p.sl) if p.ticket == position.ticket
+                        else p for p in self.pos]
+            self.sent.append(("part", position.symbol, volume, comment))
+            return Fill(True, 0, position.ticket, "done")
         self.pos = [p for p in self.pos if p.ticket != position.ticket]
         self.sent.append(("close", position.symbol, position.volume, comment))
         return Fill(True, 0, position.ticket, "done")
+
+    def modify_sl(self, position, sl, magic):
+        if getattr(self, "fail_modify", False):
+            self.sent.append(("sl-failed", position.symbol, sl))
+            return Fill(False, message="10016 invalid stops")
+        self.pos = [Position(p.ticket, p.symbol, p.volume, p.price_open, sl)
+                    if p.ticket == position.ticket else p for p in self.pos]
+        self.sent.append(("sl", position.symbol, sl))
+        return Fill(True, sl, position.ticket, "done")
 
 
 def history(dip_symbol="US100.cash", days=260):
@@ -244,6 +259,9 @@ def planned(tmp_path, **kw):
 
 
 def cfg(tmp_path, **kw):
+    """A test config. The runner tests written for FAST-4's own exits keep
+    them unless a test asks for the 5 steps (exit_mode="scale_out")."""
+    kw.setdefault("exit_mode", "fast4")
     c = FtmoConfig(state_path=str(tmp_path / "st.json"),
                    log_path=str(tmp_path / "log"), **kw)
     c.validate()

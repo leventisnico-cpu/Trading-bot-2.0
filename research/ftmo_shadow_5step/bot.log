@@ -1,0 +1,58 @@
+INFO FTMO day 2026-10-05: day-start balance 15000.00
+INFO keepalive buy SPY: Fill(ok=True, price=770.718534, ticket=1, message='done')
+INFO close SPY 0.01 lots (keepalive): Fill(ok=True, price=770.6414659999999, ticket=1, message='done')
+INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-10-06: day-start balance 15000.00
+INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-10-07: day-start balance 15000.00
+INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-10-08: day-start balance 15000.00
+INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-10-09: day-start balance 15000.00
+INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-10-12: day-start balance 15000.00
+INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-10-13: day-start balance 15000.00
+INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-10-14: day-start balance 15000.00
+INFO plan for the next open: exits [], entries ['US100', 'US500']
+INFO FTMO day 2026-10-15: day-start balance 15000.00
+INFO buy QQQ 15.90 lots stop 688.78: Fill(ok=True, price=717.0658515, ticket=2, message='done')
+INFO entry US500 cut from 23.34 to 14.01 lots: open stops already risk 449.80, room 270.20
+INFO buy SPY 14.01 lots stop 746.22: Fill(ok=True, price=765.4882725000001, ticket=3, message='done')
+INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-10-16: day-start balance 15000.00
+INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-10-19: day-start balance 15000.00
+INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-10-20: day-start balance 15000.00
+INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-10-21: day-start balance 15000.00
+INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-10-22: day-start balance 15000.00
+INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-10-23: day-start balance 15000.00
+INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-10-26: day-start balance 15000.00
+INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-10-27: day-start balance 15000.00
+INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-10-28: day-start balance 15000.00
+INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-10-29: day-start balance 15000.00
+INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-10-30: day-start balance 15000.00
+INFO US100 no longer open (stop hit or closed outside the bot)
+INFO plan for the next open: exits [], entries ['US30']
+INFO FTMO day 2026-11-02: day-start balance 14550.20
+INFO buy DIA 28.79 lots stop 507.70: Fill(ok=True, price=522.8600416950001, ticket=4, message='done')
+INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-11-03: day-start balance 14550.20
+INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-11-04: day-start balance 14550.20
+INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-11-05: day-start balance 14550.20
+INFO US500 no longer open (stop hit or closed outside the bot)
+INFO plan for the next open: exits [], entries []
+INFO FTMO day 2026-11-06: day-start balance 14280.19
+INFO plan for the next open: exits [], entries []

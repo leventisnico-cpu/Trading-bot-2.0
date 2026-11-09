@@ -100,6 +100,18 @@ Nico's style: one-line status first, then at most one thing for him to do.
   broken on Astral's side (paused, its stop feed is down), and a bug report
   was filed on 11-05. **The bot does not use Astral.** Ignore it.
 - **Verdict on 11-05:** ready for the free trial.
+- **11-08, Nico's order: the bot runs the 5-step exits.**
+  - `exit_mode: scale_out`, the default; `ftmo_bot/scale_out.py`.
+  - 1/2 is closed at +1R and the stop moves to the entry; 1/4 at +1.5R
+    and the stop moves to +1R; the last 1/4 trails 1R under the highest
+    close. There is no SMA5 or time exit.
+  - **Measured, not promised:** 61–62% winners (2012–2026), not 30 of
+    31. Faster passes within 18 months (19–41% of attempts against 7–17%),
+    but 12–13% of 2019–26 attempts breached, against 1%.
+  - Live shadow over 10-05 to 11-06 (`research/ftmo_shadow_5step/`): −6.8%
+    equity, against −0.4% for the old exits on the same bars.
+  - `exit_mode: fast4` brings the old exits back. That is Nico's call;
+    never switch it on your own.
 
 ## 3. The bot on one screen
 
@@ -108,9 +120,19 @@ Nico's style: one-line status first, then at most one thing for him to do.
 - **Planning:** after the US close (16:05 New York) it rebuilds each
   index's 09:30–16:00 session from 30-minute bars and plans the next open.
   - Entry: close above the 200-day average and RSI(2) below 10.
-  - Exit: close above the 5-day average, or after 10 sessions.
-- **At the next open** (09:31–10:30 New York) it sends exits first, then
-  entries:
+  - Exits, the 5 steps (`exit_mode: scale_out`), with 1R = the first
+    stop's distance (3 × ATR):
+    - at +1R it closes 1/2 and moves the stop to the entry;
+    - at +1.5R it closes 1/4 and moves the stop to +1R;
+    - after each close, the last 1/4's stop rises to 1R under the highest
+      close since entry.
+
+    These run weekdays 09:31–17:00 New York, checked every minute; the
+    stop rests in MT5 around the clock. A trade can last weeks.
+  - Old exits (`exit_mode: fast4`): close above the 5-day average, or
+    after 10 sessions. They still apply to any position opened under them.
+- **At the next open** (09:31–10:30 New York) it sends planned FAST-4 exits
+  first, then entries:
   - 3% of balance at risk;
   - a stop at entry minus 3 × ATR(14), resting in MT5;
   - at most 2 positions, notional at most 3× balance.
@@ -130,12 +152,22 @@ Nico's style: one-line status first, then at most one thing for him to do.
   These run only 10:00–10:45 New York.
 - **Realistic odds** ("Read this first" in `docs/FTMO_BOT.md`):
   - FAST-4 is NO-GO for a *fast* pass.
-  - With the bot's controls, attempts started 2019–26 passed both phases
-    68–70% of the time within the data, with 1% breached. But it takes
-    about 2 to 2.4 years, and only 14–17% pass within 18 months.
-  - In the harder 2011–18 market, 41–43% of attempts breached.
+  - **With the 5 steps (the default since 11-08):**
+    - attempts started 2011–18: 34–41% passed both phases within 18
+      months; 37% breached;
+    - attempts started 2019–26: 19–24% passed within 18 months; 12–13%
+      breached; 46–49% were still running when the data ended.
+    - 61–62% of trades win (2012–2026). Never 30 of 31.
+  - **With the old FAST-4 exits (`exit_mode: fast4`):**
+    - attempts started 2019–26 passed both phases 68–70% of the time within
+      the data, with 1% breached. But that takes about 2 to 2.4 years, and
+      only 14–17% pass within 18 months.
+    - In the harder 2011–18 market, 41–43% of attempts breached.
   - The evaluation has no time limit, so slow is fine. Only a breach costs
     a new fee.
+  - The 5-step shadow has not yet run a part close or a stop move: both of
+    its trades stopped out before +1R. Those paths are tested in code only,
+    so watch the first one on the trial closely (section 6).
 
 ## 4. Hard rules
 
@@ -157,8 +189,9 @@ Nico's style: one-line status first, then at most one thing for him to do.
   Going live there is Nico's call, made in that session, after the trial
   meets the criteria in section 6.
 - **Don't change strategy parameters:** 3% risk, 3 × ATR stop,
-  SMA200 / RSI(2) / SMA5, 10 sessions, 2 positions, cap on. They are the
-  researched rule. Never change one to make something pass.
+  SMA200 / RSI(2), the 5 steps (`exit_mode: scale_out`), 2 positions, cap
+  on. They are the researched rule plus Nico's order. Never change one to
+  make something pass.
 - **Never commit `state\` or `.env`.** Both are git-ignored and hold the
   account number and the bot's state.
 - **One bot process at a time.** Stop `run` with Ctrl+C before logging the
@@ -184,6 +217,10 @@ window) before giving the next.
      `cd C:\Users\leven; git clone -b claude/mini-prop-os-trading-zmm4ym https://github.com/leventisnico-cpu/Trading-bot-2.0.git`
    - If it exists:
      `cd C:\Users\leven\Trading-bot-2.0; git pull`
+   - The 5-step exits arrived with the 11-08 pull. A
+     `state\ftmo_config.yaml` installed before then has no `exit_mode:`
+     line and gets the 5 steps by default. The preflight prints
+     `exits for new positions: 5-step scale-out ...`.
 3. **Setup:**
    `cd C:\Users\leven\Trading-bot-2.0; powershell -ExecutionPolicy Bypass -File deploy\ftmo\setup.ps1`
    It must end with `Setup done`. It installs the trial config as
@@ -255,8 +292,19 @@ git-ignored but on disk.
   `buy US100.cash <lots> lots stop <price>: Fill(ok=True ...)`. A second
   entry may log `entry X cut from A to B lots: open stops ...`. That is the
   cap working as intended.
+- **The 5 steps on an open trade:**
+  - `US100: bid ... reached +1.0R (entry ..., R ...): step 3`;
+  - then `TP1: close <half> of <lots> lots of US100.cash: Fill(ok=True ...)`;
+  - then `stop of US100.cash (ticket N) <old> -> <entry>: Fill(ok=True ...)`.
+  - Step 4 logs `+1.5R`, `TP2` and a stop at entry + 1R.
+  - Step 5 logs a stop move after 16:05 when the trade made a new high
+    close.
+  - Check each in MT5: the volume falls by half, then by a quarter, and
+    the S/L column moves up.
 - **Report these to Nico at once:**
   - any `ERROR` line, `order refused`, `GUARD:` or `halted:`;
+  - a `TP1`/`TP2` close or a stop move with `Fill(ok=False`, or
+    `closing the rest`;
   - `missed the open window` or `cannot read today's session`;
   - the bot window closed, MT5 disconnected, or Algo Trading off.
 - **Check-ins:** on trading days, schedule `send_later` around 10:50 (after
@@ -268,6 +316,8 @@ git-ignored but on disk.
 - the keep-alive round trip filled and FTMO counted the trading day;
 - any FAST-4 entry filled with a stop about 3 ATR away and a size risking
   about 3% (cut entries count, as intended);
+- if a trade reached +1R: half of it closed and its stop moved to the
+  entry, both visible in MT5;
 - no `ERROR` lines.
 
 If FTMO asks for payment for the trial, use any broker's free MT5 demo

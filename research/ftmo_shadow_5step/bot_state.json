@@ -1,0 +1,34 @@
+{
+  "initial_balance": 15000.0,
+  "day": "2026-11-06",
+  "day_start_balance": 14280.188235460611,
+  "plan_day": "2026-11-06",
+  "plan_checked": "2026-11-06",
+  "pending_exits": [],
+  "pending_entries": [],
+  "pending_atr": {},
+  "executed_day": "2026-11-02",
+  "held": {
+    "US30": {
+      "ticket": 4,
+      "entry_day": "2026-11-02",
+      "exit": "scale_out",
+      "stop0": 507.700849377425,
+      "stage": 0,
+      "vol0": 28.79,
+      "high_close": 533.0078
+    }
+  },
+  "to_close": [],
+  "last_fill": "2026-11-02T10:05:00-05:00",
+  "trading_days": [
+    "2026-10-05",
+    "2026-10-15",
+    "2026-11-02"
+  ],
+  "blocked_until": null,
+  "halted": null,
+  "login": 0,
+  "target_locked": null,
+  "last_roundtrip": "2026-10-05"
+}

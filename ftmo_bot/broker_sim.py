@@ -14,6 +14,7 @@ from __future__ import annotations
 import csv
 import json
 from bisect import bisect_right
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -132,17 +133,45 @@ class SimBroker:
                            "price": round(ask, 4), "sl": sl, "why": comment})
         return Fill(True, ask, t, "done")
 
-    def close(self, position: Position, magic: int, comment: str) -> Fill:
-        bid, _ = self.quote(position.symbol)
-        self._settle(position, bid, comment, self.clock)
-        return Fill(True, bid, position.ticket, "done")
+    def close(self, position: Position, magic: int, comment: str,
+              volume: Optional[float] = None) -> Fill:
+        """Close the position, or ``volume`` lots of it (the ticket stays
+        open with the rest), at the bid."""
+        cur = next((p for p in self.pos if p.ticket == position.ticket), None)
+        if cur is None:
+            return Fill(False, message="no such position")
+        bid, _ = self.quote(cur.symbol)
+        self._settle(cur, bid, comment, self.clock,
+                     None if volume is None else min(volume, cur.volume))
+        return Fill(True, bid, cur.ticket, "done")
 
-    def _settle(self, p: Position, price: float, why: str, when: datetime) -> None:
-        pnl = (price - p.price_open) * p.volume
+    def modify_sl(self, position: Position, sl: float, magic: int) -> Fill:
+        cur = next((p for p in self.pos if p.ticket == position.ticket), None)
+        if cur is None:
+            return Fill(False, message="no such position")
+        bid, _ = self.quote(cur.symbol)
+        if sl >= bid:                            # a long's stop must sit under the price
+            return Fill(False, message="invalid stops")
+        self.pos = [replace(p, sl=sl) if p.ticket == cur.ticket else p for p in self.pos]
+        self.deals.append({"time": self.clock.isoformat(), "ticket": cur.ticket,
+                           "side": "sl", "symbol": cur.symbol, "volume": cur.volume,
+                           "price": round(sl, 4), "why": "stop moved"})
+        return Fill(True, sl, cur.ticket, "done")
+
+    def _settle(self, p: Position, price: float, why: str, when: datetime,
+                volume: Optional[float] = None) -> None:
+        """Sell ``volume`` lots of ``p`` at ``price`` (all of it if None)."""
+        part = volume is not None and volume < p.volume - 1e-9
+        vol = volume if part else p.volume
+        pnl = (price - p.price_open) * vol
         self.balance += pnl
-        self.pos = [x for x in self.pos if x.ticket != p.ticket]
+        if part:
+            self.pos = [replace(x, volume=round(x.volume - vol, 8))
+                        if x.ticket == p.ticket else x for x in self.pos]
+        else:
+            self.pos = [x for x in self.pos if x.ticket != p.ticket]
         self.deals.append({"time": when.isoformat(), "ticket": p.ticket,
-                           "side": "sell", "symbol": p.symbol, "volume": p.volume,
+                           "side": "sell", "symbol": p.symbol, "volume": vol,
                            "price": round(price, 4), "pnl": round(pnl, 2),
                            "why": why})
 

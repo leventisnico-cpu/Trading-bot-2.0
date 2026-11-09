@@ -509,3 +509,69 @@ above is left as written. These corrections and caveats apply to it:
    need to clamp each position's open risk at 0 once its stop is at or
    above entry, as this script does. Today no stop is ever raised, so it
    is unreachable.
+
+## Operator's order and the port to the bot (2026-11-08)
+
+The operator ordered the bot to follow the 5 steps ("the bot should lose
+1 trade per 31"). V1 is now in the bot as `exit_mode: scale_out`, the
+default (`ftmo_bot/scale_out.py`, `Runner.manage`). The verdict above is
+unchanged: this is an order, not a pass of the pre-registered rule.
+
+**What was ported, as V1 specifies:**
+
+* R = the first stop's distance, 3 × ATR(14).
+* TP1 at +1R closes 1/2 and moves the stop to the entry.
+* TP2 at +1.5R closes 1/4 and moves the stop to +1R.
+* From TP2 on, the stop rises after each session's close to
+  max(entry + 1R, highest close since entry − 1R).
+* There is no SMA5 or time exit.
+
+**What differs from the study:**
+
+* The live bot has no resting take-profit. It polls every minute,
+  weekdays 09:31–17:00 New York, and sells at the bid once it touches a
+  level. A touch outside those hours does not count.
+* A part close that rounds below the minimum lot is not sent.
+
+**Caveat 7 is done.** The combined-risk sum now counts each position's
+open risk as max(0, …), so a stop at or above its entry adds no room.
+
+**A gap the study did not have.** The bot's keep-alive was refused when
+both slots were full. 5-step positions are held a median of 22–23
+sessions. Two of them could therefore starve FTMO's 30-day inactivity
+clock, which the study's model never starves. The round trip now runs
+whatever is held.
+
+**The 1-in-31 claim.** It means P(+1R before −1R) ≥ 96.8%. The highest
+measured above is 61.6%, so 38–39% of trades lose. The trade management
+cannot change that (see "The webinar's hit rate is implausible").
+
+### Live shadow comparison, 2026-10-05 → 11-06 (same bars, same code)
+
+Both runs use `scripts/ftmo_shadow.py` with the same Astral 30-minute
+exports (2025-08-14 → 2026-11-06). The first tick is 10-05 09:35 New
+York.
+
+* A replay with `--exit-mode fast4` matches the code before this change
+  exactly: deals, balance and bot state.
+* It differs from the committed `research/ftmo_shadow/` (14,945.96) by a
+  first-session keep-alive and slightly revised bars.
+
+| exits | trades closed | realized P&L | balance | equity 11-06 | lowest equity | open |
+|---|---|---|---|---|---|---|
+| FAST-4 (`fast4`) | 4 + keep-alive | QQQ −45.18, SPY +71.78, DIA +182.26, QQQ −268.81 | 14,938.78 (−0.4%) | 14,938.78 | — | none |
+| 5 steps (`scale_out`) | 2 + keep-alive | QQQ −449.80 (stop), SPY −270.02 (stop) | 14,280.19 (−4.8%) | 13,974.12 (−6.8%) | 13,872.46 (−7.5%) | DIA 28.79 @ 522.86, stop 507.70 |
+
+**The October rebound was too small for the 5 steps.**
+
+* The QQQ and SPY entries of 10-15 peaked at +0.44R and +0.53R (bar
+  highs) before their stops. TP1 sat at +1R, 3 ATR above entry.
+* The DIA entry of 11-02 has reached +0.91R so far.
+* FAST-4's 5-day-average exit sold that rebound within a week.
+* The 5-step positions were held into the late-October and 11-05
+  sell-offs and stopped out at the full −1R.
+* Two losers in two trades are not evidence about a 61%-win rule
+  (0.39² ≈ 15%). The comparison does show the mechanism above: every
+  loser is a full stop, held for weeks.
+* `research/ftmo_shadow_5step/` is continued daily next to
+  `research/ftmo_shadow/`.

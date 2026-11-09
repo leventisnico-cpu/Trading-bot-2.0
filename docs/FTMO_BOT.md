@@ -15,18 +15,22 @@ of the attempt; each bot cell is a range between a lock that fills at
 the day's high (optimistic) and one that waits for the next open
 (pessimistic):
 
-| measure | bot, 2011–18 starts | bot, 2019–26 starts | bare rule, 2019–26 starts |
-|---|---|---|---|
-| both phases passed, within the data | 24–29% | 68–70% | 23% |
-| breached a rule (fee lost) | 41–43% | 1% | 77% |
-| still running when the data ends | 30–32% | 29–31% | 0% |
-| both phases within 18 months | 7–9% | 14–17% | 18% |
-| days to pass, median | 670–699 | 858–870 | 392 |
-| funded account survives 1 year | 85% | 99% | 36% |
-| funded 1-year return, median of survivors | +3.9% | +6.6% | +10.1% |
-| fees per funded account (EUR 89 per attempt) | 2.4–2.8 (EUR 214–249) | 1.02 (EUR 90–91) | 4.3 (EUR 381) |
+Since 2026-11-08 the bot's exits are the 5 steps (`exit_mode: scale_out`,
+the operator's order; `research/ftmo_scale_out.md`, V1). The FAST-4 exit
+columns are `exit_mode: fast4`, the rule before that.
 
-What this means: the bot rarely loses an account in a good regime (the
+| measure | FAST-4 exits, 2011–18 starts | FAST-4 exits, 2019–26 starts | bare rule, 2019–26 starts | **5 steps (default)**, 2011–18 starts | **5 steps (default)**, 2019–26 starts |
+|---|---|---|---|---|---|
+| both phases passed, within the data | 24–29% | 68–70% | 23% | 46–47% | 38–42% |
+| breached a rule (fee lost) | 41–43% | 1% | 77% | 37% | 12–13% |
+| still running when the data ends | 30–32% | 29–31% | 0% | 16–17% | 46–49% |
+| both phases within 18 months | 7–9% | 14–17% | 18% | 34–41% | 19–24% |
+| days to pass, median | 670–699 | 858–870 | 392 | 310–344 | 468–547 |
+| funded account survives 1 year | 85% | 99% | 36% | 68% | 95% |
+| funded 1-year return, median of survivors | +3.9% | +6.6% | +10.1% | +3.8–4.0% | +2.8% |
+| fees per funded account (EUR 89 per attempt) | 2.4–2.8 (EUR 214–249) | 1.02 (EUR 90–91) | 4.3 (EUR 381) | 1.8 (EUR 159–160) | 1.29–1.35 (EUR 115–120) |
+
+What this means for the FAST-4 exits: the bot rarely loses an account in a good regime (the
 cap keeps every open stop above FTMO's lines; the lock keeps a reached
 target) and still loses about 42% of attempts in a hard one (gaps
 through the stops), but it is slow either way: about 2 to 2.4 years to
@@ -36,6 +40,15 @@ a slow attempt keeps running at no extra cost; only a breach costs a
 new fee. Funded, the median return is +3.9% to +6.6% a year on the
 account size, of which the trader keeps 80%. The bot executes the rule
 faithfully; it does not change these odds.
+
+What it means for the 5 steps: faster passes (a third or more of 2011–18
+attempts within 18 months, a fifth to a quarter of 2019–26 ones), but
+in the good 2019–26 regime 12–13% of attempts breached, against 1%, and
+half were still running when the data ended. Every loser is a full −1R
+stop, often held for weeks. Neither exit rule wins 30 trades in 31: the
+5 steps win 61–62% of trades (2012–2026), because a trade loses when
+price falls 1R before it rises 1R, which the entry decides before step
+3 can happen.
 
 **Why two positions could fail the account in one day, and the cap.**
 FTMO's daily line is day-start *balance* minus 5%, and balance ignores
@@ -55,18 +68,61 @@ The two bot columns above include the cap; the bare-rule column does not.
   `US30.cash`, `US2000.cash`; check the names in Market Watch).
 * After the US close (16:05 New York) it rebuilds each index's
   09:30–16:00 session bars from 30-minute bars and computes FAST-4:
-  buy when close > 200-day average and RSI(2) < 10; exit when close >
-  5-day average or after 10 sessions.
+  buy when close > 200-day average and RSI(2) < 10.
+* **Exits: the 5 steps** (`exit_mode: scale_out`, the operator's order
+  of 2026-11-08; `ftmo_bot/scale_out.py`). 1R is the first stop's
+  distance, 3 × ATR(14):
+  1. and 2. 3% of balance at risk to the first stop (the deck's 30% of
+     the account × a 10% stop is the same 3%);
+  3. at entry + 1R: close 1/2, stop to the entry;
+  4. at entry + 1.5R: close 1/4, stop to entry + 1R;
+  5. the last 1/4 is never sold by hand: after each session its stop
+     rises to 1R under the highest close since entry.
+
+  No SMA5 or time exit. The part closes and stop moves run weekdays
+  09:31–17:00 New York, polled every minute; the stop rests in MT5 around
+  the clock. A position keeps the exit rule it was opened with, so
+  `exit_mode: fast4` (close > 5-day average or 10 sessions, the rule
+  until 2026-11-08) can be switched back at any time.
+* **What the 5 steps measured** (`research/ftmo_scale_out.md`, V1,
+  2012–2026; and the two shadow runs):
+  * 61–62% of trades win. A trade loses when price falls 1R before it
+    rises 1R; that is decided by the entry before step 3 can happen, so
+    no exit rule turns it into 30 wins in 31.
+  * Both phases passed within 18 months in 34–41% (2011–18) and 19–24%
+    (2019–26) of attempts, against 7–9% and 14–17% with the FAST-4 exits.
+    But 12–13% of 2019–26 attempts breached a rule, against 1%. Losers
+    are full −1R stops, often held for weeks.
+  * In 2011–18 the 5 steps also breached less (37% of attempts against
+    41–43%). In 2019–26, 46–49% of attempts were still running when the
+    data ended, against 29–31%.
+  * Live shadow, 2026-10-05 to 11-06 (`research/ftmo_shadow_5step/`): two
+    full −1R stops (QQQ −449.80, SPY −270.02) and DIA open; −4.8%
+    balance, −6.8% equity, low −7.5%. The FAST-4 exits on the same bars:
+    −0.4%. Neither trade reached +1R (they peaked at +0.44R and +0.53R),
+    so the shadow has not yet run a part close or a stop move: those
+    paths are covered by unit tests only (`tests/test_ftmo_scale_out.py`).
+  * If the bot is not running at the close, the trail is raised by the
+    first plan it makes afterwards, at any hour. A refused part close or
+    stop move is retried after 5 minutes. For a refused close, see the
+    next bullets.
 * At the next US open (09:31–10:30 New York) it sends exits first, then
   entries: 3% of balance at risk, stop at entry − 3 × ATR(14) resting in
   MT5, at most two positions, notional at most 3× balance. Each plan is
   executed at most once: it is marked done and saved before any order
   is sent, so a crash or restart can miss a trade but never double it.
   A plan older than the previous session is thrown away.
-* Exits are never blocked. A close that fails is retried every minute
-  until it succeeds; positions the bot finds open but does not know are
-  adopted, never forgotten. If MT5 cannot report positions, the bot does
-  nothing that minute.
+* Exits are never blocked. A close that fails is retried until it
+  succeeds:
+  * every minute while a target lock, a guard block or a halt is in
+    force, and a close queued then stays at every minute until it closes;
+  * otherwise (a planned exit, a 5-step stop level) at once, then after
+    1, 2, 4 and 8 minutes, then every 15. A closed market refuses every
+    attempt, and FTMO counts server requests (at most 2,000 a day).
+
+  Positions the bot finds open but does not know are adopted, never
+  forgotten. If MT5 cannot report positions, the bot does nothing that
+  minute.
 * **Guard:** if equity comes within 0.2% of the account of FTMO's daily
   line (day-start balance − 5%) or the max-loss line (90% of initial),
   it closes everything and blocks entries until the next FTMO day (for
@@ -133,8 +189,8 @@ Re-read them before buying; FTMO changes them.
 | Profit target 10% (Phase 1), 5% (Verification), none on the funded account | `profit_target`; the target lock above |
 | 4 minimum trading days per phase, a trading day being a Prague calendar day on which a position is opened; none on the funded account | Prague dates of opened positions only; the lock adds missing days with minimum-lot round trips |
 | No time limit | none assumed |
-| Inactivity: no new trade for 30 consecutive days ends the account, in every phase | keep-alive after 25 days, in every phase |
-| Swing account: overnight and weekend holding allowed in every phase, no news restriction; leverage 1:15 on indices, 1:9 on US2000 | FAST-4 holds up to 10 sessions, so buy **Swing** (a Standard funded account ends on the first weekend hold, and Standard cannot be changed to Swing later); notional capped at 3× balance per position |
+| Inactivity: no new trade for 30 consecutive days ends the account, in every phase | keep-alive after 25 days, in every phase, even with both slots held (the 5 steps hold for weeks) |
+| Swing account: overnight and weekend holding allowed in every phase, no news restriction; leverage 1:15 on indices, 1:9 on US2000 | the 5 steps hold for weeks (FAST-4's exits: up to 10 sessions), so buy **Swing** (a Standard funded account ends on the first weekend hold, and Standard cannot be changed to Swing later); notional capped at 3× balance per position |
 | Forbidden: opening a trade within 2 hours of a market close of 2 hours or more, opposite positions across accounts, more than 2,000 server requests a day, letting a third party trade the account | entries only 09:31–10:30 and round trips only 10:00–10:45 New York (more than 2 hours before a 13:00 early close); long only; a handful of orders a week; you run the bot yourself |
 | Server clock GMT+2 in winter and GMT+3 in summer, changing with the US clocks (New York + 7 h); the daily reset is Prague midnight | `server_clock: NY+7`, checked against a live tick before every bar read; the preflight prints it |
 | Funded account: payouts from day 14, only with no open positions; 80% split, scaling every 4 months | `python -m ftmo_bot flat` before you request one |
