@@ -76,6 +76,8 @@ ROUNDTRIP_FROM, ROUNDTRIP_TO = time(10, 0), time(10, 45)   # >2 h before a 13:00
 MANAGE_FROM, MANAGE_TO = time(9, 31), time(17, 0)
 MANAGE_RETRY = timedelta(minutes=5)       # after a refused part close or stop move
 CLOSE_RETRY_MAX = timedelta(minutes=15)   # the slowest pace of a queued close's retries
+SELFTEST_STOPS = (0.05, 0.04)             # the self-test's stop, then where it moves: under the ask
+FROZEN_ROOM = 0.0005                      # of the initial balance: under it a flat account is frozen
 BAR_MINUTES = 30
 # FTMO's index CFDs trade ~23 h a day: ~46 half-hour bars per session.
 # 15,000 bars is ~320 sessions, enough for the 200-session average plus
@@ -588,13 +590,11 @@ class Runner:
                 continue
             if self.cfg.cap_combined_risk:
                 lpl = self.b.loss_per_lot(sym, ask, stop)
-                # a stop at or over its entry risks nothing (the 5-step moves
-                # stops there); never let it count as negative risk
-                committed = sum(max(0.0, self.b.loss_per_lot(p.symbol, p.price_open, p.sl))
-                                * p.volume for p in current if p.sl)
-                room = rules.risk_room(a.balance, self.st.day_start_balance,
-                                       committed, self.limits,
-                                       self.cfg.cap_max_loss_buffer)
+                committed = self._committed(current)
+                daily, total = rules.rooms(a.balance, self.st.day_start_balance,
+                                           committed, self.limits,
+                                           self.cfg.cap_max_loss_buffer)
+                room = max(0.0, min(daily, total))
                 fit = math.floor(room / lpl / spec.volume_step + 1e-9) * spec.volume_step
                 if fit < vol:
                     log.info("entry %s cut from %.2f to %.2f lots: open stops "
@@ -602,7 +602,10 @@ class Runner:
                              committed, room)
                     vol = round(fit, 8)
                 if vol < spec.volume_min:
-                    log.info("entry %s skipped: no risk room left", s)
+                    if self._frozen(not current, total):
+                        log.warning("entry %s skipped: FROZEN. %s", s, self._frozen_text(a.balance))
+                    else:
+                        log.info("entry %s skipped: no risk room left", s)
                     continue
             if self.cfg.dry_run:
                 log.info("DRY-RUN buy %s %.2f lots at ~%.2f, stop %.2f", sym,
@@ -680,6 +683,40 @@ class Runner:
             log.info("keep-alive refused: %s", why)
             return
         self._roundtrip(now, "keepalive")
+
+    # ------------------------------------------------------- risk room
+    def _committed(self, positions: List[Position]) -> float:
+        """Summed entry-to-stop risk of the open positions. A stop at or
+        over its entry risks nothing (the 5 steps move stops there); it
+        never counts as negative risk."""
+        return sum(max(0.0, self.b.loss_per_lot(p.symbol, p.price_open, p.sl)) * p.volume
+                   for p in positions if p.sl)
+
+    def _frozen(self, flat: bool, total: float) -> bool:
+        """Nothing open and practically no room (``FROZEN_ROOM``) over the
+        max-loss line and its buffer. That room only returns if the
+        balance rises, which a flat account's cannot."""
+        return flat and total <= FROZEN_ROOM * self.limits.initial
+
+    def _frozen_text(self, balance: float) -> str:
+        floor = self.limits.total_floor() + self.cfg.cap_max_loss_buffer * self.limits.initial
+        return (f"The balance {balance:,.2f} leaves no room over {floor:,.2f} (the max-loss "
+                f"line plus the {self.cfg.cap_max_loss_buffer:.1%} buffer), so the bot can "
+                "open nothing more on this account and it cannot reach a target. Start a "
+                "new phase, or lower cap_max_loss_buffer to trade what is left.")
+
+    def entry_room(self) -> Optional[Tuple[float, bool]]:
+        """(what a new entry may risk now, in account currency; frozen as
+        ``_frozen`` defines it), or None with the cap off. Read-only."""
+        if not self.cfg.cap_combined_risk:
+            return None
+        a = self.b.account()
+        current = self.b.positions(self.cfg.magic)
+        day_start = (a.balance if self.st.day_start_balance is None
+                     else self.st.day_start_balance)
+        daily, total = rules.rooms(a.balance, day_start, self._committed(current),
+                                   self.limits, self.cfg.cap_max_loss_buffer)
+        return max(0.0, min(daily, total)), self._frozen(not current, total)
 
     # ------------------------------------------------------ the 5 steps
     def manage(self, now: datetime, live: List[Position],
@@ -811,6 +848,134 @@ class Runner:
         log.info("stop of %s (ticket %d) %.2f -> %.2f: %s", p.symbol, p.ticket,
                  p.sl, sl, f)
         return f.ok
+
+    # ------------------------------------------------------- self-test
+    def _position(self, ticket: int) -> Optional[Position]:
+        return next((p for p in self.b.positions(self.cfg.magic) if p.ticket == ticket),
+                    None)
+
+    def _queue_close(self, ticket: int) -> None:
+        """Hand a ticket of ours to the close retries of ``run``."""
+        log.error("ticket %d queued for closing", ticket)
+        if ticket not in self.st.to_close:
+            self.st.to_close.append(ticket)
+        try:
+            self.save()
+        except Exception:                            # never hide the error that led here
+            log.exception("state not saved; close ticket %d in MT5", ticket)
+
+    def _sweep(self, before: set, now: datetime) -> str:
+        """After a self-test buy that raised (it may have filled): close
+        whatever it opened, and say what was found."""
+        try:
+            new = [p for p in self.b.positions(self.cfg.magic) if p.ticket not in before]
+        except Exception:
+            log.exception("selftest: positions unreadable after the failed buy; open "
+                          "before it: %s", sorted(before) or "none")
+            return ("MT5 could not be read: check it for a new position and close it "
+                    "there before `run`, which would manage it as a trade")
+        if not new:
+            return "No position was opened."
+        self._note_open(now)
+        done = [self._close(p, "selftest", now) for p in new]   # a failure is queued
+        return ("The position it opened was closed." if all(done) else
+                "The position it opened could not be closed: `run` will retry it, or "
+                "close it in MT5.")
+
+    def selftest(self, now: datetime) -> List[Tuple[bool, str]]:
+        """One tiny position through every order the 5 steps send: a buy
+        with a stop, a part close, a stop move, the final close. It proves
+        on the account itself (the free trial) that the broker takes each
+        of them, which a quiet trial may never show. Returns (passed, what
+        happened) lines, in order.
+
+        It is a round trip like the keep-alive: the same 10:00-10:45 New
+        York window, the same entry checks, twice the minimum lot of the
+        keep-alive symbol with a stop 5% under the price. It is not sized
+        by the combined-risk cap: its size is fixed. It opens a position,
+        so it counts as a trading day and resets the inactivity clock.
+        Nothing is left open on purpose: whatever step fails, the rest is
+        closed, and a close that fails (or an error after the buy) leaves
+        the ticket queued for ``run``."""
+        out: List[Tuple[bool, str]] = []
+        if not self._roundtrip_window(now):
+            return [(False, "not sent: the self-test runs on weekdays "
+                            f"{ROUNDTRIP_FROM:%H:%M}-{ROUNDTRIP_TO:%H:%M} New York time "
+                            "(like the keep-alive: well before any market close)")]
+        if self.st.halted or self.st.target_locked:
+            return [(False, "not sent: the bot is halted or holds a locked target "
+                            f"({self.st.halted or 'target lock'})")]
+        self.roll_day(now)
+        a = self.b.account()
+        before = {p.ticket for p in self.b.positions(self.cfg.magic)}
+        why = rules.check_entry(a.equity, self.st.day_start_balance, self.limits,
+                                len(before), self.cfg.max_positions + 1,
+                                bool(self.st.blocked_until))
+        if why:
+            return [(False, f"not sent: {why}")]
+        sym = self.cfg.symbols[self.cfg.keepalive_symbol]
+        spec = self.b.spec(sym)
+        if not spec.exists or spec.volume_step <= 0:
+            return [(False, f"not sent: symbol {sym} unavailable")]
+        half = math.ceil(max(spec.volume_min, spec.volume_step) / spec.volume_step
+                         - 1e-9) * spec.volume_step
+        half, vol = round(half, 8), round(2 * half, 8)
+        _, ask = self.b.quote(sym)
+        stop, stop2 = (ask * (1 - x) for x in SELFTEST_STOPS)
+        if self.cfg.dry_run:
+            return [(True, f"DRY-RUN, nothing sent: would buy {vol:g} {sym} with a stop at "
+                           f"{stop:.2f}, close {half:g}, move the stop to {stop2:.2f}, "
+                           "close the rest")]
+        try:
+            f = self.b.buy(sym, vol, stop, self.cfg.magic, "FAST4 selftest")
+        except Exception as e:                       # may or may not have filled
+            log.exception("selftest buy %s failed", sym)
+            return [(False, f"buy {vol:g} {sym}: error ({e}). {self._sweep(before, now)}")]
+        log.info("selftest buy %s %.2f lots stop %.2f: %s", sym, vol, stop, f)
+        if not f.ok:
+            return [(False, f"buy {vol:g} {sym} with a stop: refused ({f.message})")]
+        self._note_open(now)
+        self.save()
+        try:
+            self._selftest_orders(out, f.ticket, sym, vol, half, stop2, now)
+        except Exception as e:                       # e.g. the terminal went away
+            log.exception("selftest failed after the buy; ticket %d queued", f.ticket)
+            self._queue_close(f.ticket)
+            out.append((False, f"error after the buy ({e}): ticket {f.ticket} is queued, "
+                               "`run` closes it; or close it in MT5"))
+        return out
+
+    def _selftest_orders(self, out: List[Tuple[bool, str]], ticket: int, sym: str,
+                         vol: float, half: float, stop2: float, now: datetime) -> None:
+        """The self-test after its buy: check the position, part close,
+        stop move, close. Appends a line per order to ``out``."""
+        p = self._position(ticket)
+        if p is None:
+            self._queue_close(ticket)                # closed by `run` if it shows up
+            out.append((False, f"buy filled (ticket {ticket}) but the position is not "
+                               "listed; if MT5 shows it, close it there"))
+            return
+        out.append((abs(p.volume - vol) < 1e-9 and p.sl > 0,
+                    f"buy {p.volume:g} {sym} at {p.price_open:.2f} with a stop at "
+                    f"{p.sl:.2f} (ticket {p.ticket})"))
+        sent = self._part_close(p, half, "selftest part")
+        p2 = self._position(ticket)
+        left = "nothing" if p2 is None else f"{p2.volume:g}"
+        out.append((sent and p2 is not None and abs(p2.volume - (vol - half)) < 1e-9,
+                    f"part close of {half:g}: {left} left open"))
+        if p2 is not None:
+            sent = self._move_stop(p2, stop2)
+            p3 = self._position(ticket)
+            out.append((sent and p3 is not None and p3.sl > p2.sl,
+                        f"stop move: {p2.sl:.2f} -> "
+                        f"{'gone' if p3 is None else format(p3.sl, '.2f')}"))
+        rest = self._position(ticket)
+        if rest is not None:
+            closed = self._close(rest, "selftest", now)   # a failure is queued for `run`
+            gone = self._position(ticket) is None
+            out.append((closed and gone, "close of the rest: "
+                        + ("flat" if closed and gone else
+                           "FAILED; `run` will retry it, or close it in MT5")))
 
     # ------------------------------------------------------------ tick
     def tick(self, now: Optional[datetime] = None) -> None:

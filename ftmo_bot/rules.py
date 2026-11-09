@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Tuple
 
 
 @dataclass(frozen=True)
@@ -71,12 +71,21 @@ def risk_room(balance: float, day_start_balance: float, committed: float,
     is left. A wider ``max_loss_buffer`` (``cap_max_loss_buffer``; W2 of
     research/ftmo_scale_out_v2.md: 0.015) leaves room for stops that gaps,
     costs and financing carry past their level."""
+    return max(0.0, min(rooms(balance, day_start_balance, committed, limits,
+                              max_loss_buffer)))
+
+
+def rooms(balance: float, day_start_balance: float, committed: float,
+          limits: Limits, max_loss_buffer: Optional[float] = None) -> Tuple[float, float]:
+    """``risk_room`` line by line: (room above the daily line, room above
+    the max-loss line), each after its buffer; either may be negative.
+    The daily room comes back with the next FTMO day. The max-loss room
+    does not: a flat account without it can open nothing more (frozen)."""
     pad = limits.buffer * limits.initial
     total_pad = (limits.buffer if max_loss_buffer is None else max_loss_buffer) * limits.initial
     worst = balance - committed                      # all open stops filled
-    daily = worst - (limits.daily_floor(day_start_balance) + pad)
-    total = worst - (limits.total_floor() + total_pad)
-    return max(0.0, min(daily, total))
+    return (worst - (limits.daily_floor(day_start_balance) + pad),
+            worst - (limits.total_floor() + total_pad))
 
 
 def check_entry(equity: float, day_start_balance: float, limits: Limits,

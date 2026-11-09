@@ -126,6 +126,24 @@ Nico's style: one-line status first, then at most one thing for him to do.
       in both configs. The funded account is to be decided again later.
     - The preflight prints `risk cap: all open stops together stay 0.2%
       above the daily line and 1.5% above the max-loss line`.
+- **11-09, later: an audit of the bot's own code, and a correction.**
+  - **Audit.** `scripts/ftmo_replay.py` ran the real bot over 2012–2026.
+    Every part close, stop move, trail and stop-out matched an independent
+    oracle: 0 mismatches (`reports/ftmo_bot_replay.md`). The 5 steps are
+    implemented correctly. 60% of the bot's own trades reached +1R first.
+  - **Frozen accounts.** Most "still running" attempts in the studies are
+    frozen: flat, with no risk room left over the max-loss line, so the
+    bot can open nothing more (`research/ftmo_frozen_accounts.py`).
+  - **What that means for the buffer.** It turns breaches into frozen
+    accounts and does not add passes. Nico was told and advised to turn
+    it off again. **It stays on until he says otherwise.**
+  - **In the bot.** It now logs `FROZEN` at warning level, and the
+    preflight prints `room for the next entry: ...`.
+  - **`run.ps1 -SelfTest`** was added: one tiny round trip through every
+    order the 5 steps send (step 9).
+  - **The 1-in-31 claim.** It would need a first target a tenth of the
+    stop's distance (`research/ftmo_win_rate_dial.md`). The 5 steps set
+    the first target as far as the stop.
 
 ## 3. The bot on one screen
 
@@ -167,20 +185,24 @@ Nico's style: one-line status first, then at most one thing for him to do.
 - **Realistic odds** ("Read this first" in `docs/FTMO_BOT.md`):
   - FAST-4 is NO-GO for a *fast* pass.
   - **With the 5 steps and the 1.5% buffer (the default since 11-09):**
-    - attempts started 2011–18: 31–38% passed both phases within 18
-      months; 15–16% breached;
-    - attempts started 2019–26: 20–24% passed within 18 months; 2%
-      breached; 58–61% were still running when the data ended.
+    - attempts started 2011–18: 38–43% passed both phases (31–38% within
+      18 months); 15–16% breached; 42–47% froze;
+    - attempts started 2019–26: 37–40% passed (20–24% within 18 months);
+      2% breached; 42% froze; 16–19% were still trading when the data
+      ended.
+    - Counting a frozen attempt as lost: 2.1 to 2.7 attempts per pass.
     - 61–62% of trades win (2012–2026). Never 30 of 31.
     - Funded, the median survivor made +0.5% to +2.5% a year.
-    - Without the buffer: 37% and 12–13% breached.
+    - Without the buffer: 46–47% and 38–42% passed, 37% and 12–13%
+      breached, 17% and 30% froze; 2.0 to 2.2 attempts per pass.
   - **With the old FAST-4 exits (`exit_mode: fast4`):**
     - attempts started 2019–26 passed both phases 68–70% of the time within
       the data, with 1% breached. But that takes about 2 to 2.4 years, and
       only 14–17% pass within 18 months.
-    - In the harder 2011–18 market, 41–43% of attempts breached.
-  - The evaluation has no time limit, so slow is fine. Only a breach costs
-    a new fee.
+    - In the harder 2011–18 market, 41–43% of attempts breached and
+      29–31% froze (10% froze in 2019–26).
+  - The evaluation has no time limit, so slow is fine. A breached or
+    frozen attempt costs a new fee.
   - The 5-step shadow has not yet run a part close or a stop move: both of
     its trades stopped out before +1R. Those paths are tested in code only,
     so watch the first one on the trial closely (section 6).
@@ -261,7 +283,19 @@ window) before giving the next.
    replace the line `login: null` with `login: <trial number>`. The
    preflight's `WARN: login not set` line prints the number. Verify with
    `grep -n '^login:' state/ftmo_config.yaml`.
-9. **Start the bot:**
+9. **Self-test, then start the bot.**
+   - On a weekday between 10:00 and 10:45 New York time, once per trial
+     account, with no `-Live` window running:
+     `cd C:\Users\leven\Trading-bot-2.0; powershell -ExecutionPolicy Bypass -File deploy\ftmo\run.ps1 -SelfTest`
+   - It buys 0.02 lots of `US500.cash` with a stop, closes half, moves the
+     stop, and closes the rest. Expect four `PASS` lines and
+     `self-test passed: this account takes every order the 5 steps send`.
+   - On a `FAIL` line, stop and report it with the log. Outside the
+     window it prints `FAIL not sent` and sends nothing. If an order
+     fails midway, the bot closes what it opened; what it cannot close
+     it queues, and `-Live` closes it. Check MT5 shows no position
+     before going on.
+   - Then start the bot:
    `cd C:\Users\leven\Trading-bot-2.0; powershell -ExecutionPolicy Bypass -File deploy\ftmo\run.ps1 -Live`
    - It prints the `rules:` line, then keeps running. Leave the window
      open.
@@ -322,6 +356,8 @@ git-ignored but on disk.
   - any `ERROR` line, `order refused`, `GUARD:` or `halted:`;
   - a `TP1`/`TP2` close or a stop move with `Fill(ok=False`, or
     `closing the rest`;
+  - `FROZEN` in the log or in the preflight: the account has no risk room
+    left and the bot can open nothing more;
   - `missed the open window` or `cannot read today's session`;
   - the bot window closed, MT5 disconnected, or Algo Trading off.
 - **Check-ins:** on trading days, schedule `send_later` around 10:50 (after

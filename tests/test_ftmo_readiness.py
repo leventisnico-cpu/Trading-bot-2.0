@@ -1071,15 +1071,15 @@ def test_login_must_be_an_account_number(login):
         FtmoConfig(login=login).validate()
 
 
-def test_run_ps1_sends_orders_only_for_live_and_flat():
+def test_run_ps1_sends_orders_only_for_live_flat_and_selftest():
     text = (ROOT / "deploy/ftmo/run.ps1").read_text(encoding="ascii")
     cmds = dict(re.findall(r'^(?:if|elseif) \(\$(\w+)\) \{ \$cmd = @\(([^)]*)\) \}', text, re.M))
     default = re.search(r'^else \{ \$cmd = @\(([^)]*)\) \}', text, re.M).group(1)
-    assert set(cmds) == {"Plan", "DryRun", "Live", "Flat"}
-    assert {k for k, v in cmds.items() if "--execute" in v} == {"Live", "Flat"}
+    assert set(cmds) == {"Plan", "DryRun", "Live", "Flat", "SelfTest"}
+    assert {k for k, v in cmds.items() if "--execute" in v} == {"Live", "Flat", "SelfTest"}
     assert '"preflight"' in default and "--execute" not in default
     code = [line for line in text.splitlines() if not line.lstrip().startswith("#")]
-    assert sum(line.count("--execute") for line in code) == 2       # nowhere else
+    assert sum(line.count("--execute") for line in code) == 3       # nowhere else
 
 
 def test_setup_ps1_installs_the_trial_config_by_default():

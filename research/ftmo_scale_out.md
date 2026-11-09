@@ -591,3 +591,14 @@ operator's call; its trade-off is in that note's "Decision".
 Later on 2026-11-09 the operator ordered W2's buffer on: "buffer on".
 `cap_max_loss_buffer: 0.015` is now the default, with the 5 steps. See
 `research/ftmo_scale_out_v2.md`, "Operator's order".
+
+**Correction (2026-11-09).** "Still running" in the tables above is
+mostly frozen accounts: flat, with no risk room left, unable to pass.
+
+| rule | frozen, 2011–18 starts | frozen, 2019–26 starts |
+|---|---|---|
+| V0 | 29–31% | 10% |
+| V1 | 17% | 30% |
+
+See `research/ftmo_frozen_accounts.py` and the correction in
+`research/ftmo_scale_out_v2.md`.

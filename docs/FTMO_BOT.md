@@ -23,41 +23,73 @@ of `research/ftmo_scale_out_v2.md`. W2 did not pass its pre-registered
 rule. The default columns are both together. The FAST-4 exit columns are
 `exit_mode: fast4` with the old 0.2% buffer.
 
+**Frozen accounts (measured 2026-11-09, `research/ftmo_frozen_accounts.py`).**
+An attempt that neither passed nor breached was reported as "still
+running". Most of those are frozen: flat, with no risk room left over
+the max-loss line, so the bot can open nothing more and the attempt
+cannot pass. The table counts them on their own row.
+
 | measure | FAST-4 exits, 2011–18 starts | FAST-4 exits, 2019–26 starts | bare rule, 2019–26 starts | **5 steps + 1.5% buffer (default)**, 2011–18 starts | **5 steps + 1.5% buffer (default)**, 2019–26 starts |
 |---|---|---|---|---|---|
 | both phases passed, within the data | 24–29% | 68–70% | 23% | 38–43% | 37–40% |
 | breached a rule (fee lost) | 41–43% | 1% | 77% | 15–16% | 2% |
-| still running when the data ends | 30–32% | 29–31% | 0% | 42–47% | 58–61% |
+| **frozen**: flat, no room left, cannot pass | 29–31% | 10% | none (no cap) | 42–47% | 42% |
+| still trading when the data ends | 1% | 19–21% | 0% | 0% | 16–19% |
 | both phases within 18 months | 7–9% | 14–17% | 18% | 31–38% | 20–24% |
 | days to pass, median | 670–699 | 858–870 | 392 | 307–328 | 459–533 |
-| funded account survives 1 year | 85% | 99% | 36% | 81% | 99% |
+| funded account survives 1 year (a frozen one counts as surviving) | 85% | 99% | 36% | 81% | 99% |
 | funded 1-year return, median of survivors | +3.9% | +6.6% | +10.1% | +0.5% | +2.5% |
-| fees per funded account (EUR 89 per attempt) | 2.4–2.8 (EUR 214–249) | 1.02 (EUR 90–91) | 4.3 (EUR 381) | 1.34–1.42 (EUR 119–126) | 1.05–1.07 (EUR 93–95) |
+| attempts per pass, a frozen attempt counted as lost (EUR 89 each) | 3.4–4.1 (EUR 303–363) | 1.15–1.17 (EUR 102–104) | 4.3 (EUR 381) | 2.3–2.7 (EUR 205–238) | 2.1–2.2 (EUR 185–196) |
 
-What this means for the FAST-4 exits: the bot rarely loses an account in a good regime (the
-cap keeps every open stop above FTMO's lines; the lock keeps a reached
-target) and still loses about 42% of attempts in a hard one (gaps
-through the stops), but it is slow either way: about 2 to 2.4 years to
-pass both phases, and only one attempt in six or seven passes within
-18 months even in the good regime. The evaluation has no time limit, so
-a slow attempt keeps running at no extra cost; only a breach costs a
-new fee. Funded, the median return is +3.9% to +6.6% a year on the
-account size, of which the trader keeps 80%. The bot executes the rule
-faithfully; it does not change these odds.
+What this means for the FAST-4 exits:
+
+* **Good regime (2019–26 starts):** the bot rarely breaches (1%), because
+  the cap keeps every open stop above FTMO's lines and the lock keeps a
+  reached target. A further 10% of attempts freeze.
+* **Hard regime (2011–18 starts):** about 42% of attempts breach (gaps
+  through the stops) and another 30% freeze.
+* **Speed:** slow either way. It takes about 2 to 2.4 years to pass both
+  phases. Only one attempt in six or seven passes within 18 months, even
+  in the good regime.
+* **Cost:** the evaluation has no time limit, so a slow attempt keeps
+  running at no extra cost. A breached or frozen one costs a new fee.
+* **Funded:** the median return is +3.9% to +6.6% a year on the account
+  size, of which the trader keeps 80%.
+
+The bot executes the rule faithfully; it does not change these odds.
 
 What it means for the default (the 5 steps with the 1.5% buffer):
 
 * **Passes:** 31–38% of 2011–18 attempts and 20–24% of 2019–26 ones
   pass within 18 months.
-* **Breaches:** 15–16% and 2% of attempts. Many attempts are still
-  running when the data ends, so finishing is slow.
+* **Breaches and freezes:** 15–16% and 2% of attempts breach, and 42–47%
+  and 42% freeze. Counting a frozen attempt as lost, it takes 2.1 to 2.7
+  attempts per pass.
 * **Losers:** every loser is a full −1R stop, often held for weeks.
 * **Funded:** the median survivor makes +0.5% to +2.5% a year on the
-  account. The buffer trims entries whenever the account is down about
-  3.7% or more.
+  account, frozen accounts included. The buffer trims entries whenever
+  the account is down about 3.7% or more.
 * **No exit rule wins 30 trades in 31.** The 5 steps win 61–62% of
   trades (2012–2026). A trade loses when price falls 1R before it rises
-  1R, and the entry decides that before step 3 can happen.
+  1R, and the entry decides that before step 3 can happen. What 30 in 31
+  would take is measured in `research/ftmo_win_rate_dial.md`: a first
+  target a tenth as far away as the stop.
+
+**The bot's own 5 steps, audited over 2012–2026** (2026-11-09,
+`scripts/ftmo_replay.py`, `reports/ftmo_bot_replay.md`):
+
+* The same `Runner` the MT5 bot runs traded a simulated account through
+  14 years of daily bars, in both bar orders, as a funded account and as
+  a chain of challenge accounts.
+* Every plan, entry size, part close, stop move, trail and stop-out was
+  checked against an oracle written separately from the bot: 2,190 deals
+  in 398 trades, **0 mismatches**. The exits have no bug to fix.
+* 60% of the bot's own trades reached +1R before −1R (1 loss in 2.6).
+* It runs with zero costs: it audits what the bot does, not what it
+  earns.
+* It found the frozen accounts above: one challenge account lost four
+  trades in a row by April 2016 and then could open nothing for 10½
+  years.
 
 **The buffer: on (`cap_max_loss_buffer: 0.015`) against off (`0.002`)**
 (W2, `research/ftmo_scale_out_v2.md`; on by the operator's order of
@@ -67,17 +99,25 @@ What it means for the default (the 5 steps with the 1.5% buffer):
 |---|---|---|
 | breached a rule | 37% / 12–13% | 15–16% / 2% |
 | both phases within 18 months | 34–41% / 19–24% | 31–38% / 20–24% |
-| still running when the data ends | 16–17% / 46–49% | 42–47% / 58–61% |
+| **frozen**: flat, no room left, cannot pass | 17% / 30% | 42–47% / 42% |
+| still trading when the data ends | 0% / 16–19% | 0% / 16–19% |
 | both phases passed, within the data | 46–47% / 38–42% | 38–43% / 37–40% |
-| attempts per pass | 1.79–1.80 / 1.29–1.35 | 1.34–1.42 / 1.05–1.07 |
-| funded account survives 1 year | 68% / 95% | 81% / 99% |
+| attempts per pass, a frozen attempt counted as lost | 2.15–2.16 / 2.01–2.14 | 2.30–2.67 / 2.08–2.20 |
+| funded account survives 1 year (a frozen one counts) | 68% / 95% | 81% / 99% |
 | funded 1-year return, median of survivors | +3.8–4.0% / +2.8% | +0.5% / +2.5% |
 
-W2 did not pass its pre-registered rule: its 18-month passes fell by
-1–9 start dates in three of four cells. It trades long-run income and
-speed of finishing for far fewer lost accounts. It only ever shrinks
-entries, and only once the account is down about 3.7%. The funded
-account is to be decided again when there is one.
+**The buffer turns breaches into frozen accounts; it does not add
+passes.**
+
+* Off passes more often in every cell (46–47% against 38–43%; 38–42%
+  against 37–40%) and needs fewer attempts per pass.
+* W2 did not pass its pre-registered rule.
+* It is on by the operator's order of 2026-11-09. He gave that order
+  before the frozen accounts were measured, on a trade-off that did not
+  count them. He has been told and advised to turn it off again
+  (`cap_max_loss_buffer: 0.002`). Until he decides it stays on.
+* A frozen account is not closed by FTMO. Lowering the buffer lets the
+  bot trade what is left.
 
 **Why two positions could fail the account in one day, and the cap.**
 FTMO's daily line is day-start *balance* minus 5%, and balance ignores
@@ -130,9 +170,10 @@ The two bot columns above include the cap; the bare-rule column does not.
     data ended, against 29–31%.
   * **Two safety rules, tested 2026-11-09 (`research/ftmo_scale_out_v2.md`):**
     * A 10-session time stop made things worse.
-    * A 1.5% max-loss buffer cut breaches to 15–16% and 2%, but with
-      lower funded returns. It did not pass its rule. It is **on** by the
-      operator's order of 2026-11-09.
+    * A 1.5% max-loss buffer cut breaches to 15–16% and 2%, but the
+      attempts it saved from a breach froze instead. It did not pass its
+      rule. It is **on** by the operator's order of 2026-11-09 (see
+      "The buffer" above).
     * 2% risk instead of 3% cut 2011–18 breaches (to 21–28%) but raised
       2019–26 ones (to 14–20%), and slowed passes (16–20% within 18
       months).
@@ -480,8 +521,33 @@ server clock are what paper cannot test.
    number (in FTMO's email; the preflight's WARN line shows it), for
    example `login: 1234567`, and save. It is the account number, not the
    password. Orders go only to that account: `-Live` refuses to start
-   without it, or with the terminal on another account. Then start the
-   bot:
+   without it, or with the terminal on another account.
+
+   **Self-test first** (once per trial account, on a weekday between
+   10:00 and 10:45 New York time, with no `-Live` window running):
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File deploy\ftmo\run.ps1 -SelfTest
+   ```
+
+   It sends one tiny position through every order the 5 steps use:
+   * it buys twice the minimum lot of `US500.cash` with a stop 5% under
+     the price;
+   * it closes half;
+   * it moves the stop up;
+   * it closes the rest.
+
+   A quiet trial may never reach a target, and then these orders would
+   stay unproven. Each prints `PASS` or `FAIL`, and the run ends with
+   `self-test passed: this account takes every order the 5 steps send`.
+   The round trip costs the spread on 0.02 lots and counts as the trial's
+   first trading day. Its size is fixed: the combined-risk cap does not
+   size it, but the bot's entry checks (halt, block, the guard at the
+   loss lines) do apply. On a `FAIL`, send me the line and
+   `state\ftmo_bot.log`. If an order fails midway, the bot closes what
+   it opened; what it cannot close it queues, and `-Live` closes it.
+
+   Then start the bot:
 
    ```powershell
    powershell -ExecutionPolicy Bypass -File deploy\ftmo\run.ps1 -Live
@@ -495,12 +561,15 @@ server clock are what paper cannot test.
    trades only on a signal, about twice a month, so a quiet trial is
    normal. Read `state\ftmo_bot.log` each day: the plan after 16:05 New
    York, then the orders at the next open with lots and stops.
-10. Before buying the challenge, the trial must show: the round trip
-    filled and FTMO's dashboard counted the trading day; any FAST-4
-    entry filled with a stop-loss at about 3 ATR and a lot size risking
-    about 3% (a second entry is cut so both stops stay above FTMO's
-    lines, "cut from X to Y lots" in the log, as intended); no ERROR
-    lines in the log.
+10. Before buying the challenge, the trial must show:
+    * the self-test passed (four `PASS` lines);
+    * the round trip filled and FTMO's dashboard counted the trading day;
+    * any FAST-4 entry filled with a stop-loss at about 3 ATR and a lot
+      size risking about 3%. A second entry is cut so both stops stay
+      above FTMO's lines ("cut from X to Y lots" in the log, as intended);
+    * no ERROR lines in the log, and no `FROZEN` warning. The preflight
+      prints `room for the next entry: ...`; `WARN: FROZEN` there means
+      the account can open nothing more.
 
 **No free trial?** If FTMO asks for payment for the trial, use any
 broker's free MT5 demo: in `state\ftmo_config.yaml` put that broker's

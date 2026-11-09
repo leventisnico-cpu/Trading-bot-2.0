@@ -1,4 +1,4 @@
-"""python -m ftmo_bot {preflight|plan|run|flat} --config deploy/ftmo/config.yaml [--execute]
+"""python -m ftmo_bot {preflight|plan|run|flat|selftest} --config deploy/ftmo/config.yaml [--execute]
 
 * preflight: read-only checks (terminal, account, server clock, the
              initial balance with its loss line and target, symbols,
@@ -13,6 +13,11 @@
              out only on a flat account); same opt-ins as ``run``.
              Stop ``run`` first: only one of them may hold the state file
              (``lock.py``), so ``flat`` refuses while ``run`` is going.
+* selftest:  one tiny round trip through every order the 5 steps send (a
+             buy with a stop, a part close, a stop move, the close), on
+             weekdays 10:00-10:45 New York; prints PASS or FAIL per order.
+             For the free trial, before ``run``; same opt-ins and lock as
+             ``flat``.
 """
 
 from __future__ import annotations
@@ -21,6 +26,7 @@ import argparse
 import logging
 import sys
 from pathlib import Path
+from typing import Optional
 
 from . import fast4, lock, sessions
 from .runner import BAR_COUNT, MIN_SESSIONS, Runner, cap_rule, exit_rule
@@ -40,9 +46,21 @@ def rules_line(r: Runner) -> str:
                else "; target locked" if st.target_locked else ""))
 
 
+def room_line(r: Runner) -> Optional[str]:
+    """What a new entry may risk now, or that the account is frozen."""
+    got = r.entry_room()
+    if got is None:
+        return None
+    room, frozen = got
+    if frozen:
+        return "WARN: FROZEN. " + r._frozen_text(r.b.account().balance)
+    return (f"room for the next entry: {room:,.2f} "
+            f"({room / r.st.initial_balance:.1%} of the account)")
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="ftmo_bot")
-    ap.add_argument("command", choices=["preflight", "plan", "run", "flat"])
+    ap.add_argument("command", choices=["preflight", "plan", "run", "flat", "selftest"])
     ap.add_argument("--config", required=True)
     ap.add_argument("--execute", action="store_true",
                     help="send real orders (also needs dry_run: false in the config)")
@@ -52,7 +70,7 @@ def main(argv=None) -> int:
     except (OSError, ValueError, TypeError) as e:
         print(f"FAIL config {a.config}: {e}")
         return 1
-    if a.command not in ("run", "flat") or not a.execute:
+    if a.command not in ("run", "flat", "selftest") or not a.execute:
         cfg.dry_run = True
     Path(cfg.log_path).parent.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(level=logging.INFO,
@@ -123,6 +141,9 @@ def main(argv=None) -> int:
             print(rules_line(r))
             print(f"exits for new positions: {exit_rule(cfg)}")
             print(f"risk cap: {cap_rule(cfg)}")
+            line = room_line(r)
+            if line:
+                print(line)
         if cfg.login is None:
             print(f"WARN: login not set; run.ps1 -Live and -Flat need `login: "
                   f"{acct.login}` in {a.config} (replace the `login: null` line; "
@@ -165,7 +186,7 @@ def main(argv=None) -> int:
         return 1
     try:
         try:
-            r = Runner(cfg, b, readonly=a.command == "flat" and cfg.dry_run)
+            r = Runner(cfg, b, readonly=a.command != "run" and cfg.dry_run)
         except RuntimeError as e:
             print(f"FAIL {e}")
             if a.command == "flat":
@@ -185,6 +206,19 @@ def main(argv=None) -> int:
             print("flat" if not left else
                   f"{len(left)} position(s) still open; run flat again")
             return 0 if not left else 1
+        if a.command == "selftest":
+            lines = r.selftest(b.now())
+            if cfg.dry_run:
+                for _, text in lines:
+                    print(text)
+                return 0 if all(ok for ok, _ in lines) else 1
+            for ok, text in lines:
+                print(f"{'PASS' if ok else 'FAIL'} {text}")
+            good = len(lines) == 4 and all(ok for ok, _ in lines)
+            print("self-test passed: this account takes every order the 5 steps send"
+                  if good else "self-test NOT passed: see the FAIL line above and the log")
+            print(rules_line(r))
+            return 0 if good else 1
         print(rules_line(r))
         r.run()
         return 0

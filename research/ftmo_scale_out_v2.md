@@ -351,3 +351,74 @@ long-run income and speed of finishing for far fewer lost accounts.
 * **The verdict above is unchanged.** W2 did not pass its pre-registered
   rule. It runs on the operator's order, with the costs listed in
   "Decision".
+
+## Correction (2026-11-09, later): "still running" is mostly frozen accounts
+
+**How it was found.** A replay of the real bot over the whole history
+(`scripts/ftmo_replay.py`, `reports/ftmo_bot_replay.md`) left one account
+flat at 13,725 of 15,000 from 2015 to 2026. That is the max-loss line plus
+the 1.5% buffer. The cap left it nothing to risk, so the bot skipped
+every signal for eleven years. In the tables above such an attempt counts
+as "still running".
+
+**The measurement.** `research/ftmo_frozen_accounts.py` reruns the same
+evaluations through the same functions and reads the last account of
+each unfinished attempt. It is a diagnostic of rules already tested, not
+a new rule. Run: `python -B -I research/ftmo_frozen_accounts.py
+--data-dir <dir>`, 17 s, on the same data.
+
+Frozen: flat when the data ends, with under 0.05% of the initial balance left to risk. Attempts per pass counts a frozen attempt as lost, like a breach.
+
+| rule | bound | starts | attempts | passed | breached | frozen | still trading | median years since a frozen account's last entry | attempts per pass |
+|---|---|---|---|---|---|---|---|---|---|
+| V0 (FAST-4 exits, 0.2% buffer) | pessimistic | 2011–18 | 352 | 24.1% | 43.5% | 31.0% | 1.4% | 7.2 | 4.08 |
+| V0 (FAST-4 exits, 0.2% buffer) | pessimistic | 2019–26 | 368 | 67.7% | 1.4% | 10.1% | 20.9% | 4.8 | 1.17 |
+| V0 (FAST-4 exits, 0.2% buffer) | optimistic | 2011–18 | 352 | 29.0% | 40.6% | 29.0% | 1.4% | 7.2 | 3.40 |
+| V0 (FAST-4 exits, 0.2% buffer) | optimistic | 2019–26 | 368 | 70.1% | 1.1% | 9.5% | 19.3% | 4.8 | 1.15 |
+| V1 (5 steps, 0.2% buffer) | pessimistic | 2011–18 | 352 | 46.3% | 36.9% | 16.8% | 0.0% | 8.0 | 2.16 |
+| V1 (5 steps, 0.2% buffer) | pessimistic | 2019–26 | 368 | 37.8% | 13.0% | 29.9% | 19.3% | 4.8 | 2.14 |
+| V1 (5 steps, 0.2% buffer) | optimistic | 2011–18 | 352 | 46.6% | 36.9% | 16.5% | 0.0% | 8.0 | 2.15 |
+| V1 (5 steps, 0.2% buffer) | optimistic | 2019–26 | 368 | 41.8% | 12.2% | 30.2% | 15.8% | 4.8 | 2.01 |
+| W2 (5 steps, 1.5% max-loss buffer) | pessimistic | 2011–18 | 352 | 37.5% | 15.6% | 46.9% | 0.0% | 10.2 | 2.67 |
+| W2 (5 steps, 1.5% max-loss buffer) | pessimistic | 2019–26 | 368 | 36.7% | 2.4% | 41.6% | 19.3% | 4.8 | 2.20 |
+| W2 (5 steps, 1.5% max-loss buffer) | optimistic | 2011–18 | 352 | 43.5% | 14.8% | 41.8% | 0.0% | 10.5 | 2.30 |
+| W2 (5 steps, 1.5% max-loss buffer) | optimistic | 2019–26 | 368 | 40.2% | 1.9% | 41.6% | 16.3% | 4.8 | 2.08 |
+
+**What it changes.**
+
+1. **The buffer turns breaches into frozen accounts. It does not add
+   passes.** Against V1, W2 breaches less (16% against 37%; 2% against
+   12–13%). But it freezes more (42–47% against 17%; 42% against 30%),
+   and it passes less often in every cell (38–43% against 46–47%; 37–40%
+   against 38–42%).
+2. **Attempts per pass.** Counting a frozen attempt as lost, W2 needs
+   2.1–2.7 attempts per pass and V1 needs 2.0–2.2. The figures given
+   above (1.34–1.42 and 1.05–1.07 for W2) counted only breaches as lost.
+3. **Funded figures.** The funded "survival" and "median return of the
+   survivors" above also include frozen accounts. W2's +0.5% median for
+   2011–18 is mostly accounts that stopped trading.
+4. **The trade-off put to the operator was incomplete.**
+   * He was told "far fewer lost accounts, about the same pass speed,
+     smaller income once funded", and that many attempts were "still
+     unfinished".
+   * The pre-registered verdict (keep V1) stands, and this measurement
+     supports it.
+   * He is told this correction in the same session, with the advice to
+     turn the buffer off again (`cap_max_loss_buffer: 0.002`).
+   * Until he answers, the buffer stays as he ordered it.
+5. **The first note's tables hide the same thing.** V0's "still running"
+   is 29–31% frozen for 2011–18 starts and 10% for 2019–26 starts.
+6. **Why accounts freeze.**
+   * The cap sizes an entry at min(3% of the balance, all the room that
+     is left). So the last entry before the floor stakes everything that
+     remains.
+   * FTMO's max-loss line is static, so a flat account's room never
+     returns.
+   * A rule that never commits all the remaining room is a new
+     hypothesis and needs its own note.
+
+**In the bot.**
+
+* A skipped entry on a flat account with no max-loss room now logs
+  `FROZEN` at warning level, with the balance and the floor.
+* The preflight prints the room for the next entry, or the freeze.
