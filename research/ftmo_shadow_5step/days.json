@@ -383,5 +383,20 @@
     "trading_days": 3,
     "flags": [],
     "errors": 0
+  },
+  {
+    "day": "2026-11-09",
+    "balance": 14280.188235460611,
+    "equity": 14293.718335061561,
+    "min_equity": 13972.709835061558,
+    "daily_floor": 13530.188235460611,
+    "open": [
+      "DIA 28.79@522.86 sl 507.70"
+    ],
+    "plan": "",
+    "deals": [],
+    "trading_days": 3,
+    "flags": [],
+    "errors": 0
   }
 ]

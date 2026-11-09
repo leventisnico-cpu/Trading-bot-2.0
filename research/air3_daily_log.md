@@ -1486,3 +1486,55 @@ paper position to report. Astral's paper slot holds the FTMO bot test
 * The backtest's trade was a winner because it entered at 276.80 in
   July 2025. The live entry came 15 months into that trade, near the
   top, so the same exit gave a loss.
+
+### 2026-11-09 (Monday, after the close)
+
+* **SMH:** close 487.26 from the last 30-minute bar (today's daily bar
+  has not posted), +5.0% on the day against Friday's posted close of
+  463.96 (the 30-minute bar showed 463.73). SMA50 564.32, SMA200 522.19.
+  Buy level 548.30, sell level 496.08.
+* **No order.** By the rule the position was sold at the 11-06 open
+  (473.41), so it is flat. The next BUY needs a close above 548.30
+  (12.5% above today's) with SMA50 above SMA200 (true today).
+  - The operator has not confirmed the TFSA fill yet; record it here
+    when he does.
+  - If the position is still held, the SELL stands: the close is $8.82
+    (1.8%) below the sell level.
+* **ETF scan** (1Y / 6M / YTD %):
+  - SOXX 45.8 / −15.4 / 46.2;
+  - SMH 35.8 / −14.0 / 35.3;
+  - XSD 33.1 / −19.8 / 38.3;
+  - SMHX 23.9 / −11.0 / 30.6;
+  - THNQ 22.9 / 4.9 / 30.5;
+  - XLK 15.6 / −2.7 / 18.7;
+  - FTEC 14.9 / −0.4 / 18.9;
+  - VGT 14.8 / −0.4 / 18.8;
+  - IYW 14.2 / −1.9 / 17.2;
+  - AIQ 12.8 / −5.7 / 15.6;
+  - CHAT 10.9 / −17.2 / 21.0;
+  - QQQ 9.0 / −4.5 / 10.6;
+  - WTAI 7.3 / −17.6 / 15.1;
+  - context only: USD (2×) −2.4 / −40.5 / 8.0 and SOXL (3×) 25.1 /
+    −68.2 / 33.8.
+
+  Top 3 unleveraged by 1Y: SOXX, SMH, XSD. No unswept ETF beats SMH on
+  all three, so there is no backtest.
+* **FTMO bot shadows: no trade, part close or stop move.** Both exit 0,
+  no tick errors. The indices rose: DIA +2.2%, SPY +2.4%, QQQ +3.5%,
+  IWM +3.2%.
+  - **5 steps (the bot's rule):** still holds US30, 28.79 at 522.86,
+    stop 507.70. DIA closed at 523.33, +0.03R; the first target is
+    538.02. Balance 14,280.19, equity 14,293.72 (−4.71%). Lowest mark
+    13,972.71, at Friday's close before the open; the daily floor is
+    13,530.19. No plan for Tuesday's open.
+  - With the 1.5% buffer a new entry could risk only 118.76 (0.8% of
+    the account) while this position is at its first stop.
+  - **FAST-4 exits:** flat, 14,945.96 (−0.36%), nothing planned.
+  - They ran on today's bot code (commits `9f6e26f`, `629095c`,
+    `ce989a8`: the audit, the `FROZEN` warning, the self-test, and the
+    two rejected fixes of `research/ftmo_slots_sizing.md`). No `FROZEN`
+    line in either log.
+* **Astral 1999:** no orders or fills; still paused and degraded, and
+  its stop feed now fails for SPY as well (DIA, IWM, QQQ, SPY). It
+  still holds DIA from 11-02 (14.16 shares at 520.80; closed at 523.33,
+  about +$36, with no working stop).
