@@ -80,12 +80,12 @@ def test_shipped_configs_use_the_five_steps():
         FtmoConfig(exit_mode="webinar").validate()
 
 
-def test_the_max_loss_buffer_stays_at_the_pre_registered_verdict():
-    """research/ftmo_scale_out_v2.md: W2 (0.015) did not pass its rule, so
-    the default and both shipped configs keep V1's 0.2%; 0.015 is allowed."""
-    assert FtmoConfig().cap_max_loss_buffer == 0.002
+def test_the_max_loss_buffer_is_on_by_the_operators_order():
+    """research/ftmo_scale_out_v2.md: W2 (0.015) did not pass its rule; the
+    operator ordered it on (2026-11-09) for the trial and the challenge."""
+    assert FtmoConfig().cap_max_loss_buffer == 0.015
     for name in ("config.trial.yaml", "config.example.yaml"):
-        assert load(ROOT / "deploy/ftmo" / name).cap_max_loss_buffer == 0.002
+        assert load(ROOT / "deploy/ftmo" / name).cap_max_loss_buffer == 0.015
     for ok in (0.0, 0.015, 0.05):
         FtmoConfig(cap_max_loss_buffer=ok).validate()
     for bad in (-0.001, 0.051, 0.2):
@@ -104,7 +104,7 @@ def test_risk_room_keeps_its_own_buffer_over_the_max_loss_line():
 
 
 def test_an_entry_near_the_max_loss_line_is_cut_to_the_buffer(tmp_path):
-    sc = Scene(tmp_path, cap_max_loss_buffer=0.015)       # W2
+    sc = Scene(tmp_path)                                  # the default: W2's 1.5%
     sc.r.st.day = sc.day.isoformat()                      # FTMO day already rolled
     sc.r.st.day_start_balance = 14000.0
     sc.b.balance = sc.b.equity = 14000.0                  # 6.7% down: room 14,000 - 13,725
@@ -580,3 +580,12 @@ def test_sim_broker_part_close_and_stop_move():
     assert sim.modify_sl(sim.pos[0], 105.0, 0).ok and sim.pos[0].sl == 105.0
     sim.advance_to(t0 + timedelta(minutes=95))               # the next bar's low 104 hits it
     assert sim.pos == [] and sim.balance == pytest.approx(15040.0 + 6 * 5.0)
+
+
+def test_the_risk_cap_is_spelled_out_for_the_operator():
+    from ftmo_bot.runner import cap_rule
+    assert cap_rule(FtmoConfig()) == ("all open stops together stay 0.2% above the daily "
+                                      "line and 1.5% above the max-loss line")
+    assert cap_rule(FtmoConfig(cap_max_loss_buffer=0.002)).endswith(
+        "0.2% above the max-loss line")
+    assert cap_rule(FtmoConfig(cap_combined_risk=False)).startswith("OFF")

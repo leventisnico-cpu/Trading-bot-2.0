@@ -10,6 +10,8 @@ proxies (QQQ = US100, SPY = US500, DIA = US30, IWM = US2000).
 ``--exit-mode`` is the bot's ``exit_mode`` (default fast4, the rule
 ``research/ftmo_shadow`` has run since 2026-10-05; ``research/ftmo_shadow_5step``
 runs scale_out, the 5 steps). A directory keeps the mode it started with.
+Both run the bot's current risk cap (since 2026-11-09 the 1.5% max-loss
+buffer, ``cap_max_loss_buffer``), so the two differ only in their exits.
 
 DIR holds ``qqq_30m.csv``, ``spy_30m.csv``, ``dia_30m.csv``, ``iwm_30m.csv``
 (Astral exports). Each run continues from the saved state and ticks the

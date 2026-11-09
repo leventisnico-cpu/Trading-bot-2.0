@@ -121,8 +121,11 @@ Nico's style: one-line status first, then at most one thing for him to do.
     - Passes within 18 months fell 0–3 points in three of four cells.
     - The median funded return fell to +0.5% (2011–18) and +2.5%
       (2019–26).
-    - It did not pass its pre-registered rule, so it is **off** (0.002).
-      Switching it on is Nico's call; never do it on your own.
+    - It did not pass its pre-registered rule.
+    - Nico then ordered it **on**: "buffer on". It is the default and is
+      in both configs. The funded account is to be decided again later.
+    - The preflight prints `risk cap: all open stops together stay 0.2%
+      above the daily line and 1.5% above the max-loss line`.
 
 ## 3. The bot on one screen
 
@@ -163,15 +166,14 @@ Nico's style: one-line status first, then at most one thing for him to do.
   These run only 10:00–10:45 New York.
 - **Realistic odds** ("Read this first" in `docs/FTMO_BOT.md`):
   - FAST-4 is NO-GO for a *fast* pass.
-  - **With the 5 steps (the default since 11-08):**
-    - attempts started 2011–18: 34–41% passed both phases within 18
-      months; 37% breached;
-    - attempts started 2019–26: 19–24% passed within 18 months; 12–13%
-      breached; 46–49% were still running when the data ended.
+  - **With the 5 steps and the 1.5% buffer (the default since 11-09):**
+    - attempts started 2011–18: 31–38% passed both phases within 18
+      months; 15–16% breached;
+    - attempts started 2019–26: 20–24% passed within 18 months; 2%
+      breached; 58–61% were still running when the data ended.
     - 61–62% of trades win (2012–2026). Never 30 of 31.
-    - With `cap_max_loss_buffer: 0.015` (off; Nico's call): 15–16% and 2%
-      breached, 31–38% and 20–24% passed within 18 months, and lower
-      funded returns.
+    - Funded, the median survivor made +0.5% to +2.5% a year.
+    - Without the buffer: 37% and 12–13% breached.
   - **With the old FAST-4 exits (`exit_mode: fast4`):**
     - attempts started 2019–26 passed both phases 68–70% of the time within
       the data, with 1% breached. But that takes about 2 to 2.4 years, and
@@ -204,8 +206,8 @@ Nico's style: one-line status first, then at most one thing for him to do.
   meets the criteria in section 6.
 - **Don't change strategy parameters:** 3% risk, 3 × ATR stop,
   SMA200 / RSI(2), the 5 steps (`exit_mode: scale_out`), 2 positions, cap
-  on (`cap_max_loss_buffer: 0.002` unless Nico orders 0.015). They are
-  the researched rule plus Nico's orders. Never change one to make
+  on with the 1.5% max-loss buffer (`cap_max_loss_buffer: 0.015`). They
+  are the researched rule plus Nico's orders. Never change one to make
   something pass.
 - **Never commit `state\` or `.env`.** Both are git-ignored and hold the
   account number and the bot's state.

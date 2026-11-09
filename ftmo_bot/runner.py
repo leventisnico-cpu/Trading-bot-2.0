@@ -85,6 +85,14 @@ MIN_SESSIONS = 205
 log = logging.getLogger("ftmo_bot")
 
 
+def cap_rule(cfg: FtmoConfig) -> str:
+    """The combined-risk cap, in words (logs and preflight)."""
+    if not cfg.cap_combined_risk:
+        return "OFF (each entry risks its full share, whatever is open)"
+    return (f"all open stops together stay {cfg.guard_buffer:.1%} above the daily line "
+            f"and {cfg.cap_max_loss_buffer:.1%} above the max-loss line")
+
+
 def exit_rule(cfg: FtmoConfig) -> str:
     """The exit rule new positions get, in words (logs, plan, preflight)."""
     if cfg.exit_mode == "scale_out":
@@ -904,6 +912,7 @@ class Runner:
                  "DRY-RUN" if self.cfg.dry_run else "LIVE ORDERS",
                  self.cfg.risk_per_trade * 100, self.cfg.symbols)
         log.info("exits for new positions: %s", exit_rule(self.cfg))
+        log.info("risk cap: %s", cap_rule(self.cfg))
         while True:
             try:
                 self.tick()

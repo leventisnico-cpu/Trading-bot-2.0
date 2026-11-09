@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 
 from . import fast4, lock, sessions
-from .runner import BAR_COUNT, MIN_SESSIONS, Runner, exit_rule
+from .runner import BAR_COUNT, MIN_SESSIONS, Runner, cap_rule, exit_rule
 from .config import load
 
 
@@ -122,6 +122,7 @@ def main(argv=None) -> int:
         else:                                       # compare with FTMO's dashboard
             print(rules_line(r))
             print(f"exits for new positions: {exit_rule(cfg)}")
+            print(f"risk cap: {cap_rule(cfg)}")
         if cfg.login is None:
             print(f"WARN: login not set; run.ps1 -Live and -Flat need `login: "
                   f"{acct.login}` in {a.config} (replace the `login: null` line; "

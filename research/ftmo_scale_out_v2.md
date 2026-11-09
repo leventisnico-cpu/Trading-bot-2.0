@@ -325,3 +325,29 @@ The trade-off, as measured above, against V1 (2011–18 / 2019–26):
 In short, the buffer only ever makes an entry smaller, and only once the
 day-start balance is under about 96.3% of the initial balance. It trades
 long-run income and speed of finishing for far fewer lost accounts.
+
+## Operator's order (2026-11-09): the buffer is on
+
+* **The question.** After the decision above, the operator was asked in
+  this session's chat whether the 1.5% buffer should be on for the
+  $100k challenge. He was given the trade-off:
+  * far fewer lost accounts, 2–16% of attempts instead of 12–37%;
+  * about the same pass speed;
+  * smaller income once funded.
+
+  The recommendation given was: "on for the challenge, then decide again
+  once funded".
+* **The answer,** verbatim: "buffer on".
+* **What changed:**
+  * `cap_max_loss_buffer: 0.015` is now the code default.
+  * Both shipped configs carry it too. The question named only the $100k
+    challenge. The free trial also runs the buffer because it rehearses
+    the challenge: the bot's choice, not the operator's words.
+    `cap_max_loss_buffer: 0.002` in the trial config reverses it.
+  * The bot prints and logs its cap: `risk cap: all open stops together
+    stay 0.2% above the daily line and 1.5% above the max-loss line`.
+  * The funded account is to be decided again when there is one.
+    `0.002` turns the buffer off.
+* **The verdict above is unchanged.** W2 did not pass its pre-registered
+  rule. It runs on the operator's order, with the costs listed in
+  "Decision".

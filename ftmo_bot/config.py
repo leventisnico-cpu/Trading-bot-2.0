@@ -66,9 +66,9 @@ class FtmoConfig:
     cap_combined_risk: bool = True        # all open stops together never cross a loss line
     # ... and stay this far (of the initial balance) above the max-loss line;
     # the daily line keeps guard_buffer (set separately: changing guard_buffer
-    # no longer moves this one). 0.015 is W2 of research/ftmo_scale_out_v2.md
-    # (far fewer breaches, lower funded returns): the operator's call
-    cap_max_loss_buffer: float = 0.002
+    # does not move this one). 0.015 = W2 of research/ftmo_scale_out_v2.md, on
+    # by the operator's order of 2026-11-09 ("buffer on"); 0.002 = without it
+    cap_max_loss_buffer: float = 0.015
     target_margin: float = 0.003          # lock the target this far above it (closing costs)
     keepalive_days: int = 25              # every phase (FTMO closes inactive accounts); 0 = off
     keepalive_symbol: str = "US500"
@@ -110,7 +110,7 @@ class FtmoConfig:
         if not 0 <= self.guard_buffer < self.daily_loss:
             raise ValueError("guard_buffer must be in [0, daily_loss)")
         if not 0 <= self.cap_max_loss_buffer <= 0.05:
-            raise ValueError("cap_max_loss_buffer must be in [0, 5%] (0.002, or 0.015 for W2)")
+            raise ValueError("cap_max_loss_buffer must be in [0, 5%] (0.015 = W2, the default; 0.002 = off)")
         if not 0 < self.notional_cap <= 30:
             raise ValueError("notional_cap must be in (0, 30] x balance")
         if not 0 < self.atr_stop_mult <= 10:

@@ -587,3 +587,7 @@ Two safety rules for the 5 steps were pre-registered and tested in
 None beats V1 by that note's rule, so the bot keeps V1. W2's buffer is
 available as `cap_max_loss_buffer: 0.015`, and turning it on is the
 operator's call; its trade-off is in that note's "Decision".
+
+Later on 2026-11-09 the operator ordered W2's buffer on: "buffer on".
+`cap_max_loss_buffer: 0.015` is now the default, with the 5 steps. See
+`research/ftmo_scale_out_v2.md`, "Operator's order".

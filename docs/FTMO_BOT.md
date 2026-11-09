@@ -16,21 +16,23 @@ the day's high (optimistic) and one that waits for the next open
 (pessimistic):
 
 Since 2026-11-08 the bot's exits are the 5 steps (`exit_mode: scale_out`,
-the operator's order; `research/ftmo_scale_out.md`, V1). The FAST-4
-exit columns are `exit_mode: fast4`, the rule before that.
-`cap_max_loss_buffer: 0.015` (W2 of `research/ftmo_scale_out_v2.md`) is
-built and tested but off; see the next table.
+the operator's order; `research/ftmo_scale_out.md`, V1). Since
+2026-11-09, also by the operator's order ("buffer on"), the cap keeps all
+open stops 1.5% above the max-loss line: `cap_max_loss_buffer: 0.015`, W2
+of `research/ftmo_scale_out_v2.md`. W2 did not pass its pre-registered
+rule. The default columns are both together. The FAST-4 exit columns are
+`exit_mode: fast4` with the old 0.2% buffer.
 
-| measure | FAST-4 exits, 2011–18 starts | FAST-4 exits, 2019–26 starts | bare rule, 2019–26 starts | **5 steps (default)**, 2011–18 starts | **5 steps (default)**, 2019–26 starts |
+| measure | FAST-4 exits, 2011–18 starts | FAST-4 exits, 2019–26 starts | bare rule, 2019–26 starts | **5 steps + 1.5% buffer (default)**, 2011–18 starts | **5 steps + 1.5% buffer (default)**, 2019–26 starts |
 |---|---|---|---|---|---|
-| both phases passed, within the data | 24–29% | 68–70% | 23% | 46–47% | 38–42% |
-| breached a rule (fee lost) | 41–43% | 1% | 77% | 37% | 12–13% |
-| still running when the data ends | 30–32% | 29–31% | 0% | 16–17% | 46–49% |
-| both phases within 18 months | 7–9% | 14–17% | 18% | 34–41% | 19–24% |
-| days to pass, median | 670–699 | 858–870 | 392 | 310–344 | 468–547 |
-| funded account survives 1 year | 85% | 99% | 36% | 68% | 95% |
-| funded 1-year return, median of survivors | +3.9% | +6.6% | +10.1% | +3.8–4.0% | +2.8% |
-| fees per funded account (EUR 89 per attempt) | 2.4–2.8 (EUR 214–249) | 1.02 (EUR 90–91) | 4.3 (EUR 381) | 1.8 (EUR 159–160) | 1.29–1.35 (EUR 115–120) |
+| both phases passed, within the data | 24–29% | 68–70% | 23% | 38–43% | 37–40% |
+| breached a rule (fee lost) | 41–43% | 1% | 77% | 15–16% | 2% |
+| still running when the data ends | 30–32% | 29–31% | 0% | 42–47% | 58–61% |
+| both phases within 18 months | 7–9% | 14–17% | 18% | 31–38% | 20–24% |
+| days to pass, median | 670–699 | 858–870 | 392 | 307–328 | 459–533 |
+| funded account survives 1 year | 85% | 99% | 36% | 81% | 99% |
+| funded 1-year return, median of survivors | +3.9% | +6.6% | +10.1% | +0.5% | +2.5% |
+| fees per funded account (EUR 89 per attempt) | 2.4–2.8 (EUR 214–249) | 1.02 (EUR 90–91) | 4.3 (EUR 381) | 1.34–1.42 (EUR 119–126) | 1.05–1.07 (EUR 93–95) |
 
 What this means for the FAST-4 exits: the bot rarely loses an account in a good regime (the
 cap keeps every open stop above FTMO's lines; the lock keeps a reached
@@ -43,24 +45,25 @@ new fee. Funded, the median return is +3.9% to +6.6% a year on the
 account size, of which the trader keeps 80%. The bot executes the rule
 faithfully; it does not change these odds.
 
-What it means for the 5 steps:
+What it means for the default (the 5 steps with the 1.5% buffer):
 
-* **Passes:** 34–41% of 2011–18 attempts and 19–24% of 2019–26 ones
+* **Passes:** 31–38% of 2011–18 attempts and 20–24% of 2019–26 ones
   pass within 18 months.
-* **Breaches:** in the good 2019–26 regime, 12–13% of attempts breached,
-  against 1% with the FAST-4 exits. Half were still running when the
-  data ended.
+* **Breaches:** 15–16% and 2% of attempts. Many attempts are still
+  running when the data ends, so finishing is slow.
 * **Losers:** every loser is a full −1R stop, often held for weeks.
+* **Funded:** the median survivor makes +0.5% to +2.5% a year on the
+  account. The buffer trims entries whenever the account is down about
+  3.7% or more.
 * **No exit rule wins 30 trades in 31.** The 5 steps win 61–62% of
   trades (2012–2026). A trade loses when price falls 1R before it rises
   1R, and the entry decides that before step 3 can happen.
 
-**The option: `cap_max_loss_buffer: 0.015`** (W2,
-`research/ftmo_scale_out_v2.md`, the operator's call). The cap then keeps
-all open stops 1.5% above the max-loss line, not 0.2%. Below, 5 steps
-with W2 against the default, 2011–18 / 2019–26 starts:
+**The buffer: on (`cap_max_loss_buffer: 0.015`) against off (`0.002`)**
+(W2, `research/ftmo_scale_out_v2.md`; on by the operator's order of
+2026-11-09). 5 steps, 2011–18 / 2019–26 starts:
 
-| measure | 5 steps (default) | 5 steps + `cap_max_loss_buffer: 0.015` |
+| measure | 5 steps, buffer off (`0.002`) | 5 steps, buffer on (`0.015`, default) |
 |---|---|---|
 | breached a rule | 37% / 12–13% | 15–16% / 2% |
 | both phases within 18 months | 34–41% / 19–24% | 31–38% / 20–24% |
@@ -70,10 +73,11 @@ with W2 against the default, 2011–18 / 2019–26 starts:
 | funded account survives 1 year | 68% / 95% | 81% / 99% |
 | funded 1-year return, median of survivors | +3.8–4.0% / +2.8% | +0.5% / +2.5% |
 
-W2 did not pass its pre-registered rule. Its 18-month passes fell by
+W2 did not pass its pre-registered rule: its 18-month passes fell by
 1–9 start dates in three of four cells. It trades long-run income and
 speed of finishing for far fewer lost accounts. It only ever shrinks
-entries, and only once the account is down about 3.7%.
+entries, and only once the account is down about 3.7%. The funded
+account is to be decided again when there is one.
 
 **Why two positions could fail the account in one day, and the cap.**
 FTMO's daily line is day-start *balance* minus 5%, and balance ignores
@@ -81,9 +85,11 @@ floating P&L, so open risk counts in full against every day's 5%. Two
 positions at 3% each (6%) cross it if both stops are hit. That was the
 main failure in the research. With `cap_combined_risk: true` (the
 default) each entry is sized so that all open stops together stay 0.2%
-above both loss lines: the first position risks 3%, a second one gets
-what is left (about 1.8%). `cap_max_loss_buffer` sets the max-loss one
-(0.015 = W2, off unless the operator orders it). On the 2025-2026 replay this widened the closest
+above the daily line and 1.5% above the max-loss line
+(`cap_max_loss_buffer`): the first position risks 3%, a second one gets
+what is left (about 1.8%), and once the account is down about 3.7% the
+max-loss buffer trims new entries further. The preflight prints the cap
+as `risk cap: ...`. On the 2025-2026 replay the 0.2% cap widened the closest
 approach to the daily line from 43 to 177 and delayed Phase 1 from 204
 to 236 weekdays. What it cannot stop: a gap that opens beyond the stops.
 The two bot columns above include the cap; the bare-rule column does not.
@@ -125,8 +131,8 @@ The two bot columns above include the cap; the bare-rule column does not.
   * **Two safety rules, tested 2026-11-09 (`research/ftmo_scale_out_v2.md`):**
     * A 10-session time stop made things worse.
     * A 1.5% max-loss buffer cut breaches to 15–16% and 2%, but with
-      lower funded returns. It did not pass its rule. It is built in, off
-      by default, and the operator decides.
+      lower funded returns. It did not pass its rule. It is **on** by the
+      operator's order of 2026-11-09.
     * 2% risk instead of 3% cut 2011–18 breaches (to 21–28%) but raised
       2019–26 ones (to 14–20%), and slowed passes (16–20% within 18
       months).
@@ -219,7 +225,7 @@ Re-read them before buying; FTMO changes them.
 | FTMO rule (2-Step, Swing) | what the bot does |
 |---|---|
 | Maximum Daily Loss: equity may not fall below the balance at 00:00 Prague time minus 5% of the initial balance; floating P&L counts | the FTMO day rolls at Prague midnight on the PC's clock; the guard flattens 0.2% above the line; every open stop together stays above it (`cap_combined_risk`) |
-| Maximum Loss: equity may not fall below 90% of the initial balance, static | the same guard on the 90% line; entries stop for good after it; all open stops together stay `cap_max_loss_buffer` (0.2%) above it |
+| Maximum Loss: equity may not fall below 90% of the initial balance, static | the same guard on the 90% line; entries stop for good after it; all open stops together stay 1.5% above it (`cap_max_loss_buffer`) |
 | Profit target 10% (Phase 1), 5% (Verification), none on the funded account | `profit_target`; the target lock above |
 | 4 minimum trading days per phase, a trading day being a Prague calendar day on which a position is opened; none on the funded account | Prague dates of opened positions only; the lock adds missing days with minimum-lot round trips |
 | No time limit | none assumed |
