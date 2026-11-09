@@ -112,6 +112,17 @@ Nico's style: one-line status first, then at most one thing for him to do.
     equity, against −0.4% for the old exits on the same bars.
   - `exit_mode: fast4` brings the old exits back. That is Nico's call;
     never switch it on your own.
+- **11-09, "Do what's necessary for the success of the bot":** two
+  safety rules were pre-registered and tested
+  (`research/ftmo_scale_out_v2.md`).
+  - A 10-session time stop made things worse and was dropped.
+  - A 1.5% max-loss buffer (`cap_max_loss_buffer: 0.015`) cut breaches.
+    - 2011–18: from 37% to 15–16%. 2019–26: from 12–13% to 2%.
+    - Passes within 18 months fell 0–3 points in three of four cells.
+    - The median funded return fell to +0.5% (2011–18) and +2.5%
+      (2019–26).
+    - It did not pass its pre-registered rule, so it is **off** (0.002).
+      Switching it on is Nico's call; never do it on your own.
 
 ## 3. The bot on one screen
 
@@ -158,6 +169,9 @@ Nico's style: one-line status first, then at most one thing for him to do.
     - attempts started 2019–26: 19–24% passed within 18 months; 12–13%
       breached; 46–49% were still running when the data ended.
     - 61–62% of trades win (2012–2026). Never 30 of 31.
+    - With `cap_max_loss_buffer: 0.015` (off; Nico's call): 15–16% and 2%
+      breached, 31–38% and 20–24% passed within 18 months, and lower
+      funded returns.
   - **With the old FAST-4 exits (`exit_mode: fast4`):**
     - attempts started 2019–26 passed both phases 68–70% of the time within
       the data, with 1% breached. But that takes about 2 to 2.4 years, and
@@ -190,8 +204,9 @@ Nico's style: one-line status first, then at most one thing for him to do.
   meets the criteria in section 6.
 - **Don't change strategy parameters:** 3% risk, 3 × ATR stop,
   SMA200 / RSI(2), the 5 steps (`exit_mode: scale_out`), 2 positions, cap
-  on. They are the researched rule plus Nico's order. Never change one to
-  make something pass.
+  on (`cap_max_loss_buffer: 0.002` unless Nico orders 0.015). They are
+  the researched rule plus Nico's orders. Never change one to make
+  something pass.
 - **Never commit `state\` or `.env`.** Both are git-ignored and hold the
   account number and the bot's state.
 - **One bot process at a time.** Stop `run` with Ctrl+C before logging the

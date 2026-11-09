@@ -35,6 +35,8 @@ max_loss: 0.10
 daily_loss: 0.05
 guard_buffer: 0.002
 cap_combined_risk: true
+cap_max_loss_buffer: 0.002   # all open stops stay this far above the max-loss line. 0.015 (W2,
+                             # research/ftmo_scale_out_v2.md): far fewer breaches, lower funded returns
 target_margin: 0.003
 keepalive_days: 5        # a trade at least every 5 days (the trial needs one in its first 7)
 keepalive_symbol: US500

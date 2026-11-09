@@ -575,3 +575,15 @@ York.
   loser is a full stop, held for weeks.
 * `research/ftmo_shadow_5step/` is continued daily next to
   `research/ftmo_shadow/`.
+
+## Follow-up (2026-11-09)
+
+Two safety rules for the 5 steps were pre-registered and tested in
+`research/ftmo_scale_out_v2.md`:
+
+* a 10-session time stop (W1);
+* a 1.5% buffer over the max-loss line (W2).
+
+None beats V1 by that note's rule, so the bot keeps V1. W2's buffer is
+available as `cap_max_loss_buffer: 0.015`, and turning it on is the
+operator's call; its trade-off is in that note's "Decision".

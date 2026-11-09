@@ -585,7 +585,8 @@ class Runner:
                 committed = sum(max(0.0, self.b.loss_per_lot(p.symbol, p.price_open, p.sl))
                                 * p.volume for p in current if p.sl)
                 room = rules.risk_room(a.balance, self.st.day_start_balance,
-                                       committed, self.limits)
+                                       committed, self.limits,
+                                       self.cfg.cap_max_loss_buffer)
                 fit = math.floor(room / lpl / spec.volume_step + 1e-9) * spec.volume_step
                 if fit < vol:
                     log.info("entry %s cut from %.2f to %.2f lots: open stops "

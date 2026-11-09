@@ -16,6 +16,10 @@
 # 30 of 31. Of attempts started 2011-18 / 2019-26: both phases passed within
 # 18 months 34-41% / 19-24% (FAST-4 exits: 7-9% / 14-17%); breached 37% /
 # 12-13% (FAST-4 exits: 41-43% / 1%); 2019-26 still running 46-49%.
+# cap_max_loss_buffer: 0.015 (W2, research/ftmo_scale_out_v2.md) would cut
+# the breaches to 15-16% / 2% at 31-38% / 20-24% within 18 months, with
+# lower funded returns (median +0.5% / +2.5%): not adopted by its
+# pre-registered rule; the operator's call.
 
 symbols:                 # strategy name -> FTMO MT5 symbol (check Market Watch)
   US100: US100.cash
@@ -40,6 +44,9 @@ max_loss: 0.10
 daily_loss: 0.05
 guard_buffer: 0.002      # flatten 0.2% of initial before a loss line
 cap_combined_risk: true  # size each entry so all open stops together stay above both loss lines
+cap_max_loss_buffer: 0.002   # ... this far above the max-loss line (the daily line: guard_buffer).
+                         # 0.015 = W2 (research/ftmo_scale_out_v2.md): breaches 37% -> 15-16% and
+                         # 12-13% -> 2%, but lower funded returns; switching it on is the operator's call
 target_margin: 0.003     # lock the phase target once equity is this far (of initial) above it
 keepalive_days: 25       # minimum-lot round trip after this many days without an opened
                          # position, in every phase (FTMO closes inactive accounts); 0 = off

@@ -60,17 +60,22 @@ def lots(balance: float, risk: float, entry: float, stop: float,
 
 
 def risk_room(balance: float, day_start_balance: float, committed: float,
-              limits: Limits) -> float:
+              limits: Limits, max_loss_buffer: Optional[float] = None) -> float:
     """Most a new position may risk (entry to stop, account currency) so
     that every open stop hit together, today or on any later day, stays
-    ``buffer`` above both loss lines. ``committed``: summed entry-to-stop
-    risk of the open positions. FTMO's day-start balance ignores floating
-    P&L, so open risk counts in full against each day's 5%: two 3% stops
-    (6%) would cross it; this caps the second one at what is left."""
+    ``buffer`` above the daily line and ``max_loss_buffer`` (default:
+    ``buffer``) above the max-loss line. ``committed``: summed
+    entry-to-stop risk of the open positions. FTMO's day-start balance
+    ignores floating P&L, so open risk counts in full against each day's
+    5%: two 3% stops (6%) would cross it; this caps the second one at what
+    is left. A wider ``max_loss_buffer`` (``cap_max_loss_buffer``; W2 of
+    research/ftmo_scale_out_v2.md: 0.015) leaves room for stops that gaps,
+    costs and financing carry past their level."""
     pad = limits.buffer * limits.initial
+    total_pad = (limits.buffer if max_loss_buffer is None else max_loss_buffer) * limits.initial
     worst = balance - committed                      # all open stops filled
     daily = worst - (limits.daily_floor(day_start_balance) + pad)
-    total = worst - (limits.total_floor() + pad)
+    total = worst - (limits.total_floor() + total_pad)
     return max(0.0, min(daily, total))
 
 

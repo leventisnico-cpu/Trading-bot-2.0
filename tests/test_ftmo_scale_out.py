@@ -12,7 +12,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from ftmo_bot import fast4, scale_out  # noqa: E402
+from ftmo_bot import fast4, rules, scale_out  # noqa: E402
 from ftmo_bot.broker import Position  # noqa: E402
 from ftmo_bot.broker_sim import SimBroker  # noqa: E402
 from ftmo_bot.config import FtmoConfig, load  # noqa: E402
@@ -78,6 +78,41 @@ def test_shipped_configs_use_the_five_steps():
         assert load(ROOT / "deploy/ftmo" / name).exit_mode == "scale_out"
     with pytest.raises(ValueError, match="exit_mode"):
         FtmoConfig(exit_mode="webinar").validate()
+
+
+def test_the_max_loss_buffer_stays_at_the_pre_registered_verdict():
+    """research/ftmo_scale_out_v2.md: W2 (0.015) did not pass its rule, so
+    the default and both shipped configs keep V1's 0.2%; 0.015 is allowed."""
+    assert FtmoConfig().cap_max_loss_buffer == 0.002
+    for name in ("config.trial.yaml", "config.example.yaml"):
+        assert load(ROOT / "deploy/ftmo" / name).cap_max_loss_buffer == 0.002
+    for ok in (0.0, 0.015, 0.05):
+        FtmoConfig(cap_max_loss_buffer=ok).validate()
+    for bad in (-0.001, 0.051, 0.2):
+        with pytest.raises(ValueError, match="cap_max_loss_buffer"):
+            FtmoConfig(cap_max_loss_buffer=bad).validate()
+
+
+def test_risk_room_keeps_its_own_buffer_over_the_max_loss_line():
+    lim = rules.Limits(15000)                    # max-loss line 13,500; daily 0.2% pad
+    # balance 14,000 at the day's start: daily room 14,000 - 13,280 = 720
+    assert rules.risk_room(14000, 14000, 0, lim) == pytest.approx(470)       # 0.2%: 13,530
+    assert rules.risk_room(14000, 14000, 0, lim, 0.015) == pytest.approx(275)  # 1.5%: 13,725
+    assert rules.risk_room(14000, 14000, 300, lim, 0.015) == 0.0           # open risk uses it up
+    # far from the max-loss line the daily line still decides
+    assert rules.risk_room(15000, 15000, 0, lim, 0.015) == pytest.approx(720)
+
+
+def test_an_entry_near_the_max_loss_line_is_cut_to_the_buffer(tmp_path):
+    sc = Scene(tmp_path, cap_max_loss_buffer=0.015)       # W2
+    sc.r.st.day = sc.day.isoformat()                      # FTMO day already rolled
+    sc.r.st.day_start_balance = 14000.0
+    sc.b.balance = sc.b.equity = 14000.0                  # 6.7% down: room 14,000 - 13,725
+    atr = sc.r.st.pending_atr["US100"]
+    sc.at(9, 35)
+    buys = [x for x in sc.b.sent if x[0] == "buy"]
+    lpl = sc.r.cfg.atr_stop_mult * atr
+    assert buys and buys[0][2] == pytest.approx(int(275 / lpl / 0.01 + 1e-9) * 0.01)
 
 
 # ---------------------------------------------------------- the runner
