@@ -91,6 +91,24 @@ What it means for the default (the 5 steps with the 1.5% buffer):
   trades in a row by April 2016 and then could open nothing for 10½
   years.
 
+**Two fixes tested and rejected** (2026-11-09,
+`research/ftmo_slots_sizing.md`, written down before the run):
+
+* **More of the signals.** The account takes 153 of 990 FAST-4 signals:
+  a position keeps one of the two slots until its last quarter is sold.
+  Freeing the slot once the stop is at the entry takes 216. But the
+  payoff per trade falls from +0.13–0.15R to +0.08R, breaches rise in
+  every period, and fewer attempts pass within the data.
+* **Safer sizing.** Letting an entry risk only a third of the room left
+  over the max-loss line ends the freezes and cuts breaches. But far
+  fewer attempts pass (18% against 38–42% for 2019–26 starts): the
+  accounts it saves trade on too small to recover.
+* **Both together** pass more often for 2019–26 starts and less often
+  for 2011–18 starts.
+* None passed its rule, so the bot is unchanged. The slots and the
+  sizing are not what holds the system back; the entry's thin edge is
+  (+0.13–0.15R per trade, about ten trades a year).
+
 **The buffer: on (`cap_max_loss_buffer: 0.015`) against off (`0.002`)**
 (W2, `research/ftmo_scale_out_v2.md`; on by the operator's order of
 2026-11-09). 5 steps, 2011–18 / 2019–26 starts:

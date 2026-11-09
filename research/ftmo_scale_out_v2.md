@@ -422,3 +422,9 @@ Frozen: flat when the data ends, with under 0.05% of the initial balance left to
 * A skipped entry on a flat account with no max-loss room now logs
   `FROZEN` at warning level, with the balance and the floor.
 * The preflight prints the room for the next entry, or the freeze.
+
+**Follow-up (2026-11-09, later still).** The rule named in point 6 was
+tested: an entry may risk a third of the room over the max-loss line
+(S1 of `research/ftmo_slots_sizing.md`, pre-registered). It ends the
+freezes and cuts breaches, and far fewer attempts pass. It failed its
+rule; the bot's sizing is unchanged.

@@ -141,6 +141,12 @@ Nico's style: one-line status first, then at most one thing for him to do.
     preflight prints `room for the next entry: ...`.
   - **`run.ps1 -SelfTest`** was added: one tiny round trip through every
     order the 5 steps send (step 9).
+  - **Two fixes tested and rejected** (`research/ftmo_slots_sizing.md`):
+    freeing a slot once a position's stop is at its entry (216 of 990
+    signals taken instead of 153, but less per trade and more breaches),
+    and risking only a third of the room over the max-loss line (no
+    freezes, far fewer passes). Neither passed its rule. The bot's rules
+    did not change.
   - **The 1-in-31 claim.** It would need a first target a tenth of the
     stop's distance (`research/ftmo_win_rate_dial.md`). The 5 steps set
     the first target as far as the stop.

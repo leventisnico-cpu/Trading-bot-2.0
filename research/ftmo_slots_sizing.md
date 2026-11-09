@@ -242,3 +242,245 @@ with fewer changes.
 
 Results are appended below under a dated heading. Nothing above is
 edited.
+
+## Results — 2026-11-09
+
+**How it was run.**
+
+* Command: `python -B -I research/ftmo_slots_sizing.py --data-dir <dir>`.
+  It took 4.5 minutes on four cores.
+* The note, the script and its tests were committed and pushed first
+  (commit `629095c`, 21:48 UTC); the run started after that.
+* Data: the Astral exports of the earlier notes, sha256 QQQ `cfab2078…`,
+  SPY `66043ca3…`, DIA `be0494ef…`, IWM `44cc382e…`.
+* Script: sha256 `203706b9a0c2cbc87cc454bb5121305916554110a127c09957005a17a5c9b562`,
+  unchanged since that commit.
+* One run. Nothing was changed after it.
+
+Common dates 2011-03-23 → 2026-10-29; continuous account 2012-01-06 → 2026-10-29; start dates (2011–18 / 2019–26): 352 / 368 evaluations. Checks passed: with the share at one and free slots off, the new account reproduces V1 and W2 trade by trade and in every FTMO figure; V1's signal counts are the note's; V1's and W2's frozen shares are the published ones.
+
+* **V1**: the 5 steps, 0.2% buffer (the last note's verdict)
+* **W2**: the 5 steps, 1.5% buffer over the max-loss line (the bot today, by order)
+* **S1**: V1 + an entry risks at most 1/3 of the room over the max-loss line
+* **S2**: V1 + a position with its stop at or above its entry takes no slot
+* **S3**: S1 + S2
+* **W2+S1**: W2 + the 1/3 share
+* **W2+S2**: W2 + free slots
+* **W2+S3**: W2 + both
+* **S1 at 1/2**: S1 with 1/2 (sensitivity)
+* **S3 at 1/2**: S3 with 1/2 (sensitivity)
+
+**Per trade** (continuous account; trades open at the end left out):
+
+| variant | bound | trades | trades per year | TP1 before stop | P&L win rate | avg win (R) | avg loss (R) | payoff (R/trade) | avg first risk | median sessions held | most open at once | CAGR | max DD |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| V1 | pessimistic | 151 | 10.2 | 61.6% | 61.6% | +0.93 | -1.11 | +0.147 | 2.55% | 23 | 2 | +3.2% | 29.7% |
+| V1 | optimistic | 154 | 10.4 | 61.0% | 61.0% | +0.92 | -1.11 | +0.129 | 2.56% | 22 | 2 | +3.0% | 29.7% |
+| W2 | pessimistic | 151 | 10.2 | 61.6% | 61.6% | +0.93 | -1.11 | +0.147 | 2.55% | 23 | 2 | +3.2% | 29.7% |
+| W2 | optimistic | 154 | 10.4 | 61.0% | 61.0% | +0.92 | -1.11 | +0.129 | 2.56% | 22 | 2 | +3.0% | 29.7% |
+| S1 | pessimistic | 151 | 10.2 | 61.6% | 61.6% | +0.93 | -1.11 | +0.147 | 2.54% | 23 | 2 | +3.3% | 29.5% |
+| S1 | optimistic | 154 | 10.4 | 61.0% | 61.0% | +0.92 | -1.11 | +0.129 | 2.54% | 22 | 2 | +3.0% | 29.5% |
+| S2 | pessimistic | 214 | 14.4 | 58.9% | 58.9% | +0.92 | -1.13 | +0.079 | 2.45% | 22 | 4 | +1.4% | 37.3% |
+| S2 | optimistic | 214 | 14.4 | 58.9% | 58.9% | +0.92 | -1.13 | +0.079 | 2.45% | 22 | 4 | +1.4% | 37.3% |
+| S3 | pessimistic | 214 | 14.4 | 58.9% | 58.9% | +0.92 | -1.13 | +0.079 | 2.43% | 22 | 4 | +1.5% | 37.3% |
+| S3 | optimistic | 214 | 14.4 | 58.9% | 58.9% | +0.92 | -1.13 | +0.079 | 2.43% | 22 | 4 | +1.5% | 37.3% |
+| W2+S1 | pessimistic | 151 | 10.2 | 61.6% | 61.6% | +0.93 | -1.11 | +0.147 | 2.43% | 23 | 2 | +3.2% | 28.6% |
+| W2+S1 | optimistic | 154 | 10.4 | 61.0% | 61.0% | +0.92 | -1.11 | +0.129 | 2.44% | 22 | 2 | +2.9% | 28.6% |
+| W2+S2 | pessimistic | 214 | 14.4 | 58.9% | 58.9% | +0.92 | -1.13 | +0.079 | 2.45% | 22 | 4 | +1.4% | 37.3% |
+| W2+S2 | optimistic | 214 | 14.4 | 58.9% | 58.9% | +0.92 | -1.13 | +0.079 | 2.45% | 22 | 4 | +1.4% | 37.3% |
+| W2+S3 | pessimistic | 214 | 14.4 | 58.9% | 58.9% | +0.92 | -1.13 | +0.079 | 2.34% | 22 | 4 | +1.6% | 37.1% |
+| W2+S3 | optimistic | 214 | 14.4 | 58.9% | 58.9% | +0.92 | -1.13 | +0.079 | 2.34% | 22 | 4 | +1.6% | 37.1% |
+| S1 at 1/2 | pessimistic | 151 | 10.2 | 61.6% | 61.6% | +0.93 | -1.11 | +0.147 | 2.55% | 23 | 2 | +3.2% | 29.7% |
+| S1 at 1/2 | optimistic | 154 | 10.4 | 61.0% | 61.0% | +0.92 | -1.11 | +0.129 | 2.56% | 22 | 2 | +3.0% | 29.7% |
+| S3 at 1/2 | pessimistic | 214 | 14.4 | 58.9% | 58.9% | +0.92 | -1.13 | +0.079 | 2.45% | 22 | 4 | +1.4% | 37.3% |
+| S3 at 1/2 | optimistic | 214 | 14.4 | 58.9% | 58.9% | +0.92 | -1.13 | +0.079 | 2.45% | 22 | 4 | +1.4% | 37.3% |
+
+**Signals** (continuous account, pessimistic bound; 'free': a position whose stop is at or above its entry):
+
+| variant | signals | planned for the next open | entered | not taken: index already held | … by a free position | not taken: slots full | … while a free position was open | … while every open position was free | sessions with two or more positions open |
+|---|---|---|---|---|---|---|---|---|---|
+| V1 | 990 | 153 | 153 | 408 | 179 | 429 | 250 | 161 | 2341 of 3725 |
+| W2 | 990 | 153 | 153 | 408 | 179 | 429 | 250 | 161 | 2341 of 3725 |
+| S1 | 990 | 153 | 153 | 408 | 179 | 429 | 250 | 161 | 2341 of 3725 |
+| S2 | 990 | 216 | 216 | 550 | 191 | 224 | 45 | 5 | 2428 of 3725 |
+| S3 | 990 | 216 | 216 | 550 | 191 | 224 | 45 | 5 | 2428 of 3725 |
+| W2+S1 | 990 | 153 | 153 | 408 | 179 | 429 | 250 | 161 | 2341 of 3725 |
+| W2+S2 | 990 | 216 | 216 | 550 | 191 | 224 | 45 | 5 | 2428 of 3725 |
+| W2+S3 | 990 | 216 | 216 | 550 | 191 | 224 | 45 | 5 | 2428 of 3725 |
+| S1 at 1/2 | 990 | 153 | 153 | 408 | 179 | 429 | 250 | 161 | 2341 of 3725 |
+| S3 at 1/2 | 990 | 216 | 216 | 550 | 191 | 224 | 45 | 5 | 2428 of 3725 |
+
+**FTMO** (cohorts by start date). Frozen: flat at the end with under 0.05% of room. Stuck: flat at the end and a new entry may risk under 0.5% (every frozen attempt is stuck). Attempts per pass counts a stuck attempt as lost.
+
+| policy | period | P1 passed | both ≤6 mo | both ≤18 mo | both ≤36 mo | both, ever | breached | frozen | stuck | still trading | days to pass (p25 / median / p75) | main failure | funded 1y survival | funded 1y return | attempts per pass |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| V1 pessimistic | 2011–18 | 66% | 5% | 33.8% | 46.3% | 46.3% | 36.9% | 16.8% | 16.8% | 0.0% | 254 / 344 / 563 | P1 max_loss 17% | 68% | +3.8% | 2.16 |
+| V1 pessimistic | 2019–26 | 64% | 2% | 19.3% | 37.8% | 37.8% | 13.0% | 29.9% | 29.9% | 19.3% | 383 / 547 / 766 | P1 unfinished 26% | 95% | +2.8% | 2.14 |
+| V1 optimistic | 2011–18 | 65% | 5% | 40.6% | 46.6% | 46.6% | 36.9% | 16.5% | 16.5% | 0.0% | 237 / 310 / 416 | P1 max_loss 18% | 68% | +4.0% | 2.15 |
+| V1 optimistic | 2019–26 | 65% | 2% | 24.5% | 41.8% | 41.8% | 12.2% | 30.2% | 30.2% | 15.8% | 350 / 468 / 721 | P1 unfinished 26% | 95% | +2.8% | 2.01 |
+| W2 pessimistic | 2011–18 | 60% | 5% | 31.2% | 37.5% | 37.5% | 15.6% | 46.9% | 46.9% | 0.0% | 238 / 328 / 475 | P1 unfinished 29% | 81% | +0.5% | 2.67 |
+| W2 pessimistic | 2019–26 | 63% | 2% | 19.8% | 36.1% | 36.7% | 2.4% | 41.6% | 41.6% | 19.3% | 364 / 533 / 802 | P1 unfinished 35% | 99% | +2.5% | 2.20 |
+| W2 optimistic | 2011–18 | 62% | 5% | 38.4% | 43.5% | 43.5% | 14.8% | 41.8% | 41.8% | 0.0% | 236 / 307 / 385 | P1 unfinished 30% | 81% | +0.5% | 2.30 |
+| W2 optimistic | 2019–26 | 64% | 2% | 24.2% | 39.7% | 40.2% | 1.9% | 41.6% | 41.6% | 16.3% | 335 / 459 / 679 | P1 unfinished 35% | 99% | +2.5% | 2.08 |
+| S1 pessimistic | 2011–18 | 56% | 5% | 23.6% | 33.5% | 33.8% | 20.2% | 0.0% | 0.0% | 46.0% | 240 / 358 / 636 | P1 unfinished 26% | 84% | -2.7% | 1.60 |
+| S1 pessimistic | 2019–26 | 68% | 2% | 13.6% | 17.7% | 17.9% | 1.4% | 0.0% | 0.0% | 80.7% | 280 / 396 / 540 | P2 unfinished 50% | 99% | +0.1% | 1.08 |
+| S1 optimistic | 2011–18 | 60% | 4% | 30.4% | 40.3% | 40.6% | 19.9% | 0.0% | 0.0% | 39.5% | 244 / 342 / 538 | P1 unfinished 26% | 84% | -2.7% | 1.49 |
+| S1 optimistic | 2019–26 | 68% | 1% | 16.0% | 17.9% | 18.2% | 1.4% | 0.0% | 0.0% | 80.4% | 307 / 433 / 500 | P2 unfinished 50% | 99% | +0.1% | 1.07 |
+| S2 pessimistic | 2011–18 | 51% | 5% | 34.4% | 37.8% | 37.8% | 42.6% | 19.6% | 19.6% | 0.0% | 210 / 265 / 338 | P1 max_loss 21% | 62% | +1.7% | 2.65 |
+| S2 pessimistic | 2019–26 | 57% | 9% | 30.4% | 30.4% | 30.4% | 18.5% | 40.2% | 40.2% | 10.9% | 166 / 308 / 376 | P1 unfinished 30% | 87% | +3.2% | 2.93 |
+| S2 optimistic | 2011–18 | 53% | 9% | 35.5% | 38.6% | 38.6% | 43.8% | 17.6% | 17.6% | 0.0% | 188 / 244 / 335 | P1 max_loss 22% | 61% | +2.1% | 2.59 |
+| S2 optimistic | 2019–26 | 63% | 11% | 39.7% | 39.7% | 39.7% | 17.1% | 34.0% | 34.0% | 9.2% | 168 / 267 / 350 | P1 unfinished 24% | 87% | +3.2% | 2.29 |
+| S3 pessimistic | 2011–18 | 44% | 5% | 31.0% | 31.0% | 31.0% | 13.9% | 0.0% | 0.0% | 55.1% | 201 / 273 / 345 | P1 unfinished 42% | 80% | -5.0% | 1.45 |
+| S3 pessimistic | 2019–26 | 54% | 9% | 29.3% | 45.7% | 47.0% | 5.7% | 0.0% | 0.0% | 47.3% | 249 / 449 / 665 | P1 unfinished 41% | 94% | +0.8% | 1.12 |
+| S3 optimistic | 2011–18 | 46% | 8% | 31.2% | 35.5% | 35.5% | 13.6% | 0.0% | 0.0% | 50.9% | 190 / 257 / 398 | P1 unfinished 40% | 80% | -4.8% | 1.38 |
+| S3 optimistic | 2019–26 | 61% | 11% | 39.9% | 51.9% | 53.8% | 5.7% | 0.0% | 0.0% | 40.5% | 207 / 346 / 598 | P1 unfinished 34% | 94% | +0.8% | 1.11 |
+| W2+S1 pessimistic | 2011–18 | 52% | 3% | 22.2% | 25.3% | 27.0% | 21.3% | 0.0% | 0.0% | 51.7% | 231 / 346 / 404 | P1 unfinished 30% | 86% | -3.5% | 1.79 |
+| W2+S1 pessimistic | 2019–26 | 65% | 2% | 12.0% | 17.1% | 17.4% | 1.4% | 0.0% | 0.0% | 81.2% | 296 / 434 / 569 | P2 unfinished 47% | 99% | -0.8% | 1.08 |
+| W2+S1 optimistic | 2011–18 | 54% | 5% | 26.1% | 31.0% | 33.0% | 20.2% | 0.0% | 0.0% | 46.9% | 222 / 329 / 502 | P1 unfinished 29% | 86% | -3.2% | 1.61 |
+| W2+S1 optimistic | 2019–26 | 65% | 1% | 17.4% | 22.6% | 22.8% | 1.4% | 0.0% | 0.0% | 75.8% | 292 / 386 / 539 | P2 unfinished 42% | 99% | -0.8% | 1.06 |
+| W2+S2 pessimistic | 2011–18 | 45% | 5% | 33.8% | 35.2% | 35.2% | 21.0% | 43.8% | 43.8% | 0.0% | 209 / 260 / 322 | P1 unfinished 35% | 77% | -6.7% | 2.84 |
+| W2+S2 pessimistic | 2019–26 | 52% | 9% | 30.4% | 42.4% | 42.4% | 8.4% | 38.3% | 38.3% | 10.9% | 214 / 360 / 602 | P1 unfinished 41% | 92% | +1.7% | 2.10 |
+| W2+S2 optimistic | 2011–18 | 48% | 8% | 34.1% | 35.5% | 35.5% | 19.3% | 45.2% | 45.2% | 0.0% | 188 / 237 / 302 | P1 unfinished 34% | 77% | -6.4% | 2.82 |
+| W2+S2 optimistic | 2019–26 | 58% | 12% | 39.4% | 51.9% | 51.9% | 7.3% | 31.8% | 31.8% | 9.0% | 192 / 309 / 519 | P1 unfinished 34% | 92% | +1.7% | 1.75 |
+| W2+S3 pessimistic | 2011–18 | 43% | 5% | 26.4% | 32.4% | 32.4% | 6.5% | 0.0% | 0.0% | 61.1% | 220 / 306 / 426 | P1 unfinished 51% | 88% | -5.5% | 1.20 |
+| W2+S3 pessimistic | 2019–26 | 52% | 9% | 26.6% | 45.7% | 47.3% | 1.9% | 0.0% | 0.0% | 50.8% | 256 / 505 / 787 | P1 unfinished 46% | 98% | -0.6% | 1.04 |
+| W2+S3 optimistic | 2011–18 | 45% | 6% | 28.1% | 31.2% | 31.2% | 6.5% | 0.0% | 0.0% | 62.2% | 194 / 279 / 386 | P1 unfinished 49% | 88% | -5.1% | 1.21 |
+| W2+S3 optimistic | 2019–26 | 54% | 11% | 30.2% | 45.4% | 47.0% | 1.6% | 0.0% | 0.0% | 51.4% | 193 / 447 / 792 | P1 unfinished 45% | 98% | -0.5% | 1.03 |
+| S1 at 1/2 pessimistic | 2011–18 | 64% | 5% | 26.1% | 31.8% | 32.4% | 24.4% | 21.6% | 21.6% | 21.6% | 225 / 328 / 468 | P1 unfinished 24% | 81% | +0.1% | 2.42 |
+| S1 at 1/2 pessimistic | 2019–26 | 63% | 2% | 14.7% | 38.6% | 38.6% | 2.4% | 0.0% | 0.0% | 59.0% | 426 / 633 / 829 | P1 unfinished 36% | 99% | +1.1% | 1.06 |
+| S1 at 1/2 optimistic | 2011–18 | 64% | 5% | 38.1% | 44.6% | 45.2% | 19.9% | 21.3% | 21.3% | 13.6% | 236 / 309 / 404 | P1 unfinished 24% | 81% | +0.8% | 1.91 |
+| S1 at 1/2 optimistic | 2019–26 | 64% | 1% | 16.8% | 38.6% | 38.6% | 2.4% | 0.0% | 0.0% | 59.0% | 434 / 626 / 823 | P1 unfinished 35% | 99% | +1.1% | 1.06 |
+| S3 at 1/2 pessimistic | 2011–18 | 47% | 5% | 32.1% | 33.0% | 33.0% | 25.6% | 28.1% | 28.1% | 13.4% | 206 / 266 / 338 | P1 unfinished 29% | 76% | -3.7% | 2.63 |
+| S3 at 1/2 pessimistic | 2019–26 | 52% | 9% | 29.9% | 45.9% | 45.9% | 8.4% | 0.0% | 0.0% | 45.7% | 259 / 442 / 616 | P1 unfinished 41% | 92% | +1.7% | 1.18 |
+| S3 at 1/2 optimistic | 2011–18 | 49% | 8% | 35.8% | 37.2% | 37.2% | 23.0% | 26.1% | 26.1% | 13.6% | 189 / 245 / 326 | P1 unfinished 29% | 76% | -3.6% | 2.32 |
+| S3 at 1/2 optimistic | 2019–26 | 59% | 11% | 38.6% | 53.3% | 53.3% | 7.3% | 0.0% | 0.0% | 39.4% | 207 / 328 / 561 | P1 unfinished 34% | 92% | +1.7% | 1.14 |
+
+### Verdict against V1, by the pre-registered rule
+
+| variant | cohort | bound | breached: variant vs V1 | both ≤18 mo | both, ever | no worse |
+|---|---|---|---|---|---|---|
+| S1 | 2011–18 | pessimistic | 71/352 (20.2%) vs 130/352 (36.9%) | 83/352 (23.6%) vs 119/352 (33.8%) | 119/352 (33.8%) vs 163/352 (46.3%) | no |
+| S1 | 2011–18 | optimistic | 70/352 (19.9%) vs 130/352 (36.9%) | 107/352 (30.4%) vs 143/352 (40.6%) | 143/352 (40.6%) vs 164/352 (46.6%) | no |
+| S1 | 2019–26 | pessimistic | 5/368 (1.4%) vs 48/368 (13.0%) | 50/368 (13.6%) vs 71/368 (19.3%) | 66/368 (17.9%) vs 139/368 (37.8%) | no |
+| S1 | 2019–26 | optimistic | 5/368 (1.4%) vs 45/368 (12.2%) | 59/368 (16.0%) vs 90/368 (24.5%) | 67/368 (18.2%) vs 154/368 (41.8%) | no |
+| **S1** | | | | | | no worse anywhere: no; better somewhere: no |
+| S2 | 2011–18 | pessimistic | 150/352 (42.6%) vs 130/352 (36.9%) | 121/352 (34.4%) vs 119/352 (33.8%) | 133/352 (37.8%) vs 163/352 (46.3%) | no |
+| S2 | 2011–18 | optimistic | 154/352 (43.8%) vs 130/352 (36.9%) | 125/352 (35.5%) vs 143/352 (40.6%) | 136/352 (38.6%) vs 164/352 (46.6%) | no |
+| S2 | 2019–26 | pessimistic | 68/368 (18.5%) vs 48/368 (13.0%) | 112/368 (30.4%) vs 71/368 (19.3%) | 112/368 (30.4%) vs 139/368 (37.8%) | no |
+| S2 | 2019–26 | optimistic | 63/368 (17.1%) vs 45/368 (12.2%) | 146/368 (39.7%) vs 90/368 (24.5%) | 146/368 (39.7%) vs 154/368 (41.8%) | no |
+| **S2** | | | | | | no worse anywhere: no; better somewhere: yes |
+| S3 | 2011–18 | pessimistic | 49/352 (13.9%) vs 130/352 (36.9%) | 109/352 (31.0%) vs 119/352 (33.8%) | 109/352 (31.0%) vs 163/352 (46.3%) | no |
+| S3 | 2011–18 | optimistic | 48/352 (13.6%) vs 130/352 (36.9%) | 110/352 (31.2%) vs 143/352 (40.6%) | 125/352 (35.5%) vs 164/352 (46.6%) | no |
+| S3 | 2019–26 | pessimistic | 21/368 (5.7%) vs 48/368 (13.0%) | 108/368 (29.3%) vs 71/368 (19.3%) | 173/368 (47.0%) vs 139/368 (37.8%) | yes |
+| S3 | 2019–26 | optimistic | 21/368 (5.7%) vs 45/368 (12.2%) | 147/368 (39.9%) vs 90/368 (24.5%) | 198/368 (53.8%) vs 154/368 (41.8%) | yes |
+| **S3** | | | | | | no worse anywhere: no; better somewhere: yes |
+
+**No variant beats V1** by the rule.
+
+### Verdict against W2, by the pre-registered rule
+
+| variant | cohort | bound | breached: variant vs W2 | both ≤18 mo | both, ever | no worse |
+|---|---|---|---|---|---|---|
+| W2+S1 | 2011–18 | pessimistic | 75/352 (21.3%) vs 55/352 (15.6%) | 78/352 (22.2%) vs 110/352 (31.2%) | 95/352 (27.0%) vs 132/352 (37.5%) | no |
+| W2+S1 | 2011–18 | optimistic | 71/352 (20.2%) vs 52/352 (14.8%) | 92/352 (26.1%) vs 135/352 (38.4%) | 116/352 (33.0%) vs 153/352 (43.5%) | no |
+| W2+S1 | 2019–26 | pessimistic | 5/368 (1.4%) vs 9/368 (2.4%) | 44/368 (12.0%) vs 73/368 (19.8%) | 64/368 (17.4%) vs 135/368 (36.7%) | no |
+| W2+S1 | 2019–26 | optimistic | 5/368 (1.4%) vs 7/368 (1.9%) | 64/368 (17.4%) vs 89/368 (24.2%) | 84/368 (22.8%) vs 148/368 (40.2%) | no |
+| **W2+S1** | | | | | | no worse anywhere: no; better somewhere: no |
+| W2+S2 | 2011–18 | pessimistic | 74/352 (21.0%) vs 55/352 (15.6%) | 119/352 (33.8%) vs 110/352 (31.2%) | 124/352 (35.2%) vs 132/352 (37.5%) | no |
+| W2+S2 | 2011–18 | optimistic | 68/352 (19.3%) vs 52/352 (14.8%) | 120/352 (34.1%) vs 135/352 (38.4%) | 125/352 (35.5%) vs 153/352 (43.5%) | no |
+| W2+S2 | 2019–26 | pessimistic | 31/368 (8.4%) vs 9/368 (2.4%) | 112/368 (30.4%) vs 73/368 (19.8%) | 156/368 (42.4%) vs 135/368 (36.7%) | no |
+| W2+S2 | 2019–26 | optimistic | 27/368 (7.3%) vs 7/368 (1.9%) | 145/368 (39.4%) vs 89/368 (24.2%) | 191/368 (51.9%) vs 148/368 (40.2%) | no |
+| **W2+S2** | | | | | | no worse anywhere: no; better somewhere: yes |
+| W2+S3 | 2011–18 | pessimistic | 23/352 (6.5%) vs 55/352 (15.6%) | 93/352 (26.4%) vs 110/352 (31.2%) | 114/352 (32.4%) vs 132/352 (37.5%) | no |
+| W2+S3 | 2011–18 | optimistic | 23/352 (6.5%) vs 52/352 (14.8%) | 99/352 (28.1%) vs 135/352 (38.4%) | 110/352 (31.2%) vs 153/352 (43.5%) | no |
+| W2+S3 | 2019–26 | pessimistic | 7/368 (1.9%) vs 9/368 (2.4%) | 98/368 (26.6%) vs 73/368 (19.8%) | 174/368 (47.3%) vs 135/368 (36.7%) | yes |
+| W2+S3 | 2019–26 | optimistic | 6/368 (1.6%) vs 7/368 (1.9%) | 111/368 (30.2%) vs 89/368 (24.2%) | 173/368 (47.0%) vs 148/368 (40.2%) | yes |
+| **W2+S3** | | | | | | no worse anywhere: no; better somewhere: yes |
+
+**No variant beats W2** by the rule.
+
+## Verdict (2026-11-09)
+
+**No variant beats its baseline. The bot keeps its rules.** Nothing is
+ported. Both hypotheses are refuted.
+
+## What was learned
+
+1. **S1, the share of the room, fails on passes.**
+   * It does what it was built for: breaches fall (37% to 20% for
+     2011–18 starts, 12–13% to 1.4% for 2019–26) and no account
+     freezes.
+   * But far fewer attempts pass. Within 18 months: 24–30% against
+     34–41% (2011–18) and 14–16% against 19–25% (2019–26). Within the
+     data: 34–41% against 46–47%, and 18% against 38–42%.
+   * The attempts it saves do not come back. They trade on at a small
+     size: 40–46% (2011–18) and 80–81% (2019–26) are still unfinished
+     when the data ends. At about ten trades a year, an account that
+     has shrunk its entries needs years to recover.
+   * The coin-flip model that suggested one third was wrong about
+     passes. It drew trades independently; real losses come in
+     clusters, on indices that fall together.
+   * One half (sensitivity) is no better: 15–17% within 18 months for
+     2019–26.
+2. **S2, free slots, takes more signals and earns less.**
+   * It enters 216 of the 990 signals instead of 153, and holds up to
+     four positions at once.
+   * The payoff per trade falls from +0.13R–0.15R to +0.08R. The
+     continuous account's growth falls from +3.0–3.2% to +1.4% a year,
+     and its deepest drawdown grows from 30% to 37%.
+   * On FTMO it ends attempts sooner, both ways. For 2019–26 starts,
+     30–40% pass within 18 months against 19–25%. But it breaches more
+     often in every cell (43–44% against 37%; 17–19% against 12–13%)
+     and fewer attempts pass within the data in every cell.
+3. **S3, both together, splits by period.**
+   * 2019–26 starts: better on all three counts. Within 18 months
+     29–40% pass against 19–25%; within the data 47–54% against
+     38–42%; 6% breach against 12–13%.
+   * 2011–18 starts: fewer passes. Within 18 months 31% against
+     34–41%; within the data 31–36% against 46–47%. Breaches fall from
+     37% to 14%.
+   * A rule that wins in one period and loses in the other is what the
+     pass/fail rule exists to reject.
+4. **With the 1.5% buffer the picture is the same.** W2+S3 beats W2 on
+   all three counts for 2019–26 starts and passes less often for
+   2011–18 starts.
+5. **Funded accounts do no better.**
+   * S1 and S3: the median funded year is negative for 2011–18 starts
+     (−2.7%; −4.8% to −5.0%) and +0.1% to +0.8% for 2019–26 starts,
+     against V1's +3.8–4.0% and +2.8%.
+   * S2: fewer accounts survive the year (61–62% against 68%; 87%
+     against 95%). The survivors' median year is +1.7–2.1% against
+     +3.8–4.0% for 2011–18 starts and +3.2% against +2.8% for 2019–26.
+
+**Post hoc, not part of the verdict.** A scratch comparison of V1's and
+S2's continuous accounts (`so.full_run` on `CONT_POL`, pessimistic
+bound), their trades matched by index and entry session; R per trade
+with its standard error:
+
+| trades | count | payoff per trade | total |
+|---|---|---|---|
+| V1, all | 151 | +0.147R ± 0.087 | +22.2R |
+| S2, all | 214 | +0.079R ± 0.073 | +17.0R |
+| S2's trades that V1 also takes | 111 | +0.098R ± 0.099 | +10.9R |
+| S2's trades that V1 does not take | 103 | +0.059R ± 0.108 | +6.1R |
+| V1's trades that S2 no longer takes | 40 | +0.283R ± 0.183 | +11.3R |
+
+* The signals V1 skips are not as good as the ones it takes. S2 adds
+  103 trades worth +0.06R each and gives up 40 worth +0.28R each (when
+  V1's entry comes, S2 already holds that index, has both slots at
+  risk, or has no risk room left).
+* For 2019–26 the added trades made about nothing (−0.01R each, 50 of
+  them); for 2012–18 they made +0.13R each (53).
+* Every figure in this table is within about one standard error of the
+  others. With 150 to 200 trades in 15 years the study cannot tell
+  +0.15R from +0.05R, and V1's own +0.13R–0.15R is only about one and
+  a half standard errors above zero.
+
+**The conclusion.** The slots and the sizing are not what holds the
+system back. The bot takes the better part of a thin edge, about ten
+times a year. More of the same signals does not add to it, and safer
+sizing only slows it.
+
+**What would tempt a re-run, and is not done:** keeping S3 for "the
+recent regime", another share, or counting a free position as half a
+slot. Each would be a choice made after seeing these tables.
