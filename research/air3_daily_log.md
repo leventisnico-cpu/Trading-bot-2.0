@@ -1538,3 +1538,70 @@ paper position to report. Astral's paper slot holds the FTMO bot test
   its stop feed now fails for SPY as well (DIA, IWM, QQQ, SPY). It
   still holds DIA from 11-02 (14.16 shares at 520.80; closed at 523.33,
   about +$36, with no working stop).
+
+### 2026-11-10 (Tuesday, after the close)
+
+* **SMH:** close 483.75 (today's daily bar has posted), −0.75% on the
+  day against Monday's posted close of 487.41 (Monday's entry used
+  487.26, from the last 30-minute bar). SMA50 562.86, SMA200 522.62.
+  Buy level 548.75, sell level 496.49.
+* **No order.** By the rule the position was sold at the 11-06 open
+  (473.41), so it is flat. The next BUY needs a close above 548.75
+  (13.4% above today's) with SMA50 above SMA200 (true today).
+  - The operator has not confirmed the TFSA fill yet; record it here
+    when he does.
+  - If the position is still held, the SELL stands: the close is $12.73
+    (2.6%) below the sell level.
+* **ETF scan** (1Y / 6M / YTD %):
+  - SOXX 45.5 / −15.6 / 45.9;
+  - SMH 34.8 / −14.6 / 34.3;
+  - XSD 31.8 / −20.5 / 37.0;
+  - SMHX 22.4 / −12.1 / 29.1;
+  - THNQ 21.6 / 3.8 / 29.2;
+  - XLK 14.3 / −3.8 / 17.3;
+  - FTEC 13.4 / −1.7 / 17.4;
+  - VGT 13.3 / −1.7 / 17.3;
+  - IYW 12.7 / −3.3 / 15.6;
+  - AIQ 12.1 / −6.3 / 14.8;
+  - CHAT 9.7 / −18.2 / 19.6;
+  - QQQ 8.3 / −5.1 / 9.8;
+  - WTAI 6.0 / −18.5 / 13.8;
+  - context only: USD (2×) −6.0 / −42.6 / 4.1 and SOXL (3×) 24.3 /
+    −68.4 / 33.0.
+
+  Top 3 unleveraged by 1Y: SOXX, SMH, XSD. No unswept ETF beats SMH on
+  all three, so there is no backtest.
+* **The operator's orders today.**
+  - "free slots on": shipped as commit `47019ed`
+    (`free_slots: true`; the order is recorded at the end of
+    `research/ftmo_slots_sizing.md`, the audit in
+    `reports/ftmo_bot_replay.md`). CI is green on it.
+  - "Stop process till i fix it" (about 16:55 UTC): the background
+    re-run of the audit on the committed code and the CI follow-up
+    were stopped. That re-run has not been made; it waits for his
+    word. Today's two daily routines ran as scheduled.
+* **FTMO bot shadows: no trade, part close or stop move.** Both exit 0,
+  no tick errors. The indices fell: DIA −0.3%, SPY −0.4%, QQQ −0.6%,
+  IWM −0.7%.
+  - **5 steps (the bot's rule):** still holds US30, 28.79 at 522.86,
+    stop 507.70. DIA closed at 521.74, −0.07R; the first target is
+    538.02. Balance 14,280.19, equity 14,247.94 (−5.01%). Lowest mark
+    14,175.68; the daily floor is 13,530.19. No plan for Wednesday's
+    open.
+  - A new entry could still risk only 118.76 while this position is at
+    its first stop.
+  - **Free slots from today's session** (commit `47019ed`); both
+    journals now say so. Nothing changed by it today: the one open
+    position is on its first stop, so it takes a slot.
+  - **FAST-4 exits:** flat, 14,945.96 (−0.36%), nothing planned.
+  - No `FROZEN` line in either log.
+* **Astral 1999:** no orders or fills. It still holds the paper
+  account: a deploy preview for the replacement was refused for that
+  reason at 21:42 UTC. It was paused and degraded when last listed
+  (16:30 UTC). It still holds DIA from 11-02 (14.16 shares at 520.80;
+  DIA closed at 521.74, about +$13, with no working stop).
+  - The replacement is built and saved (saved strategy 11269: the same
+    FAST-4 rule with its stop as a rule on the daily close, not
+    Astral's stop-loss monitor). It can only be deployed once 1999 is
+    stopped in Astral's dashboard, which the API refuses to do
+    (`strategy_stop_requires_dashboard`).

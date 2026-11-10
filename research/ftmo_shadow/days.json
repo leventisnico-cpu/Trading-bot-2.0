@@ -372,5 +372,18 @@
     "trading_days": 1,
     "flags": [],
     "errors": 0
+  },
+  {
+    "day": "2026-11-10",
+    "balance": 14945.956838129343,
+    "equity": 14945.956838129343,
+    "min_equity": 14945.956838129343,
+    "daily_floor": 14195.956838129343,
+    "open": [],
+    "plan": "",
+    "deals": [],
+    "trading_days": 1,
+    "flags": [],
+    "errors": 0
   }
 ]
