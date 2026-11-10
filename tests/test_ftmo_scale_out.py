@@ -250,7 +250,7 @@ def test_keepalive_runs_with_both_slots_full(tmp_path):
     bars, ds = history()
     b = FakeBroker(bars)
     b.clock = ny(ds[-1], 10, 15)
-    held = [Position(5, "US500.cash", 1.0, 100, 101), Position(6, "US30.cash", 1.0, 100, 101)]
+    held = [Position(5, "US500.cash", 1.0, 100, 99), Position(6, "US30.cash", 1.0, 100, 99)]
     b.pos = list(held)
     r = Runner(cfg(tmp_path, dry_run=False, exit_mode="scale_out"), b)
     r.roll_day(b.clock)

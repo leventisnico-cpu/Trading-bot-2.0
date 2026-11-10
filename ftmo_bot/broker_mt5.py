@@ -207,7 +207,8 @@ class MT5Broker:
         i = self.mt5.symbol_info(symbol)
         if i is None:
             return Spec(False)
-        return Spec(True, i.volume_min, i.volume_step, i.volume_max)
+        return Spec(True, i.volume_min, i.volume_step, i.volume_max,
+                    i.trade_tick_size or 10 ** -i.digits)
 
     def loss_per_lot(self, symbol: str, entry: float, stop: float) -> float:
         p = self.mt5.order_calc_profit(self.mt5.ORDER_TYPE_BUY, symbol, 1.0,

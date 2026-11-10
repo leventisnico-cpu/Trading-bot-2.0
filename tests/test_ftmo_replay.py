@@ -1,6 +1,6 @@
 """The replay audit (``scripts/ftmo_replay.py``) on a small synthetic market:
-the real bot through entries, the 5 steps, the cap and the keep-alive, with
-every deal checked against the script's independent oracle."""
+the real bot through entries, the 5 steps, the slots, the cap and the
+keep-alive, with every deal checked against the script's independent oracle."""
 
 from __future__ import annotations
 
@@ -16,17 +16,19 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 import ftmo_replay  # noqa: E402
 from ftmo_bot import runner as runner_mod, scale_out  # noqa: E402
+from ftmo_bot.broker import Position  # noqa: E402
+from ftmo_bot.runner import Runner  # noqa: E402
 
 HISTORY = 210
 # (dip sessions, then a rally if positive or a slide if negative)
 CYCLES = ((3, 9), (3, -8), (3, 12), (4, 10), (3, -9), (3, 14))
 
 
-def write_market(folder: Path) -> None:
+def write_market(folder: Path, cycles=CYCLES) -> None:
     """Four indices: a steady rise, then sharp dips (RSI(2) under 10, over the
     200-day average) followed by a rally (the targets) or a slide (the stop)."""
     rets = [0.0015] * 225
-    for dip, after in CYCLES:
+    for dip, after in cycles:
         rets += [-0.012] * dip + [0.011 if after > 0 else -0.013] * abs(after) + [0.001] * 6
     rets, shifts = np.array(rets), (0, 1, 2, 4)
     days = pd.bdate_range("2011-03-23", periods=len(rets) + max(shifts))
@@ -41,12 +43,12 @@ def write_market(folder: Path) -> None:
                      ).to_csv(folder / f"{name}_long.csv", index=False)
 
 
-def replay(tmp_path, order="low_first", sessions=None):
+def replay(tmp_path, order="low_first", sessions=None, slots="free", cycles=CYCLES):
     data = tmp_path / "data"
     data.mkdir(exist_ok=True)
-    write_market(data)
+    write_market(data, cycles)
     dates, inst = ftmo_replay.load_study(data)
-    rp = ftmo_replay.Replay(dates, inst, "funded", order, tmp_path, HISTORY)
+    rp = ftmo_replay.Replay(dates, inst, "funded", order, tmp_path, HISTORY, slots)
     rp.run(HISTORY, len(dates) if sessions is None else HISTORY + sessions)
     return rp
 
@@ -56,18 +58,89 @@ def test_the_bot_matches_the_oracle_through_wins_losses_and_the_cap(tmp_path):
     rp = replay(tmp_path)
     assert rp.problems == []
     assert runner_mod.BAR_COUNT == before                  # the run put it back
+    assert rp.r is None and rp.free                        # free slots: the bot's default
     closed = [t for t in rp.trades if t["ended_by"] == "stop"]
     assert len(closed) >= 12 and rp.count["entries"] == len(rp.trades)
     assert sum(t["parts"] for t in rp.trades) >= 8         # part closes happened
     assert sum(t["moves"] for t in rp.trades) >= 40        # and stop moves
     assert any(t["trail"] for t in closed) and any(not t["tp1"] for t in closed)
-    assert rp.count["refused"] >= 1                        # the cap ran out of room
+    assert any("cut from" in m for _, m in rp.log.lines)   # the cap cut an entry
     assert rp.count["keepalives"] >= 2 and rp.count["plans"] == rp.count["sessions"]
+    # entries beside two open positions whose stops were at or over their entries
+    assert rp.count["beyond_two"] >= 5 and rp.count["max_open"] == 4
 
 
 def test_the_other_intraday_order_also_matches(tmp_path):
     rp = replay(tmp_path, order="high_first", sessions=60)
     assert rp.problems == [] and sum(t["parts"] for t in rp.trades) >= 2
+
+
+def test_with_free_slots_off_every_position_takes_a_slot(tmp_path):
+    rp = replay(tmp_path, slots="all")
+    assert rp.problems == [] and not rp.free
+    assert rp.count["max_open"] == 2 and rp.count["beyond_two"] == 0
+    assert rp.count["entries"] >= 12
+    assert rp.count["refused"] >= 1                        # the cap ran out of room
+
+
+def test_a_bot_that_plans_as_if_every_position_took_a_slot_is_caught(tmp_path, monkeypatch):
+    monkeypatch.setattr(Runner, "_free_symbols", lambda self, positions: set())
+    rp = replay(tmp_path)
+    assert any("expected" in p and "plan []" in p for p in rp.problems), rp.problems[:3]
+
+
+def test_a_bot_that_refuses_a_planned_entry_for_a_slot_is_caught(tmp_path, monkeypatch):
+    monkeypatch.setattr(Runner, "_slots_used", lambda self, positions: len(positions))
+    rp = replay(tmp_path)
+    assert any(p.startswith("planned entry") and "refused: already 2 positions" in p
+               for p in rp.problems), rp.problems[:3]
+
+
+def test_a_bot_that_frees_a_slot_before_the_stop_is_at_the_entry_is_caught(tmp_path,
+                                                                             monkeypatch):
+    monkeypatch.setattr(Runner, "_is_free", lambda self, p: True)
+    rp = replay(tmp_path)
+    assert any("entry without a slot" in p for p in rp.problems), rp.problems[:3]
+    assert any("3 of them taking a slot" in p for p in rp.problems), rp.problems[:3]
+
+
+# four losing trades in a row, then a winner and more
+LOSERS = ((3, -8), (3, -9), (3, -8), (3, -9), (3, 12), (3, -8), (3, 10))
+
+
+def test_a_frozen_account_is_replaced_and_the_next_one_trades(tmp_path):
+    rp = replay(tmp_path, cycles=LOSERS)
+    assert rp.problems == []
+    first, second = rp.attempts
+    assert first["why"].startswith("frozen") and first["balance"] == pytest.approx(13725.0)
+    assert second["why"] == "end of the data" and second["trading_days"] >= 2
+    assert second["opened"] > first["closed"]
+    assert sum("FROZEN" in m for _, m in rp.log.lines) >= 1
+
+
+def test_a_bot_that_does_not_say_frozen_is_caught(tmp_path, monkeypatch):
+    monkeypatch.setattr(Runner, "_frozen", lambda self, flat, total: False)
+    rp = replay(tmp_path, cycles=LOSERS)
+    assert any("the account was frozen but the bot said" in p for p in rp.problems)
+    assert len(rp.attempts) == 1                           # never replaced: it never said so
+
+
+def test_a_bot_that_says_frozen_with_room_left_is_caught(tmp_path, monkeypatch):
+    monkeypatch.setattr(Runner, "_frozen", lambda self, flat, total: True)
+    rp = replay(tmp_path, slots="all")                     # here the cap runs out of room
+    assert any("the bot said FROZEN with room left" in p for p in rp.problems)
+
+
+@pytest.mark.parametrize("sl,free_slots,takes", [
+    (95.0, True, True),            # the first stop: at risk
+    (100.0, True, False),          # at the entry (step 3): free
+    (104.0, True, False),          # over it (steps 4 and 5): free
+    (0.0, True, True),             # no stop at all
+    (100.0, False, True),          # free slots off: every position takes a slot
+])
+def test_oracle_slot_rule(sl, free_slots, takes):
+    p = Position(1, "SPY", 1.0, 100.0, sl)
+    assert ftmo_replay.takes_slot(p, free_slots) is takes
 
 
 def test_a_bot_that_sells_the_wrong_share_is_caught(tmp_path, monkeypatch):

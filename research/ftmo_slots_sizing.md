@@ -484,3 +484,61 @@ sizing only slows it.
 **What would tempt a re-run, and is not done:** keeping S3 for "the
 recent regime", another share, or counting a free position as half a
 slot. Each would be a choice made after seeing these tables.
+
+## Operator's order, 2026-11-10: free slots on
+
+Appended 2026-11-10. Nothing above is changed, and the verdict stands:
+**S2 did not pass its pre-registered rule.**
+
+* **The order.** On 2026-11-10 the operator was told what the tables
+  above say about free slots: 216 of 990 signals taken instead of 153,
+  less earned per trade, more breaches. He answered: "free slots on".
+  A failed pre-registered rule is overridden only by the operator's
+  explicit order. This is that order, recorded here. It is not a new
+  finding and no table was re-read to justify it.
+* **What the bot runs from this commit.** `free_slots: true`, the
+  default in `ftmo_bot/config.py` and in both shipped configs. With the
+  5 steps and the 1.5% buffer (the operator's orders of 2026-11-08 and
+  2026-11-09) that is **W2+S2** above. `free_slots: false` gives W2
+  back.
+* **What that costs and buys, from the tables above** (W2+S2 against
+  W2; pessimistic to optimistic; 2011–18 / 2019–26 starts):
+
+  | measure | W2 (free slots off) | W2+S2 (the bot now) |
+  |---|---|---|
+  | trades a year; payoff per trade | 10.2–10.4; +0.129R to +0.147R | 14.4; +0.079R |
+  | breached | 14.8–15.6% / 1.9–2.4% | 19.3–21.0% / 7.3–8.4% |
+  | both phases within 18 months | 31.2–38.4% / 19.8–24.2% | 33.8–34.1% / 30.4–39.4% |
+  | both phases, ever | 37.5–43.5% / 36.7–40.2% | 35.2–35.5% / 42.4–51.9% |
+  | frozen | 41.8–46.9% / 41.6% | 43.8–45.2% / 31.8–38.3% |
+  | attempts per pass | 2.30–2.67 / 2.08–2.20 | 2.82–2.84 / 1.75–2.10 |
+  | funded 1y survival; median return | 81% / 99%; +0.5% / +2.5% | 77% / 92%; −6.7% to −6.4% / +1.7% |
+
+* **The rule in the bot** (`ftmo_bot/runner.py`: `_is_free`,
+  `_slots_used`, `_free_symbols`; `ftmo_bot/fast4.py`: `plan`'s `free`).
+  As `SlotAcct.in_slots` above: a position takes a slot while its stop
+  is under its entry. The plan after the close and the entry check at
+  the open both count that way, and one position per index stays. Two
+  things the bot does that the study's model has no place for; neither
+  was tested:
+  1. The broker rounds a stop to its price step, and an entry filled in
+     parts can average between two steps. The bot counts a stop within
+     half a step under the entry as at the entry.
+  2. The bot moves the stop when a polled bid is at +1R and the broker
+     accepts the move. A refused move keeps the slot until the retry
+     goes through. The study moves the stop at the touch.
+* **Audit of the bot's code, not a test of the rule.**
+  `scripts/ftmo_replay.py` ran the real bot with free slots over
+  2012-06-28 → 2026-10-29: as one funded account and as a chain of
+  challenge accounts, in both bar orders. Its oracle states the slot
+  rule apart from the bot. 836 entries, 324 of them made beside two or
+  more open positions, and 3,428 deals: **0 mismatches**
+  (`reports/ftmo_bot_replay.md`, the section of 2026-11-10). The replay
+  has no costs. It shows that the bot does what S2 describes, not that
+  S2 earns more.
+* **What will show whether it helps.** The free trial, and the 5-step
+  shadow (`research/ftmo_shadow_5step`), which runs free slots from the
+  2026-11-10 session. The tables above say what to expect: about 14
+  trades a year instead of 10, less per trade, more breaches. Nothing
+  seen in a few weeks of either can overturn or confirm tables built
+  on 15 years.

@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Optional
 
 from . import fast4, lock, sessions
-from .runner import BAR_COUNT, MIN_SESSIONS, Runner, cap_rule, exit_rule
+from .runner import BAR_COUNT, MIN_SESSIONS, Runner, cap_rule, exit_rule, slot_rule
 from .config import load
 
 
@@ -56,6 +56,14 @@ def room_line(r: Runner) -> Optional[str]:
         return "WARN: FROZEN. " + r._frozen_text(r.b.account().balance)
     return (f"room for the next entry: {room:,.2f} "
             f"({room / r.st.initial_balance:.1%} of the account)")
+
+
+def slots_line(r: Runner) -> str:
+    """The slot rule and, with positions open, how many slots they take."""
+    used, free = r.slots_now()
+    now = (f"; taken now: {used} of {r.cfg.max_positions}"
+           + (f"; no slot taken by {', '.join(free)}" if free else "")) if used or free else ""
+    return f"slots: {slot_rule(r.cfg)}{now}"
 
 
 def main(argv=None) -> int:
@@ -114,6 +122,7 @@ def main(argv=None) -> int:
         held = r.st.held
         print(f"held by the bot: {held or 'nothing'}")
         print(f"exits for new positions: {exit_rule(cfg)}")
+        print(slots_line(r))
         res = r.compute_plan(b.now())
         if res is None:
             print("no plan: symbols do not share a completed session (see log)")
@@ -140,6 +149,7 @@ def main(argv=None) -> int:
         else:                                       # compare with FTMO's dashboard
             print(rules_line(r))
             print(f"exits for new positions: {exit_rule(cfg)}")
+            print(slots_line(r))
             print(f"risk cap: {cap_rule(cfg)}")
             line = room_line(r)
             if line:

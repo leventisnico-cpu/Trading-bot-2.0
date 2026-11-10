@@ -12,6 +12,9 @@
 # only when it signals (about twice a month), so a quiet trial is normal.
 # Exits: the 5-step scale-out (operator's order, 2026-11-08): a trade is
 # held until its stop or its trail is hit, often for weeks.
+# Free slots (operator's order, 2026-11-10): a position whose stop is at or
+# over its entry takes no slot, so up to four positions can be open, at
+# most two of them with a stop under their entry.
 # If FTMO asks for payment for the trial, use any broker's free MT5 demo and
 # change `symbols` to that broker's index names, and `server_clock` to null.
 
@@ -21,7 +24,9 @@ symbols:                 # strategy name -> FTMO MT5 symbol (check Market Watch)
   US30: US30.cash
   US2000: US2000.cash
 risk_per_trade: 0.03     # as on the challenge
-max_positions: 2
+max_positions: 2         # positions that take a slot at once
+free_slots: true         # a position whose stop is at or over its entry takes no slot: S2 of
+                         # research/ftmo_slots_sizing.md, on by the operator's order (2026-11-10)
 notional_cap: 3.0
 atr_stop_mult: 3.0       # the first stop, entry - 3 x ATR(14); this distance is 1R
 exit_mode: scale_out     # the 5 steps: 1/2 at +1R, stop to entry; 1/4 at +1.5R, stop to +1R;

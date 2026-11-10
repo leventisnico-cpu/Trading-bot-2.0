@@ -3,7 +3,8 @@ close > SMA200 and RSI(2) < 10; stop entry - 3 x ATR(14); exit when
 close > SMA5 or after 10 sessions; at most 2 positions, lowest RSI(2)
 first. Pure functions over completed sessions. With the 5-step exits
 (``scale_out.py``) the entry and the stop are the same and these exits are
-not used."""
+not used. With ``free_slots`` the 2 are positions at risk (``plan``'s
+``free``); the research file counts every open position."""
 
 from __future__ import annotations
 
@@ -56,14 +57,16 @@ class Plan:
 
 def plan(ind: Dict[str, Indicators], held: Dict[str, int],
          max_positions: int = 2, max_hold: int = 10,
-         keep: Collection[str] = ()) -> Plan:
+         keep: Collection[str] = (), free: Collection[str] = ()) -> Plan:
     """``held``: symbol -> sessions held so far (entry session counts 1).
     ``keep``: held symbols whose exits FAST-4 does not decide (the 5-step
-    scale-out manages them); they still take their slot."""
+    scale-out manages them); they still take their slot. ``free``: held
+    symbols that take no slot (their stop is at or over their entry;
+    ``free_slots``). A held symbol is never bought again, free or not."""
     exits = [s for s, n in held.items()
              if s not in keep and s in ind and ind[s].sma5 is not None
              and (ind[s].close > ind[s].sma5 or n >= max_hold)]
-    slots = max_positions - (len(held) - len(exits))
+    slots = max_positions - sum(1 for s in held if s not in exits and s not in free)
     cands = sorted((x.rsi2, s) for s, x in ind.items()
                    if s not in held and x.sma200 is not None
                    and x.close > x.sma200 and x.rsi2 < 10)

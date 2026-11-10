@@ -687,6 +687,9 @@ def test_shadow_run_caps_at_data_and_resumes(tmp_path):
     assert [x["day"] for x in days] == [d.isoformat()]
     assert m.main(args[:4] + ["--until", ny(d, 21, 0).isoformat()]) == 0
     assert json.loads((out / "days.json").read_text()) == days   # nothing new, nothing lost
+    assert json.loads((out / "run.json").read_text())["free_slots_since"] == d.isoformat()
+    assert ("\nSlots: 2 positions at risk; a position whose stop is at or over its entry "
+            "takes no slot.\n") in (out / "JOURNAL.md").read_text()
 
 
 

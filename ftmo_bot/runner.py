@@ -95,6 +95,14 @@ def cap_rule(cfg: FtmoConfig) -> str:
             f"and {cfg.cap_max_loss_buffer:.1%} above the max-loss line")
 
 
+def slot_rule(cfg: FtmoConfig) -> str:
+    """The position limit, in words (logs, plan, preflight)."""
+    if cfg.free_slots:
+        return (f"{cfg.max_positions} positions at risk; a position whose stop is at or "
+                "over its entry takes no slot")
+    return f"{cfg.max_positions} positions; every open position takes a slot"
+
+
 def exit_rule(cfg: FtmoConfig) -> str:
     """The exit rule new positions get, in words (logs, plan, preflight)."""
     if cfg.exit_mode == "scale_out":
@@ -483,6 +491,8 @@ class Runner:
                       ) -> Optional[Tuple[date, fast4.Plan]]:
         ind, held_n, days, highs = {}, {}, set(), {}
         keep = {s for s, h in self.st.held.items() if h.get("exit") == "scale_out"}
+        free = (self._free_symbols(self.b.positions(self.cfg.magic))
+                if self.cfg.free_slots and self.st.held else set())
         for s in self.cfg.symbols:
             done = [x for x in self._sessions(s, now) if x.complete]
             if not done or (day is not None and done[-1].day != day):
@@ -506,7 +516,7 @@ class Runner:
             return None
         self.highs = highs
         return days.pop(), fast4.plan(ind, held_n, self.cfg.max_positions,
-                                      self.cfg.max_hold_sessions, keep)
+                                      self.cfg.max_hold_sessions, keep, free)
 
     def make_plan(self, now: datetime) -> None:
         today = now.astimezone(NY).date()
@@ -570,7 +580,7 @@ class Runner:
             blocked = bool(self.st.blocked_until or self.st.halted
                            or self.st.target_locked)
             why = rules.check_entry(a.equity, self.st.day_start_balance,
-                                    self.limits, len(current),
+                                    self.limits, self._slots_used(current),
                                     self.cfg.max_positions, blocked)
             if why:
                 log.info("entry %s refused: %s", s, why)
@@ -677,12 +687,51 @@ class Runner:
         # are held for weeks; the research model keeps the account alive
         # whatever is open)
         why = rules.check_entry(a.equity, self.st.day_start_balance, self.limits,
-                                len(live), self.cfg.max_positions + 1,
+                                self._slots_used(live), self.cfg.max_positions + 1,
                                 bool(self.st.blocked_until or self.st.halted))
         if why:
             log.info("keep-alive refused: %s", why)
             return
         self._roundtrip(now, "keepalive")
+
+    # ----------------------------------------------------------- slots
+    def _is_free(self, p: Position) -> bool:
+        """``free_slots``: a position whose stop is at or over its entry
+        takes no slot. It cannot lose against its entry unless the price
+        gaps through the stop, and the 5 steps only ever raise a stop. A
+        stop move the broker refused leaves the position at risk, so it
+        keeps its slot. The broker rounds a stop to its price step, and an
+        entry filled in parts can average between two steps: a stop within
+        half a step under the entry is at the entry. If the step cannot be
+        read, such a position keeps its slot."""
+        if not (self.cfg.free_slots and p.sl):
+            return False
+        under = p.price_open - p.sl                  # how far the stop is under the entry
+        if under <= 1e-9 * p.price_open:
+            return True
+        try:
+            step = self.b.spec(p.symbol).tick
+        except Exception as e:                       # the slot stays taken
+            log.warning("%s (ticket %d): price step unreadable (%s); its slot stays "
+                        "taken", p.symbol, p.ticket, e)
+            return False
+        return under <= 0.5 * step
+
+    def _slots_used(self, positions: List[Position]) -> int:
+        """Open positions that count against ``max_positions``."""
+        return sum(1 for p in positions if not self._is_free(p))
+
+    def _free_symbols(self, positions: List[Position]) -> set:
+        """Strategy symbols of the held positions that take no slot."""
+        by_ticket = {p.ticket: p for p in positions}
+        return {s for s, h in self.st.held.items()
+                if h.get("ticket") in by_ticket and self._is_free(by_ticket[h["ticket"]])}
+
+    def slots_now(self) -> Tuple[int, List[str]]:
+        """(slots taken by the open positions, the held symbols that take
+        none), for the operator. Read-only."""
+        positions = self.b.positions(self.cfg.magic)
+        return self._slots_used(positions), sorted(self._free_symbols(positions))
 
     # ------------------------------------------------------- risk room
     def _committed(self, positions: List[Position]) -> float:
@@ -907,9 +956,10 @@ class Runner:
                             f"({self.st.halted or 'target lock'})")]
         self.roll_day(now)
         a = self.b.account()
-        before = {p.ticket for p in self.b.positions(self.cfg.magic)}
+        open_now = self.b.positions(self.cfg.magic)
+        before = {p.ticket for p in open_now}
         why = rules.check_entry(a.equity, self.st.day_start_balance, self.limits,
-                                len(before), self.cfg.max_positions + 1,
+                                self._slots_used(open_now), self.cfg.max_positions + 1,
                                 bool(self.st.blocked_until))
         if why:
             return [(False, f"not sent: {why}")]
@@ -1077,6 +1127,7 @@ class Runner:
                  "DRY-RUN" if self.cfg.dry_run else "LIVE ORDERS",
                  self.cfg.risk_per_trade * 100, self.cfg.symbols)
         log.info("exits for new positions: %s", exit_rule(self.cfg))
+        log.info("slots: %s", slot_rule(self.cfg))
         log.info("risk cap: %s", cap_rule(self.cfg))
         while True:
             try:

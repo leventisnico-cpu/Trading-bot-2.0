@@ -51,6 +51,12 @@ class FtmoConfig:
     symbols: Dict[str, str] = field(default_factory=lambda: dict(DEFAULT_SYMBOLS))
     risk_per_trade: float = 0.03          # operator's order: 3%
     max_positions: int = 2
+    # operator's order (2026-11-10, "free slots on"): a position whose stop is at
+    # or over its entry (step 3 of the 5 steps done) takes none of the
+    # max_positions slots, so a quarter that can no longer lose does not block
+    # the next entry. S2 of research/ftmo_slots_sizing.md; it did NOT pass its
+    # pre-registered rule (more trades, less per trade, more breaches).
+    free_slots: bool = True
     notional_cap: float = 3.0             # x balance, per position (Swing leverage 1:15, US2000 1:9)
     atr_stop_mult: float = 3.0
     # operator's order (2026-11-08): the 5-step trade management. A position

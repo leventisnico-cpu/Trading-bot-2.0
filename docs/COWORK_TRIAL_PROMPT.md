@@ -150,6 +150,32 @@ Nico's style: one-line status first, then at most one thing for him to do.
   - **The 1-in-31 claim.** It would need a first target a tenth of the
     stop's distance (`research/ftmo_win_rate_dial.md`). The 5 steps set
     the first target as far as the stop.
+- **11-10, Nico's order: "free slots on".**
+  - `free_slots: true`, the default; in both configs. A config without
+    the key gets it too, so `git pull` and a restart of `run.ps1 -Live`
+    switch it on.
+  - **The rule.** A position takes one of the two slots only while its
+    stop is under its entry. Once step 3 has moved the stop to the
+    entry, the next signal can be taken. One position per index stays.
+    So up to **four** positions can be open, at most two of them with a
+    stop under their entry. That is not a fault.
+  - **Measured, not promised** (`research/ftmo_slots_sizing.md`, S2 with
+    the buffer): 216 of 990 signals taken instead of 153, about 14
+    trades a year instead of 10. Each is worth less (+0.08R against
+    +0.13R to +0.15R), and more attempts breach (19–21% and 7–8%
+    against 15–16% and 2%). It did not pass its pre-registered rule. It
+    is on by Nico's order.
+  - The preflight, `plan` and the log print `slots: 2 positions at
+    risk; a position whose stop is at or over its entry takes no slot`.
+    With positions open, the preflight and `plan` add what they take,
+    for example `taken now: 1 of 2; no slot taken by US500`.
+  - `free_slots: false` in `state\ftmo_config.yaml` turns it off. That
+    is Nico's call; never switch it on your own.
+  - The audit was run again with the new rule
+    (`reports/ftmo_bot_replay.md`, the section of 2026-11-10): 836
+    entries, 324 of them beside two or more open positions, 3,428
+    deals, 0 mismatches. The bot never held more than two positions
+    with a stop under their entry.
 
 ## 3. The bot on one screen
 
@@ -173,7 +199,8 @@ Nico's style: one-line status first, then at most one thing for him to do.
   first, then entries:
   - 3% of balance at risk;
   - a stop at entry minus 3 × ATR(14), resting in MT5;
-  - at most 2 positions, notional at most 3× balance.
+  - at most 2 positions with a stop under their entry, one per index
+    (free slots: up to 4 open); notional at most 3× balance each.
 
   Each plan runs at most once: it is saved as done before any order goes
   out.
@@ -190,7 +217,19 @@ Nico's style: one-line status first, then at most one thing for him to do.
   These run only 10:00–10:45 New York.
 - **Realistic odds** ("Read this first" in `docs/FTMO_BOT.md`):
   - FAST-4 is NO-GO for a *fast* pass.
-  - **With the 5 steps and the 1.5% buffer (the default since 11-09):**
+  - **With the 5 steps, the 1.5% buffer and free slots (the default
+    since 11-10):**
+    - attempts started 2011–18: about 35% passed both phases (34% within
+      18 months); 19–21% breached; 44–45% froze;
+    - attempts started 2019–26: 42–52% passed (30–39% within 18 months);
+      7–8% breached; 32–38% froze; 9–11% were still trading when the
+      data ended.
+    - Counting a frozen attempt as lost: 1.8 to 2.8 attempts per pass.
+    - 59% of trades reach +1R before their stop (2012–2026). Never 30
+      of 31.
+    - Funded, 77% and 92% of accounts survived a year; the median
+      survivor made −6.7% to −6.4% (2011–18 starts) and +1.7% (2019–26).
+  - **With free slots off (the default from 11-09 to 11-10):**
     - attempts started 2011–18: 38–43% passed both phases (31–38% within
       18 months); 15–16% breached; 42–47% froze;
     - attempts started 2019–26: 37–40% passed (20–24% within 18 months);
@@ -233,8 +272,9 @@ Nico's style: one-line status first, then at most one thing for him to do.
   Going live there is Nico's call, made in that session, after the trial
   meets the criteria in section 6.
 - **Don't change strategy parameters:** 3% risk, 3 × ATR stop,
-  SMA200 / RSI(2), the 5 steps (`exit_mode: scale_out`), 2 positions, cap
-  on with the 1.5% max-loss buffer (`cap_max_loss_buffer: 0.015`). They
+  SMA200 / RSI(2), the 5 steps (`exit_mode: scale_out`), 2 slots with
+  free slots on (`max_positions: 2`, `free_slots: true`), cap on with
+  the 1.5% max-loss buffer (`cap_max_loss_buffer: 0.015`). They
   are the researched rule plus Nico's orders. Never change one to make
   something pass.
 - **Never commit `state\` or `.env`.** Both are git-ignored and hold the
@@ -266,6 +306,11 @@ window) before giving the next.
      `state\ftmo_config.yaml` installed before then has no `exit_mode:`
      line and gets the 5 steps by default. The preflight prints
      `exits for new positions: 5-step scale-out ...`.
+   - Free slots arrived with the 11-10 pull. A config installed before
+     then has no `free_slots:` line and gets them by default. The
+     preflight prints `slots: 2 positions at risk; a position whose stop
+     is at or over its entry takes no slot`. A running `-Live` window
+     keeps the old rule until it is stopped (Ctrl+C) and started again.
 3. **Setup:**
    `cd C:\Users\leven\Trading-bot-2.0; powershell -ExecutionPolicy Bypass -File deploy\ftmo\setup.ps1`
    It must end with `Setup done`. It installs the trial config as

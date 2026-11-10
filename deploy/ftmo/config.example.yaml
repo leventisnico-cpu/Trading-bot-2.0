@@ -21,8 +21,16 @@
 # cannot pass) 42-47% / 42%. Without the buffer (0.002): passed 46-47% /
 # 38-42%, breached 37% / 12-13%, frozen 17% / 30%. The buffer turns
 # breaches into frozen accounts and adds no passes
-# (research/ftmo_frozen_accounts.py); the operator has been advised to
-# turn it off again.
+# (research/ftmo_frozen_accounts.py).
+#
+# Free slots, by the operator's order of 2026-11-10 (S2,
+# research/ftmo_slots_sizing.md; it did not pass its pre-registered rule):
+# a position whose stop is at or over its entry takes no slot. With the
+# 5 steps and the 1.5% buffer (what this file runs), of attempts started
+# 2011-18 / 2019-26: both phases passed 35% / 42-52% (within 18 months
+# 34% / 30-39%); breached 19-21% / 7-8%; frozen 44-45% / 32-38%. 59% of
+# trades won, about 14 a year instead of 10, +0.08R a trade instead of
+# +0.13-0.15R; up to four positions open at once.
 
 symbols:                 # strategy name -> FTMO MT5 symbol (check Market Watch)
   US100: US100.cash
@@ -30,8 +38,14 @@ symbols:                 # strategy name -> FTMO MT5 symbol (check Market Watch)
   US30: US30.cash
   US2000: US2000.cash
 risk_per_trade: 0.03     # operator's order (2026-10-04)
-max_positions: 2
-notional_cap: 3.0        # x balance per position; two positions fit the Swing account's 1:15 (US2000 1:9) leverage
+max_positions: 2         # positions that take a slot at once
+free_slots: true         # a position whose stop is at or over its entry (step 3 done) takes no
+                         # slot: up to four open, at most two with a stop under their entry.
+                         # Operator's order (2026-11-10); false = every open position takes a slot
+notional_cap: 3.0        # x balance per position, at its entry. Two positions at 3x and two
+                         # half-sold ones at 1.5x need about 3/4 of the balance as margin at
+                         # entry prices on the Swing account (1:15, US2000 1:9); more as the
+                         # half-sold ones rise
 atr_stop_mult: 3.0       # the first stop, entry - 3 x ATR(14); this distance is 1R
 exit_mode: scale_out     # the 5 steps: 1/2 at +1R, stop to entry; 1/4 at +1.5R, stop to +1R;
                          # the last 1/4 trails 1R under the highest close. fast4 = close over

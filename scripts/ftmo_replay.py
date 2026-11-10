@@ -11,22 +11,31 @@ first (``low_first`` is the unfavourable one for a long position).
 
 An account that halts (the max-loss guard; in ``challenge`` mode also the
 reached target) is replaced by a fresh one the next session, so one run is
-a chain of accounts over the whole history.
+a chain of accounts over the whole history. So is an account the bot
+reports FROZEN (flat, with no room left over the max-loss line and its
+buffer: it can open nothing more), as the operator would replace it.
 
 Checked on every run; a mismatch is a bug in the bot or in this script:
 
 * the plan after each close, against FAST-4 computed from the daily arrays
   of ``research/ftmo_fast_pass.py`` (signal, priority, slots);
-* every entry: the signal, the stop 3 x ATR under the fill, and the size
-  (3% risk, the combined-risk cap with its two buffers, the notional cap);
+* every entry: the signal, a slot for it, the stop 3 x ATR under the fill,
+  and the size (3% risk, the combined-risk cap with its two buffers, the
+  notional cap);
 * every 5-step trade, deal by deal, against an independent oracle (part
   closes, stop moves, the trail, the stop-out);
-* invariants: at most two positions, a stop never lowered, a volume never
-  raised, the balance equal to the initial balance plus the deals' P&L.
+* invariants: at most two positions taking a slot and one per index, a stop
+  never lowered, a volume never raised, the balance equal to the initial
+  balance plus the deals' P&L; no planned entry refused for want of a slot;
+  the bot says FROZEN when, and only when, the account is.
+
+``--slots free`` (the bot's default, ``free_slots``): a position whose stop
+is at or over its entry takes no slot. ``--slots all``: every open position
+takes one (the rule before 2026-11-10).
 
     python -B scripts/ftmo_replay.py --data-dir DIR [--mode funded|challenge]
-        [--order low_first|high_first] [--start YYYY-MM-DD] [--end YYYY-MM-DD]
-        [--report FILE] [--json FILE]
+        [--order low_first|high_first] [--slots free|all] [--start YYYY-MM-DD]
+        [--end YYYY-MM-DD] [--report FILE] [--json FILE]
 
 DIR holds ``qqq_long.csv``, ``spy_long.csv``, ``dia_long.csv`` and
 ``iwm_long.csv``. Exit code 1 if anything mismatched. Costs are zero here
@@ -71,7 +80,11 @@ STEP = 0.01                       # SimBroker's volume step and minimum
 # the 5 steps, restated here on purpose (not imported from the bot)
 TP1, TP2, HALF, THREE_QUARTERS = 1.0, 1.5, Decimal("0.5"), Decimal("0.75")
 RISK, ATR_MULT, NOTIONAL_CAP = 0.03, 3.0, 3.0
+SLOTS = 2                         # positions that may take a slot at once
 DAILY, MAX_LOSS, DAILY_PAD, MAX_LOSS_PAD = 0.05, 0.10, 0.002, 0.015
+# a flat account with no more room than this over the max-loss line and its
+# buffer (0.05% of the initial balance) is frozen: it can open nothing more
+FROZEN_AT = ((1 - MAX_LOSS) + MAX_LOSS_PAD + 0.0005) * INITIAL
 ACCOUNT_CLOSES = ("guard", "target", "halted", "stand-down", "retry")
 Event = Tuple[str, datetime, float, float]        # kind, time, volume, price
 
@@ -157,6 +170,14 @@ def five_steps(bars: Sequence[tuple], entry: float, stop0: float,
     return out
 
 
+def takes_slot(p, free_slots: bool) -> bool:
+    """The slot rule, restated: every open position takes one of the two
+    slots, except, with free slots, one whose stop is at or over its entry
+    price (the 5 steps moved it there; it can no longer lose against its
+    entry unless the price gaps through the stop)."""
+    return not (free_slots and p.sl and p.sl >= p.price_open)
+
+
 def expected_volume(balance: float, day_start: float, others: Sequence,
                     entry: float, stop: float) -> float:
     """3% of the balance at risk, capped by 3x notional and by the room the
@@ -187,9 +208,10 @@ class Keep(logging.Handler):
 
 class Replay:
     def __init__(self, dates, inst, mode: str, order: str, workdir: Path,
-                 history: int = HISTORY) -> None:
+                 history: int = HISTORY, slots: str = "free") -> None:
+        assert slots in ("free", "all"), slots
         self.dates, self.inst, self.mode, self.order = dates, inst, mode, order
-        self.workdir, self.history = workdir, history
+        self.workdir, self.history, self.free = workdir, history, slots == "free"
         self.keep = (history + 3) * SESSION_BARS
         self.days = [pd.Timestamp(d).date() for d in dates]
         self.data: Dict[str, list] = {p: [] for p in PROXY.values()}
@@ -198,7 +220,7 @@ class Replay:
         self.attempts: List[dict] = []
         self.trades: List[dict] = []
         self.count = dict(sessions=0, plans=0, entries=0, events=0, keepalives=0,
-                          refused=0, ticks=0)
+                          refused=0, ticks=0, beyond_two=0, max_open=0)
         self.crossed: List[Tuple[date, str]] = []     # sessions under an FTMO line
         self.log = Keep()
         self.sim: Optional[SimBroker] = None
@@ -240,7 +262,8 @@ class Replay:
         self.sim.clock = t0
         cfg = FtmoConfig(
             symbols=dict(PROXY), dry_run=False, initial_balance=INITIAL,
-            exit_mode="scale_out", profit_target=None if self.mode == "funded" else 0.10,
+            exit_mode="scale_out", free_slots=self.free,
+            profit_target=None if self.mode == "funded" else 0.10,
             state_path=str(self.workdir / f"account{self.k}" / "bot_state.json"),
             log_path=str(self.workdir / "bot.log"))
         cfg.validate()
@@ -266,6 +289,11 @@ class Replay:
                                   trading_days=len(self.r.st.trading_days)))
         self.sim = self.r = None
 
+    def frozen(self) -> bool:
+        """Flat, and the balance leaves no room over the max-loss line and
+        its buffer: nothing can be opened, so the balance cannot rise."""
+        return not self.sim.pos and self.sim.balance <= FROZEN_AT
+
     # -------------------------------------------------------------- ticks
     def tick(self, d: date, at: time) -> None:
         t = datetime.combine(d, at, NY)
@@ -275,8 +303,11 @@ class Replay:
         self.r.tick(t)
         self.count["ticks"] += 1
         self.day_low = min(self.day_low, low, self.sim.account().equity)
-        if len(self.sim.pos) > self.r.cfg.max_positions:
-            self.problems.append(f"{t}: {len(self.sim.pos)} positions open")
+        used = sum(takes_slot(p, self.free) for p in self.sim.pos)
+        if used > SLOTS or len({p.symbol for p in self.sim.pos}) < len(self.sim.pos):
+            self.problems.append(f"{t}: {len(self.sim.pos)} positions open, {used} of them "
+                                 f"taking a slot: {[p.symbol for p in self.sim.pos]}")
+        self.count["max_open"] = max(self.count["max_open"], len(self.sim.pos))
         for p in self.sim.pos:                       # stops only up, volumes only down
             s0 = self.account["stops"].get(p.ticket)
             v0 = self.account["vols"].get(p.ticket)
@@ -294,6 +325,7 @@ class Replay:
         first = {s: self.bars_of(i, s, ()) for s in PROXY}     # only bar 0 is used
         for s in PROXY:
             self.feed(PROXY[s], first[s][:1])
+        was_frozen, seen = self.frozen(), len(self.log.lines)
         self.day_low = math.inf
         self.tick(d, time(9, 35))
         day_start = self.r.st.day_start_balance
@@ -310,8 +342,18 @@ class Replay:
         elif self.day_low <= day_start - DAILY * INITIAL:
             self.crossed.append((d, "daily"))
         self.check_plan(i)
+        said = [m for _, m in self.log.lines[seen:]      # entries not taken this session
+                if m.startswith("entry ") and ("skipped" in m or "refused" in m)]
+        told = any("FROZEN" in m for m in said)
+        if was_frozen and any("FROZEN" not in m for m in said):
+            self.problems.append(f"{d}: the account was frozen but the bot said {said}")
+        if told and not self.frozen():
+            self.problems.append(f"{d}: the bot said FROZEN with room left: {said}")
         if self.r.st.halted and not self.sim.pos:
             self.close_account(self.r.st.halted, i)
+        elif told and self.frozen():
+            self.close_account("frozen: no room left over the max-loss line and its "
+                               "buffer", i)
 
     # ------------------------------------------------------------- checks
     def check_plan(self, i: int) -> None:
@@ -327,7 +369,8 @@ class Replay:
                 continue
             if x["c"][i] > x["sma200"][i] and x["rsi"][i] < 10:
                 cands.append((float(x["rsi"][i]), s))
-        want = [s for _, s in sorted(cands)[:max(0, self.r.cfg.max_positions - len(held))]]
+        used = sum(takes_slot(p, self.free) for p in self.sim.pos)
+        want = [s for _, s in sorted(cands)[:max(0, SLOTS - used)]]
         if st.pending_entries != want or st.pending_exits:
             self.problems.append(f"{self.days[i]}: plan {st.pending_entries} exits "
                                  f"{st.pending_exits}, expected {want} and no exits")
@@ -358,6 +401,11 @@ class Replay:
             where = f"account {self.k} {self.days[i]} {s}"
             if not (x["c"][i - 1] > x["sma200"][i - 1] and x["rsi"][i - 1] < 10):
                 self.problems.append(f"{where}: entry without a FAST-4 signal")
+            used = sum(takes_slot(p, self.free) for p in c["others"])
+            if used >= SLOTS or any(p.symbol == sym for p in c["others"]):
+                self.problems.append(f"{where}: entry without a slot ({used} of the "
+                                     f"{len(c['others'])} open positions take one)")
+            self.count["beyond_two"] += len(c["others"]) >= SLOTS
             stop = c["ask"] - ATR_MULT * float(x["atr"][i - 1])
             if abs(c["sl"] - stop) > 1e-7 * c["ask"]:
                 self.problems.append(f"{where}: stop {c['sl']} is not ask - 3 ATR = {stop}")
@@ -436,6 +484,10 @@ class Replay:
             logger.propagate, logger.handlers = saved[2], saved[3]
         self.count["refused"] = sum(1 for _, m in self.log.lines if m.startswith("entry ")
                                     and ("refused" in m or "skipped" in m))
+        # the plan and the open count slots alike, and between the two a slot is
+        # only ever given back: a planned entry is never refused for want of one
+        self.problems += [f"planned {m}" for _, m in self.log.lines
+                          if m.startswith("entry ") and "refused: already" in m]
 
 
 def summarise(rp: Replay, i0: int, i1: int) -> Tuple[str, dict]:
@@ -445,7 +497,8 @@ def summarise(rp: Replay, i0: int, i1: int) -> Tuple[str, dict]:
     n = len(rule) or 1
     wins = sum(t["tp1"] for t in rule)
     facts = dict(
-        mode=rp.mode, order=rp.order, first=str(rp.days[i0]), last=str(rp.days[i1 - 1]),
+        mode=rp.mode, order=rp.order, slots="free" if rp.free else "all",
+        first=str(rp.days[i0]), last=str(rp.days[i1 - 1]),
         **rp.count, accounts=len(rp.attempts), trades=len(rp.trades),
         crossed=[f"{d} {w}" for d, w in rp.crossed],
         closed_by_rule=len(rule), closed_by_account=len(cut),
@@ -462,11 +515,19 @@ def summarise(rp: Replay, i0: int, i1: int) -> Tuple[str, dict]:
         avg_risk=float(np.mean([t["risk"] for t in rp.trades])) if rp.trades else float("nan"),
         problems=len(rp.problems))
     f = facts
-    out = [f"## {rp.mode}, {rp.order.replace('_', ' ')}: {f['first']} → {f['last']}", "",
+    out = [f"## {rp.mode}, {rp.order.replace('_', ' ')}, slots {f['slots']}: "
+           f"{f['first']} → {f['last']}", "",
            f"* {f['sessions']} sessions, {f['ticks']} bot ticks, {f['accounts']} accounts "
            f"in a chain, {f['plans']} plans checked.",
-           f"* {f['entries']} entries checked (signal, stop, size); {f['refused']} planned "
-           f"entries the bot refused or skipped; {f['keepalives']} keep-alive round trips.",
+           "* Slots: " + (f"a position whose stop is at or over its entry takes none "
+                          f"(free slots). {f['beyond_two']} entries were made with two or "
+                          f"more positions already open; most open at once: {f['max_open']}."
+                          if rp.free else
+                          f"every open position takes one of the two (free slots off). "
+                          f"Most open at once: {f['max_open']}."),
+           f"* {f['entries']} entries checked (signal, slot, stop, size); {f['refused']} "
+           f"planned entries the bot refused or skipped; {f['keepalives']} keep-alive "
+           "round trips.",
            f"* {f['trades']} trades: {f['closed_by_rule']} ended by the 5 steps' stops, "
            f"{f['closed_by_account']} cut short by the account's own flatten (guard, target), "
            f"{f['open_at_end']} open at the end.",
@@ -500,6 +561,9 @@ def main(argv=None) -> int:
     ap.add_argument("--data-dir", required=True, type=Path)
     ap.add_argument("--mode", choices=("funded", "challenge"), default="funded")
     ap.add_argument("--order", choices=("low_first", "high_first"), default="low_first")
+    ap.add_argument("--slots", choices=("free", "all"), default="free",
+                    help="free: a position whose stop is at or over its entry takes no "
+                         "slot (the bot's default); all: every open position takes one")
     ap.add_argument("--start", help="first session to trade (default: the first with "
                                     f"{HISTORY} sessions of history)")
     ap.add_argument("--end", help="last session (default: the last in the data)")
@@ -515,7 +579,7 @@ def main(argv=None) -> int:
     i1 = len(days) if not a.end else 1 + max(
         i for i, d in enumerate(days) if d <= date.fromisoformat(a.end))
     with tempfile.TemporaryDirectory() as tmp:
-        rp = Replay(dates, inst, a.mode, a.order, Path(tmp), a.history)
+        rp = Replay(dates, inst, a.mode, a.order, Path(tmp), a.history, a.slots)
         rp.run(i0, i1)
     text, facts = summarise(rp, i0, i1)
     print(text)

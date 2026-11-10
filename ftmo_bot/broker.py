@@ -26,6 +26,7 @@ class Spec:
     volume_min: float = 0.0
     volume_step: float = 0.0
     volume_max: float = 0.0
+    tick: float = 0.0             # price step of a stop (0.0: not known)
 
 
 @dataclass(frozen=True)

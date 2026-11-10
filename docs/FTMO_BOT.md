@@ -20,8 +20,16 @@ the operator's order; `research/ftmo_scale_out.md`, V1). Since
 2026-11-09, also by the operator's order ("buffer on"), the cap keeps all
 open stops 1.5% above the max-loss line: `cap_max_loss_buffer: 0.015`, W2
 of `research/ftmo_scale_out_v2.md`. W2 did not pass its pre-registered
-rule. The default columns are both together. The FAST-4 exit columns are
-`exit_mode: fast4` with the old 0.2% buffer.
+rule. The FAST-4 exit columns are `exit_mode: fast4` with the old 0.2%
+buffer.
+
+Since 2026-11-10, again by the operator's order ("free slots on"), a
+position whose stop is at or over its entry takes no slot:
+`free_slots: true`, S2 of `research/ftmo_slots_sizing.md`. S2 did not pass
+its pre-registered rule either. **The default is now all three: the 5
+steps, the 1.5% buffer and free slots.** Its figures are in "Free slots:
+on against off" below; the two right-hand columns of this table are the
+same bot with free slots off.
 
 **Frozen accounts (measured 2026-11-09, `research/ftmo_frozen_accounts.py`).**
 An attempt that neither passed nor breached was reported as "still
@@ -29,7 +37,7 @@ running". Most of those are frozen: flat, with no risk room left over
 the max-loss line, so the bot can open nothing more and the attempt
 cannot pass. The table counts them on their own row.
 
-| measure | FAST-4 exits, 2011–18 starts | FAST-4 exits, 2019–26 starts | bare rule, 2019–26 starts | **5 steps + 1.5% buffer (default)**, 2011–18 starts | **5 steps + 1.5% buffer (default)**, 2019–26 starts |
+| measure | FAST-4 exits, 2011–18 starts | FAST-4 exits, 2019–26 starts | bare rule, 2019–26 starts | 5 steps + 1.5% buffer, free slots off, 2011–18 starts | 5 steps + 1.5% buffer, free slots off, 2019–26 starts |
 |---|---|---|---|---|---|
 | both phases passed, within the data | 24–29% | 68–70% | 23% | 38–43% | 37–40% |
 | breached a rule (fee lost) | 41–43% | 1% | 77% | 15–16% | 2% |
@@ -58,7 +66,8 @@ What this means for the FAST-4 exits:
 
 The bot executes the rule faithfully; it does not change these odds.
 
-What it means for the default (the 5 steps with the 1.5% buffer):
+What it means for the 5 steps with the 1.5% buffer and free slots off
+(the default until 2026-11-10):
 
 * **Passes:** 31–38% of 2011–18 attempts and 20–24% of 2019–26 ones
   pass within 18 months.
@@ -105,9 +114,88 @@ What it means for the default (the 5 steps with the 1.5% buffer):
   accounts it saves trade on too small to recover.
 * **Both together** pass more often for 2019–26 starts and less often
   for 2011–18 starts.
-* None passed its rule, so the bot is unchanged. The slots and the
-  sizing are not what holds the system back; the entry's thin edge is
-  (+0.13–0.15R per trade, about ten trades a year).
+* None passed its rule, so the bot was left unchanged on 2026-11-09. The
+  slots and the sizing are not what holds the system back; the entry's
+  thin edge is (+0.13–0.15R per trade, about ten trades a year).
+* On 2026-11-10 the operator ordered the first one on all the same
+  ("free slots on"). See the next block.
+
+**Free slots: on (`free_slots: true`, the default) against off (`false`)**
+(S2, `research/ftmo_slots_sizing.md`; on by the operator's order of
+2026-11-10). The 5 steps with the 1.5% buffer, which is what the bot
+runs: W2+S2 against W2 in the study. Where two figures are joined by a
+slash they are 2011–18 / 2019–26 starts:
+
+| measure | free slots off | free slots on (default) |
+|---|---|---|
+| FAST-4 signals taken, of 990 (2012–2026) | 153 | 216 |
+| trades a year | 10.2–10.4 | 14.4 |
+| trades that reach +1R before their stop | 61.0–61.6% | 58.9% |
+| payoff per trade, after costs | +0.129R to +0.147R | +0.079R |
+| most positions open at once | 2 | 4 |
+| one account held for the whole period: growth a year, deepest drawdown | +3.0–3.2%, 29.7% | +1.4%, 37.3% |
+| breached a rule | 14.8–15.6% / 1.9–2.4% | 19.3–21.0% / 7.3–8.4% |
+| both phases within 18 months | 31.2–38.4% / 19.8–24.2% | 33.8–34.1% / 30.4–39.4% |
+| both phases passed, within the data | 37.5–43.5% / 36.7–40.2% | 35.2–35.5% / 42.4–51.9% |
+| **frozen**: flat, no room left, cannot pass | 41.8–46.9% / 41.6% | 43.8–45.2% / 31.8–38.3% |
+| still trading when the data ends | 0% / 16.3–19.3% | 0% / 9.0–10.9% |
+| days to pass, median | 307–328 / 459–533 | 237–260 / 309–360 |
+| attempts per pass, a frozen attempt counted as lost | 2.30–2.67 / 2.08–2.20 | 2.82–2.84 / 1.75–2.10 |
+| funded account survives 1 year (a frozen one counts) | 81% / 99% | 77% / 92% |
+| funded 1-year return, median of survivors | +0.5% / +2.5% | −6.7% to −6.4% / +1.7% |
+
+What free slots change:
+
+* **The rule.** A position keeps one of the two slots only while its
+  stop is under its entry. Once step 3 has moved the stop to the entry,
+  the next signal can be taken. One position per index stays. So up to
+  four positions can be open, at most two of them with a stop under
+  their entry.
+* **More trades, each worth less.** 216 entries instead of 153, at
+  +0.08R a trade instead of +0.13R to +0.15R. In the study the 103
+  added trades earned +0.06R each and 40 trades the old rule took were
+  lost (+0.28R each). With about 200 trades those differences are
+  within the noise.
+* **More breaches.** A stop at the entry does not hold in a gap, and
+  now up to four positions sit through one. Breaches go from 15–16% to
+  19–21% (2011–18 starts) and from 2% to 7–8% (2019–26 starts).
+* **Passes: faster, not more often in both periods.** For 2019–26
+  starts more attempts pass (42–52% against 37–40%) and sooner (median
+  309–360 days against 459–533). For 2011–18 starts fewer pass (about
+  35% against 38–43%).
+* **Funded: worse.** Fewer funded accounts survive a year (77% and 92%
+  against 81% and 99%), and for 2011–18 starts the median survivor
+  loses 6.4% to 6.7% in its first year.
+* **It failed its test.** The rule written down before the run asked
+  for no more breaches and no fewer passes in any period. Free slots
+  breach more in every period. It is on by the operator's order, not on
+  the evidence. `free_slots: false` in `state\ftmo_config.yaml` turns
+  it off; a position already open is not touched either way.
+* **The buffer with free slots.** Free slots without the 1.5% buffer
+  (S2 in the study) breach 43–44% / 17–19% of attempts, against
+  19–21% / 7–8% with it. So with free slots on, the buffer is worth
+  keeping for the challenge. This comparison was not one of the study's
+  pre-registered tests.
+
+**The bot with free slots, audited** (2026-11-10,
+`reports/ftmo_bot_replay.md`, the section of that date):
+
+* The replay's oracle now states the slot rule itself. Over 2012–2026,
+  in both bar orders, as a funded account and as a chain of challenge
+  accounts: 836 entries, 324 of them made beside two or more open
+  positions, and 3,428 deals. **0 mismatches.**
+* The bot never held more than two positions with a stop under their
+  entry, and never two on one index.
+* One funded account over the whole history, before costs: 208 trades
+  at +0.19R each with free slots, against 143–145 at +0.27R to +0.28R
+  without. It ended at 29,635–29,649 from 15,000, against
+  31,382–31,738.
+* The chain of challenge accounts, one path (low-first bar order): 25
+  accounts with free slots, of which 15 reached the Phase 1 target, 8
+  froze and 1 breached. Without: 21 accounts, 15 reached it, 4 froze,
+  1 breached.
+* It runs with zero costs. It shows that the bot follows the rule, not
+  that the rule earns more.
 
 **The buffer: on (`cap_max_loss_buffer: 0.015`) against off (`0.002`)**
 (W2, `research/ftmo_scale_out_v2.md`; on by the operator's order of
@@ -132,8 +220,14 @@ passes.**
 * W2 did not pass its pre-registered rule.
 * It is on by the operator's order of 2026-11-09. He gave that order
   before the frozen accounts were measured, on a trade-off that did not
-  count them. He has been told and advised to turn it off again
+  count them. He was told and advised to turn it off again
   (`cap_max_loss_buffer: 0.002`). Until he decides it stays on.
+* Since free slots went on (2026-11-10) that advice no longer holds for
+  the challenge: with free slots the buffer halves the breaches (see
+  "The buffer with free slots" above). For a funded account the two
+  pull apart: with the buffer more accounts survive the year (77% / 92%
+  against 61–62% / 87%), but the median survivor earns less (−6.7% to
+  −6.4% / +1.7% against +1.7–2.1% / +3.2%).
 * A frozen account is not closed by FTMO. Lowering the buffer lets the
   bot trade what is left.
 
@@ -146,8 +240,11 @@ default) each entry is sized so that all open stops together stay 0.2%
 above the daily line and 1.5% above the max-loss line
 (`cap_max_loss_buffer`): the first position risks 3%, a second one gets
 what is left (about 1.8%), and once the account is down about 3.7% the
-max-loss buffer trims new entries further. The preflight prints the cap
-as `risk cap: ...`. On the 2025-2026 replay the 0.2% cap widened the closest
+max-loss buffer trims new entries further. A stop at or over its entry
+counts as no risk, so with free slots a third and a fourth position are
+sized from the same room. The preflight prints the cap as
+`risk cap: ...` and the slot rule as `slots: ...` (with positions open
+it adds, for example, `taken now: 1 of 2; no slot taken by US500`). On the 2025-2026 replay the 0.2% cap widened the closest
 approach to the daily line from 43 to 177 and delayed Phase 1 from 204
 to 236 weekdays. What it cannot stop: a gap that opens beyond the stops.
 The two bot columns above include the cap; the bare-rule column does not.
@@ -207,7 +304,13 @@ The two bot columns above include the cap; the bare-rule column does not.
     next bullets.
 * At the next US open (09:31–10:30 New York) it sends exits first, then
   entries: 3% of balance at risk, stop at entry − 3 × ATR(14) resting in
-  MT5, at most two positions, notional at most 3× balance. Each plan is
+  MT5, notional at most 3× balance per position. **Slots:** at most two
+  positions with a stop under their entry, and one position per index
+  (`max_positions: 2`, `free_slots: true`). A position whose stop the 5
+  steps have moved to its entry or over takes no slot, so up to four can
+  be open. A stop move the broker refused leaves the slot taken until it
+  goes through. MT5 rounds a stop to the symbol's price step, so a stop
+  within half a step under the entry counts as at the entry. Each plan is
   executed at most once: it is marked done and saved before any order
   is sent, so a crash or restart can miss a trade but never double it.
   A plan older than the previous session is thrown away.
