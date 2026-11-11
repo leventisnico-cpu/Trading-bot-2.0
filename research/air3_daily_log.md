@@ -1605,3 +1605,69 @@ paper position to report. Astral's paper slot holds the FTMO bot test
     Astral's stop-loss monitor). It can only be deployed once 1999 is
     stopped in Astral's dashboard, which the API refuses to do
     (`strategy_stop_requires_dashboard`).
+
+### 2026-11-11 (Wednesday, after the close)
+
+* **SMH:** close 506.98 from the last 30-minute bar (today's daily bar
+  has not posted), +4.8% on the day against Tuesday's close, which now
+  posts as 483.63 (Tuesday's entry used 483.75). SMA50 562.10, SMA200
+  523.11. Buy level 549.27, sell level 496.96.
+* **No order.** By the rule the position was sold at the 11-06 open
+  (473.41), so it is flat. The next BUY needs a close above 549.27
+  (8.3% above today's) with SMA50 above SMA200 (true today).
+  - The operator has not confirmed the TFSA fill yet; record it here
+    when he does.
+  - If the position is still held, there is no SELL today: the close is
+    back over the sell level, by $10.02 (2.0%).
+* **ETF scan** (1Y / 6M / YTD %):
+  - SOXX 58.0 / −12.5 / 54.8;
+  - SMH 44.4 / −12.0 / 40.8;
+  - XSD 41.6 / −19.9 / 43.4;
+  - SMHX 31.8 / −9.8 / 35.5;
+  - THNQ 27.1 / 5.4 / 33.4;
+  - XLK 19.0 / −2.0 / 21.1;
+  - FTEC 17.8 / 0.0 / 20.8;
+  - VGT 17.6 / 0.0 / 20.7;
+  - CHAT 16.7 / −15.0 / 25.2;
+  - IYW 16.4 / −1.4 / 18.5;
+  - AIQ 16.0 / −4.7 / 17.8;
+  - WTAI 12.8 / −15.7 / 19.8;
+  - QQQ 11.1 / −3.2 / 12.4;
+  - context only: USD (2×) 8.9 / −39.4 / 14.2 and SOXL (3×) 57.9 /
+    −65.3 / 57.1.
+
+  Top 3 unleveraged by 1Y: SOXX, SMH, XSD. No unswept ETF beats SMH on
+  all three, so there is no backtest.
+* **The FTMO bot is running live on a trial account for the first
+  time.** Started by the operator at 11:52 New York on a new FTMO demo
+  account of USD 100,000 (the login is in his `state\ftmo_config.yaml`,
+  not here).
+  - His preflight passed on it: server clock UTC+2 (rule NY+7), all
+    four index CFDs with 327 sessions, the 5 steps, free slots, the
+    1.5% buffer.
+  - At Tuesday's close the CFDs gave no signal: RSI(2) 58.3 (US100,
+    under its 200-day average), 58.3 (US500), 57.4 (US30), 59.7
+    (US2000).
+  - What stood in the way, in order: Algo Trading was off; the config
+    had no login; and with MetaQuotes' own MetaTrader 5 installed
+    beside FTMO's, the bot attached to the wrong one
+    (`Authorization failed`). Fixed with `login:` and `mt5_path:` in
+    the config (`docs/COWORK_TRIAL_PROMPT.md`, the 11-11 entry).
+  - Still to come: its first round trip on Thursday, 10:00–10:45 New
+    York, and the self-test in that window if the operator runs it.
+  - The free-slots audit was repeated on the committed code and came
+    out identical (commit `10e2466`).
+* **FTMO bot shadows: no trade, part close or stop move.** Both exit 0,
+  no tick errors. The indices rose: QQQ +2.4%, SPY +1.3%, IWM +0.9%,
+  DIA +0.5%.
+  - **5 steps (the bot's rule):** still holds US30, 28.79 at 522.86,
+    stop 507.70. DIA closed at 524.29, +0.09R; the first target is
+    538.02. Balance 14,280.19, equity 14,321.27 (−4.52%). Lowest mark
+    14,200.29; the daily floor is 13,530.19. No plan for Thursday's
+    open.
+  - **FAST-4 exits:** flat, 14,945.96 (−0.36%), nothing planned.
+  - No `FROZEN` line in either log.
+* **Astral 1999:** no orders or fills. It still holds the paper
+  account (a deploy preview for the replacement was refused for that
+  reason at 21:42 UTC). The operator knows the one step that frees it:
+  Dashboard → Strategies → Stop → Liquidate & Stop.

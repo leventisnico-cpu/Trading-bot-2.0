@@ -176,6 +176,30 @@ Nico's style: one-line status first, then at most one thing for him to do.
     entries, 324 of them beside two or more open positions, 3,428
     deals, 0 mismatches. The bot never held more than two positions
     with a stop under their entry.
+- **11-11: a new trial account, and the bot's first live start.**
+  - Nico could not log in to MT5 (the password was lost). He then
+    logged in to a new free-trial account from his FTMO client area:
+    USD 100,000, server `FTMO-Demo`; MT5's mailbox shows "You have
+    registered a new account".
+  - The installed config still had `login: null`. `-Live` refuses to
+    start without a login, so unless the config was reinstalled since,
+    the bot had not run live before.
+  - **Two MetaTraders are installed on the laptop.** MetaQuotes' own
+    (`C:\Program Files\MetaTrader 5`, a `MetaQuotes-Demo` account) and
+    FTMO's (`C:\Program Files\FTMO Global Markets MT5 Terminal`). The
+    title bar tells them apart: FTMO's reads `<login> - FTMO-Demo`.
+  - The preflight passed on FTMO's terminal. `-Live` then failed with
+    `MT5 initialize failed: (-6, 'Terminal: Authorization failed')`:
+    without `mt5_path` the bot had attached to the MetaQuotes one.
+  - Fixed by closing the MetaQuotes window, setting `login:` and
+    `mt5_path:` in `state\ftmo_config.yaml`, and switching Algo
+    Trading on. The bot started at 11:52 New York:
+    `FTMO bot running (LIVE ORDERS)`, `algo trading ON`.
+  - The line that pins the bot to the running FTMO terminal and starts
+    it (paste as one line):
+    `cd C:\Users\leven\Trading-bot-2.0; $p = (Get-Process terminal64 | Where-Object { $_.MainWindowTitle -like '*FTMO*' } | Select-Object -First 1).Path; if ($p) { (Get-Content state\ftmo_config.yaml) -replace '^mt5_path:.*', ('mt5_path: ' + $p.Replace('\','/')) | Set-Content state\ftmo_config.yaml; powershell -ExecutionPolicy Bypass -File deploy\ftmo\run.ps1 -Live }`
+  - Not done yet: `run.ps1 -SelfTest` on this account (10:00–10:45 New
+    York, with the `-Live` window stopped).
 
 ## 3. The bot on one screen
 
@@ -378,7 +402,9 @@ window) before giving the next.
   - Compare one printed last close with the chart.
 - **`FAIL cannot reach the MT5 terminal`:** MT5 is not open or not logged
   in. With several terminals installed, set `mt5_path:` in the config to
-  FTMO's `terminal64.exe`.
+  FTMO's `terminal64.exe`. `Authorization failed` after a preflight that
+  passed means the bot attached to the other MetaTrader (the 11-11
+  entry in section 2 has the fix).
 
 **Every day.** Read `state/ftmo_bot.log` through the mount. It is
 git-ignored but on disk.

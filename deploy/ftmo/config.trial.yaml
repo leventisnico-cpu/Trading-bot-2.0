@@ -49,7 +49,10 @@ magic: 404040
 dry_run: false           # demo money: orders go out with run.ps1 -Live (--execute), once login is set
 state_path: state/ftmo_state.json
 log_path: state/ftmo_bot.log
-mt5_path: null           # e.g. C:/Program Files/FTMO MetaTrader 5/terminal64.exe
+mt5_path: null           # FTMO's terminal64.exe, e.g.
+                         # C:/Program Files/FTMO Global Markets MT5 Terminal/terminal64.exe
+                         # Set it when another MetaTrader 5 is installed too: left null, the
+                         # bot may attach to that one (`Authorization failed`)
 server_clock: NY+7       # FTMO's server clock; null on another broker's demo
 login: null              # the trial's login number from FTMO's email (not the password),
                          # e.g. login: 1234567. Orders go only to this account; until it

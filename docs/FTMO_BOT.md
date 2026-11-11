@@ -618,7 +618,14 @@ server clock are what paper cannot test.
    Check, line by line:
    * `FAIL cannot reach the MT5 terminal`: open MT5 and log in first;
      with several MT5 terminals installed, set `mt5_path` in
-     `state\ftmo_config.yaml` to FTMO's `terminal64.exe`;
+     `state\ftmo_config.yaml` to FTMO's `terminal64.exe`
+     (`C:\Program Files\FTMO Global Markets MT5 Terminal\` on the
+     operator's laptop);
+   * `Authorization failed` in that line, after a preflight that
+     passed: the bot attached to another MetaTrader 5 that is not logged
+     in (seen 2026-11-11 with MetaQuotes' own terminal installed beside
+     FTMO's). Without `mt5_path` the bot takes whichever terminal
+     Windows hands it. Close the other one and set `mt5_path`;
    * `account`: the trial's login, USD, `algo trading ON`;
    * `rules:`: the initial balance is the account size (`from the
      account` on a new account), the max-loss line 10% under it and the
