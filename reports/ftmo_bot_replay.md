@@ -486,3 +486,10 @@ Every open position takes a slot (`--slots all`, the rule until
 | 18 | 2024-12-03 | 2026-02-09 | profit target reached; review the phase on FTMO | 16,606.30 | 24 |
 | 19 | 2026-02-10 | 2026-10-29 | end of the data | 15,077.00 | 14 |
 
+
+## Repeated on the committed code (2026-11-11)
+
+All eight runs were made again on commit `47019ed` itself: the bot and
+`scripts/ftmo_replay.py` byte for byte as committed, with the two review
+changes in. Every report and every figure came out identical to the runs
+above, file for file. **0 mismatches.**
