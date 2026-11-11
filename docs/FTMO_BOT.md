@@ -120,6 +120,24 @@ What it means for the 5 steps with the 1.5% buffer and free slots off
 * On 2026-11-10 the operator ordered the first one on all the same
   ("free slots on"). See the next block.
 
+**More markets tested and rejected** (2026-11-11,
+`research/ftmo_breadth.md`, written down before the run). The rule as
+the bot runs it, on the four US indices plus other markets FTMO lists.
+US-listed funds stood in for the CFDs (GLD, EWG, EWU, EWJ, EWA), with
+the limits the note lists:
+
+* **Plus gold.** Fewer breaches (16% and 5% of attempts against 19–21%
+  and 7–8%), but fewer passes within the data (28–31% and 32–39%
+  against 35–36% and 42–52%) and more frozen accounts.
+* **Plus Germany, the UK, Japan and Australia.** Much worse: 26–43% of
+  attempts breach and 14–17% pass. The account loses money (−0.09R a
+  trade).
+* **All nine.** 27–31% breach and 10–25% pass.
+* None passed its rule. The bot keeps its four markets.
+* The same run measured the rule's payoff with its standard error:
+  +0.079R ± 0.073 a trade over 214 trades since 2012. That is about
+  one standard error from zero.
+
 **Free slots: on (`free_slots: true`, the default) against off (`false`)**
 (S2, `research/ftmo_slots_sizing.md`; on by the operator's order of
 2026-11-10). The 5 steps with the 1.5% buffer, which is what the bot

@@ -200,6 +200,15 @@ Nico's style: one-line status first, then at most one thing for him to do.
     `cd C:\Users\leven\Trading-bot-2.0; $p = (Get-Process terminal64 | Where-Object { $_.MainWindowTitle -like '*FTMO*' } | Select-Object -First 1).Path; if ($p) { (Get-Content state\ftmo_config.yaml) -replace '^mt5_path:.*', ('mt5_path: ' + $p.Replace('\','/')) | Set-Content state\ftmo_config.yaml; powershell -ExecutionPolicy Bypass -File deploy\ftmo\run.ps1 -Live }`
   - Not done yet: `run.ps1 -SelfTest` on this account (10:00–10:45 New
     York, with the `-Live` window stopped).
+- **11-11: more markets tested and rejected** (`research/ftmo_breadth.md`).
+  - The bot's rule on the four US indices plus gold, plus Germany, the
+    UK, Japan and Australia, or plus all five. US-listed funds stood in
+    for FTMO's CFDs.
+  - Gold: fewer breaches, but fewer passes. The four countries: far
+    more breaches, far fewer passes, and the account loses money. No
+    list passed its rule.
+  - The bot's markets did not change. Do not add a symbol to
+    `state\ftmo_config.yaml`.
 
 ## 3. The bot on one screen
 
