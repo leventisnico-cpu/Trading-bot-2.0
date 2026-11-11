@@ -80,3 +80,5 @@
 {"daily_return": 0.02688009742201536, "decision": "OK", "drawdown": 0.014473817790222143, "reason": "ok", "ts": "2026-11-10T03:39:34.982689+00:00", "type": "pre_trade"}
 {"equity": 985.5261822097779, "halted": false, "traded": false, "ts": "2026-11-10T03:39:34.984986+00:00", "type": "cycle_done"}
 {"amount": 100.0, "since": "2026-11-07", "ts": "2026-11-10T03:39:34.985526+00:00", "type": "contribution"}
+{"daily_return": -0.004241339083187912, "decision": "OK", "drawdown": 0.018653768504333472, "reason": "ok", "ts": "2026-11-11T01:19:42.472951+00:00", "type": "pre_trade"}
+{"equity": 981.3462314956665, "halted": false, "traded": false, "ts": "2026-11-11T01:19:42.496320+00:00", "type": "cycle_done"}
