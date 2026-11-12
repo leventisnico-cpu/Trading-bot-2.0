@@ -563,3 +563,77 @@ instead. Put that broker's index symbol names under `symbols:` and set
   - `research/ftmo_fast_pass.md` (the rule; NO-GO for a fast pass);
   - `research/ftmo_bot_policy.md`, `research/ftmo_scale_out.md`;
   - `reports/ftmo_fast_pass_rerun_2026-10-29.md`.
+
+## 10. With a real PowerShell: tracking the running bot
+
+For a session that can run commands on the laptop itself (Claude Code
+installed on Windows, started in `C:\Users\leven\Trading-bot-2.0`).
+Sections 0 to 9 still hold, except that you run the lines yourself
+instead of handing them to Nico. Written 2026-11-12.
+
+**What you may do on your own, on the free trial (demo money):**
+
+- read anything in the repo folder, the log and the state file;
+- `git pull`;
+- run the preflight and `run.ps1 -Plan` (both read only);
+- start the bot in its own window when it is not running;
+- start FTMO's MetaTrader if it is closed.
+
+**What stays Nico's:** passwords, anything typed or pressed inside
+MetaTrader, `run.ps1 -Flat`, clearing a halt, any setting in
+`state\ftmo_config.yaml`, anything on a paid account, money. Never send
+an order by hand.
+
+**The checks** (run from the repo folder; none of them changes anything):
+
+- The log's end:
+  `Get-Content state\ftmo_bot.log -Tail 60`
+- Is the bot alive? It rewrites its state file every minute, so the
+  file's time is its heartbeat. More than 3 minutes old while the PC is
+  awake means the bot is not ticking:
+  `(Get-Item state\ftmo_state.json).LastWriteTime; Get-Date`
+- The bot's process (one line with `ftmo_bot run` in it):
+  `Get-CimInstance Win32_Process -Filter "Name='python.exe'" | Where-Object { $_.CommandLine -like '*ftmo_bot*' } | Select-Object ProcessId, CreationDate, CommandLine`
+- MetaTrader (FTMO's reads `<login> - FTMO-Demo` in its title):
+  `Get-Process terminal64 -ErrorAction SilentlyContinue | Format-Table Id, MainWindowTitle, Path -AutoSize`
+- Everything the bot flagged:
+  `Select-String -Path state\ftmo_bot.log -Pattern 'WARNING|ERROR|CRITICAL' | Select-Object -Last 20 | ForEach-Object { $_.Line }`
+- The preflight, at most once a session and not between 09:25 and 10:50
+  or 15:55 and 16:30 New York (it opens a second connection to the
+  terminal; read the bot's log afterwards):
+  `powershell -ExecutionPolicy Bypass -File deploy\ftmo\run.ps1 -Preflight`
+
+**When to look** (New York time, weekdays), and what must be there:
+
+| when | what |
+|---|---|
+| 09:20 | heartbeat fresh, one bot process, FTMO's MetaTrader open, no new WARNING or ERROR |
+| 10:50 | if entries were planned: a `buy ... Fill(ok=True` line for each, or a reason. If a keep-alive was due: `keepalive buy` and its `close` |
+| 16:15 | `plan for the next open: exits [...], entries [...]` logged after 16:05 |
+| 18:05 | `FTMO day <tomorrow>: day-start balance ...` logged at 18:00 |
+
+A `the bot stood still for ...` line means the PC slept or the window
+was paused. Find out why (on battery? a `WARNING power:` line at the
+start?) and tell Nico.
+
+**Starting the bot** (only when no bot process is running; trial only):
+
+`Start-Process powershell -WorkingDirectory 'C:\Users\leven\Trading-bot-2.0' -ArgumentList '-NoExit','-ExecutionPolicy','Bypass','-File','deploy\ftmo\run.ps1','-Live'`
+
+It opens its own window, which must stay open. Its first lines must
+include `FTMO bot running (LIVE ORDERS)`, a `power:` line and an
+`awake:` line.
+
+**Stopping it.** Ctrl+C in the bot's window, by Nico, is the clean way.
+If he is away and it must stop (an update, a wrong account), end the one
+python process found above with `Stop-Process -Id <id>`, never between
+09:25 and 10:50 or 15:55 and 16:30 New York, and tell Nico you did. The
+bot is built to be killed: a plan is marked done before any order goes
+out, and a restart adopts what is open.
+
+**Updating.** Stop it, `git pull`, start it. A running bot keeps the code
+it started with.
+
+**Your notes between sessions:** `state\operator_log.md`. The folder is
+git-ignored, so it stays on the laptop and is never committed. One dated
+line per check; read it first in every session.
