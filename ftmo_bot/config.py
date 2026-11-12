@@ -85,6 +85,11 @@ class FtmoConfig:
     mt5_path: Optional[str] = None        # terminal64.exe path if not default
     server_clock: Optional[str] = None    # NY+7, EET, CET or UTC; null = fit it to the terminal
     login: Optional[int] = None           # the only account orders may go to (its number, not a password)
+    # keepawake.py: while it runs, the bot keeps a Windows PC from sleeping
+    # (plugged in: no sleep on its own, the lid does nothing) and its window
+    # from pausing on a click. False leaves Windows as it is. On by the
+    # operator's order of 2026-11-12.
+    keep_awake: bool = True
 
     def validate(self) -> None:
         self._check_types()

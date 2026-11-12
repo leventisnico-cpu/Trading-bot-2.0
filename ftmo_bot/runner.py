@@ -55,12 +55,12 @@ import logging
 import math
 import time as _time
 from dataclasses import asdict, dataclass, field, fields, replace
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 from zoneinfo import ZoneInfo
 
-from . import fast4, rules, scale_out, sessions
+from . import fast4, keepawake, rules, scale_out, sessions
 from .broker import Broker, Fill, Position
 from .config import FtmoConfig
 
@@ -85,6 +85,11 @@ BAR_MINUTES = 30
 BAR_COUNT = 15000
 MIN_SESSIONS = 205
 log = logging.getLogger("ftmo_bot")
+
+
+def _utcnow() -> datetime:
+    """The PC's own clock, for the loop's stall check."""
+    return datetime.now(timezone.utc)
 
 
 def cap_rule(cfg: FtmoConfig) -> str:
@@ -1122,19 +1127,38 @@ class Runner:
             return True
         return bool(self.b.positions(self.cfg.magic))
 
-    def run(self, every: int = 60) -> None:    # pragma: no cover (loop)
+    def run(self, every: int = 60) -> None:
         log.info("FTMO bot running (%s), risk %.1f%% per trade, symbols %s",
                  "DRY-RUN" if self.cfg.dry_run else "LIVE ORDERS",
                  self.cfg.risk_per_trade * 100, self.cfg.symbols)
         log.info("exits for new positions: %s", exit_rule(self.cfg))
         log.info("slots: %s", slot_rule(self.cfg))
         log.info("risk cap: %s", cap_rule(self.cfg))
-        while True:
-            try:
-                self.tick()
-                if self.st.halted and (self.cfg.dry_run or not self.holding()):
-                    log.warning("halted: %s", self.st.halted)
-                    return
-            except Exception:                    # keep running; state untouched
-                log.exception("tick failed")
-            _time.sleep(every)
+        held, console, started = False, None, None
+        try:
+            if self.cfg.keep_awake:              # a sleeping or paused PC runs nothing
+                held = keepawake.hold()
+                console = keepawake.no_quick_edit()
+                for fine, line in keepawake.guard_lines(held, console is not None):
+                    log.log(logging.INFO if fine else logging.WARNING, line)
+            while True:
+                try:                             # the stall check never ends the loop
+                    now = _utcnow()
+                    gap = keepawake.frozen_for(started, now, every)
+                    last, started = started, now
+                    if gap is not None:          # it slept, hung or was paused
+                        log.warning(keepawake.frozen_text(last, gap))
+                except Exception:
+                    log.exception("stall check failed")
+                try:
+                    self.tick()
+                    if self.st.halted and (self.cfg.dry_run or not self.holding()):
+                        log.warning("halted: %s", self.st.halted)
+                        return
+                except Exception:                # keep running; state untouched
+                    log.exception("tick failed")
+                _time.sleep(every)
+        finally:
+            keepawake.restore_console(console)
+            if held:
+                keepawake.release()

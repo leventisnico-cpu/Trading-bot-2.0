@@ -26,11 +26,25 @@ import argparse
 import logging
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
-from . import fast4, lock, sessions
+from . import fast4, keepawake, lock, sessions
 from .runner import BAR_COUNT, MIN_SESSIONS, Runner, cap_rule, exit_rule, slot_rule
 from .config import load
+
+
+def power_lines(power: Optional[keepawake.Power], keep_awake: bool) -> List[str]:
+    """The preflight's lines on Windows' sleep and lid settings, read only
+    (nothing when this is not Windows). A sleeping PC stops the bot."""
+    if power is None:
+        return []
+    lines = [line if fine else f"WARN {line}" for fine, line in keepawake.report(power)]
+    if not power.stays_awake():
+        lines.append("     the bot sets the sleep and lid settings itself when it starts "
+                     "(it cannot plug the PC in)" if keep_awake else
+                     "     keep_awake is false in the config: the bot leaves these "
+                     "settings alone")
+    return lines
 
 
 def rules_line(r: Runner) -> str:
@@ -141,6 +155,11 @@ def main(argv=None) -> int:
     if a.command == "preflight":
         now = b.now()
         ok = True
+        try:                                        # read-only; never stops the checks
+            for line in power_lines(keepawake.read(), cfg.keep_awake):
+                print(line)
+        except Exception as e:
+            print(f"WARN power: the sleep and lid settings could not be read ({e})")
         try:
             r = Runner(cfg, b, readonly=True)       # the start-up checks of `run`
         except RuntimeError as e:
@@ -230,6 +249,18 @@ def main(argv=None) -> int:
             print(rules_line(r))
             return 0 if good else 1
         print(rules_line(r))
+        log = logging.getLogger("ftmo_bot")
+        if cfg.keep_awake:                           # a sleeping PC stops the bot
+            try:
+                lines = keepawake.report(keepawake.apply())
+            except Exception as e:                   # the bot starts without it
+                lines = [(False, f"power: the sleep and lid settings could not be set "
+                                 f"({e}); if this PC sleeps, the bot stops until it wakes")]
+            for fine, line in lines:
+                log.log(logging.INFO if fine else logging.WARNING, line)
+        else:
+            log.info("keep_awake is false: Windows' sleep and lid settings are left "
+                     "alone; if this PC sleeps, the bot stops until it wakes")
         r.run()
         return 0
     finally:

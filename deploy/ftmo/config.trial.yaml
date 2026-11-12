@@ -53,6 +53,12 @@ mt5_path: null           # FTMO's terminal64.exe, e.g.
                          # C:/Program Files/FTMO Global Markets MT5 Terminal/terminal64.exe
                          # Set it when another MetaTrader 5 is installed too: left null, the
                          # bot may attach to that one (`Authorization failed`)
+keep_awake: true         # while it runs, the bot keeps this PC from sleeping: plugged in, Windows
+                         # never sleeps on its own and closing the lid does nothing; a click in
+                         # the bot's window no longer pauses it. On battery Windows keeps its own
+                         # settings, so keep the PC plugged in. false: the bot changes nothing
+                         # (it does not undo what an earlier start set; Windows Settings does).
+                         # On by the operator's order (2026-11-12).
 server_clock: NY+7       # FTMO's server clock; null on another broker's demo
 login: null              # the trial's login number from FTMO's email (not the password),
                          # e.g. login: 1234567. Orders go only to this account; until it

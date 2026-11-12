@@ -209,6 +209,28 @@ Nico's style: one-line status first, then at most one thing for him to do.
     list passed its rule.
   - The bot's markets did not change. Do not add a symbol to
     `state\ftmo_config.yaml`.
+- **11-12, Nico's order: keep the bot running whether the laptop is open
+  or closed.**
+  - **What happened.** His window showed `FTMO day 2026-11-12` logged at
+    21:59 New York. FTMO's day changes at 18:00 New York and the bot
+    checks every minute, so it had stood still since some time after
+    16:05: the laptop slept. No trade was open and none was missed.
+  - **What the bot does now** (`ftmo_bot/keepawake.py`, `keep_awake:
+    true`, the default; a config without the key gets it):
+    - at every start it sets Windows' power plan, for when the PC is
+      plugged in, to never sleep or hibernate on its own and to do
+      nothing when the lid closes;
+    - while it runs it asks Windows not to sleep, and switches off the
+      window's click-to-select, which pauses a program on one click;
+    - it logs `the bot stood still for ...` whenever more than five
+      minutes pass between two ticks.
+  - **What it cannot do.** Plug the laptop in, run while Windows
+    restarts or is shut down, or trade without internet. Tell Nico
+    plainly if one of those happens; only an always-on computer removes
+    them, and renting one is his decision.
+  - To pick it up: stop the bot (Ctrl+C), `git pull`, start `run.ps1
+    -Live` again. The start must log a `power:` line and at least one
+    `awake:` line.
 
 ## 3. The bot on one screen
 
@@ -348,9 +370,15 @@ window) before giving the next.
    `cd C:\Users\leven\Trading-bot-2.0; powershell -ExecutionPolicy Bypass -File deploy\ftmo\setup.ps1`
    It must end with `Setup done`. It installs the trial config as
    `state\ftmo_config.yaml` and keeps it on later runs.
-4. **Keep the PC awake on weekdays:**
-   - Power: never sleep when plugged in.
-   - Windows Update active hours: cover 09:30–16:00.
+4. **Keep the PC running on weekdays: plugged in and switched on.**
+   - Since 11-12 the bot sets the power plan itself each time it starts:
+     while plugged in, no sleep or hibernation on its own, and closing
+     the lid does nothing. It logs `power: plugged in; ...` or a
+     `WARNING power:` line saying what is still wrong.
+   - On battery Windows keeps its own settings, so a closed laptop
+     sleeps. Keep it plugged in.
+   - Windows Update active hours: cover 09:30–16:00. After a restart the
+     bot must be started again.
 5. **Nico signs up** for the trial on ftmo.com: MetaTrader 5, USD, and the
    Swing account type if it is offered. FTMO emails the login and server.
 6. **Nico sets up MT5:** installs FTMO's MetaTrader 5 and logs in (ticking
@@ -485,9 +513,16 @@ instead. Put that broker's index symbol names under `symbols:` and set
     `Add-MpPreference -ExclusionPath "$env:USERPROFILE\Trading-bot-2.0"`,
     then `git checkout -- deploy/ftmo`.
   - If it names a malware family, stop and tell Nico.
-- **The PC slept or restarted:** start `run.ps1 -Live` again. It resumes
-  from its state file. A missed open means a missed trade, never a doubled
-  one.
+- **The PC slept:** the bot goes on by itself when the PC wakes, and logs
+  `the bot stood still for ...` with the times. A missed open means a
+  missed trade, never a doubled one. Then find out why it slept: on
+  battery, or a `WARNING power:` line at the start.
+- **The PC restarted:** start `run.ps1 -Live` again. It resumes from its
+  state file.
+- **`WARNING power: ...` at the start:** Windows refused a setting. Set it
+  by hand as the line says (Settings > System > Power: never sleep when
+  plugged in; Control Panel > Power Options > Choose what closing the lid
+  does: Do nothing when plugged in), then start the bot again.
 
 ## 8. Code, git and hand-offs
 

@@ -602,10 +602,40 @@ folder in PowerShell:
    tzdata, installs the free-trial config as `state\ftmo_config.yaml`,
    checks that the bot loads, and ends with `Setup done`. Run again, it
    keeps your config.
-4. Keep the PC awake on weekdays: Settings → System → Power → Screen
-   and sleep → Never (when plugged in). Set Windows Update's active
-   hours to cover the US session (09:30–16:00 New York). After a restart
-   the bot resumes from its state file once you start it again.
+4. Keep the PC running on weekdays: **plug it in and leave it on.** A
+   sleeping PC runs nothing: the bot does not plan, open, manage or
+   close, and an open position has only its stop at the broker. On
+   2026-11-11 the trial laptop slept through the evening and the bot
+   stood still for hours. Since 2026-11-12 the bot looks after this
+   itself every time it starts (`keep_awake: true`, by the operator's
+   order):
+   * **Power.** While plugged in, Windows never sleeps or hibernates on
+     its own, and closing the lid does nothing. The start logs `power:
+     plugged in; while plugged in this PC never sleeps on its own, and
+     closing the lid does nothing`. A `WARNING power:` line says what is
+     still wrong and how to set it by hand.
+   * **While it runs.** Windows is asked not to go to sleep, and a click
+     in the bot's window no longer pauses it (in an ordinary console
+     window one click starts a selection and holds everything the
+     program prints).
+   * **If it stood still anyway**, the log says so: `the bot stood still
+     for 3 h 54 min, from 18:06 to 22:00 New York`.
+   * **What the bot cannot do.** It cannot plug the PC in: on battery
+     Windows keeps its own settings, so a closed laptop sleeps. It does
+     not run while the PC is shut down or restarting (set Windows
+     Update's active hours to cover 09:30–16:00 New York, and start the
+     bot again after a restart; it resumes from its state file). It
+     cannot trade without internet. Only a computer that is always on
+     removes these.
+   * **What stays behind.** The power settings stay as the bot set
+     them after it stops. Change them back in Windows Settings if the
+     PC is no longer the bot's. The stay-awake request and
+     click-to-select come back when the bot stops with Ctrl+C; if the
+     bot is killed instead, click-to-select stays off in that window
+     until the window is closed.
+   * `keep_awake: false` in `state\ftmo_config.yaml`: the bot changes
+     nothing in Windows from then on (it does not undo what an earlier
+     start set). It still logs when it stood still.
 5. To update the bot later: stop it (Ctrl+C), then `git pull` and step 3
    again (your config is kept), and start it.
 
@@ -644,6 +674,11 @@ server clock are what paper cannot test.
      in (seen 2026-11-11 with MetaQuotes' own terminal installed beside
      FTMO's). Without `mt5_path` the bot takes whichever terminal
      Windows hands it. Close the other one and set `mt5_path`;
+   * `power:` (Windows only): `plugged in; while plugged in this PC
+     never sleeps on its own, and closing the lid does nothing`. A
+     `WARN power:` line about sleep or the lid is normal before the
+     first start: the bot sets both when it starts. `ON BATTERY`: plug
+     the PC in;
    * `account`: the trial's login, USD, `algo trading ON`;
    * `rules:`: the initial balance is the account size (`from the
      account` on a new account), the max-loss line 10% under it and the
