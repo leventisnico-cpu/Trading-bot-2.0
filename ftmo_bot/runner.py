@@ -77,6 +77,7 @@ MANAGE_FROM, MANAGE_TO = time(9, 31), time(17, 0)
 MANAGE_RETRY = timedelta(minutes=5)       # after a refused part close or stop move
 CLOSE_RETRY_MAX = timedelta(minutes=15)   # the slowest pace of a queued close's retries
 SELFTEST_STOPS = (0.05, 0.04)             # the self-test's stop, then where it moves: under the ask
+FILL_WAIT = (10, 0.3)                     # reads, and seconds between them, for a fill to show in the list
 FROZEN_ROOM = 0.0005                      # of the initial balance: under it a flat account is frozen
 BAR_MINUTES = 30
 # FTMO's index CFDs trade ~23 h a day: ~46 half-hour bars per session.
@@ -169,6 +170,7 @@ class Runner:
         ``preflight``). The start-up checks run before any state file is
         moved, so a refused start leaves the files as they were."""
         self.cfg, self.b = cfg, broker
+        self._sleep = _time.sleep            # between the reads of _settled (tests: a stub)
         self.path = Path(cfg.state_path)
         self.st = State.load(self.path)
         acct = self.b.account()
@@ -667,11 +669,11 @@ class Runner:
         if not f.ok:
             return
         self._note_open(now)
-        opened = [p for p in self.b.positions(self.cfg.magic) if p.ticket == f.ticket]
-        if not opened:
+        opened = self._settled(f.ticket, lambda p: p is not None)
+        if opened is None:
             log.error("%s ticket %d not found; reconcile will close it", why, f.ticket)
             return
-        self._close(opened[0], why, now)           # failure is queued for retry
+        self._close(opened, why, now)              # failure is queued for retry
 
     def keepalive(self, now: datetime, live: List[Position]) -> None:
         """FTMO closes an account with no opened position for 30 days, in
@@ -908,6 +910,28 @@ class Runner:
         return next((p for p in self.b.positions(self.cfg.magic) if p.ticket == ticket),
                     None)
 
+    def _settled(self, ticket: int, ready) -> Optional[Position]:
+        """The position of ``ticket`` once ``ready(position)`` holds, read
+        up to ``FILL_WAIT`` times. MT5 answers an order before its position
+        list shows the result: on FTMO's terminal the keep-alive's buy of
+        2026-11-12 was 'not found' 1 ms after its fill. The last read is
+        returned either way, so a check that never comes true still
+        reports what the broker shows."""
+        tries, pause = FILL_WAIT
+        p = None
+        for i in range(tries):
+            p = self._position(ticket)
+            if ready(p):
+                if i:
+                    log.info("ticket %d: the broker's list caught up after %.1fs",
+                             ticket, i * pause)
+                return p
+            if i < tries - 1:
+                self._sleep(pause)
+        log.warning("ticket %d: the broker's list did not catch up within %.1fs",
+                    ticket, (tries - 1) * pause)
+        return p
+
     def _queue_close(self, ticket: int) -> None:
         """Hand a ticket of ours to the close retries of ``run``."""
         log.error("ticket %d queued for closing", ticket)
@@ -1004,7 +1028,7 @@ class Runner:
                          vol: float, half: float, stop2: float, now: datetime) -> None:
         """The self-test after its buy: check the position, part close,
         stop move, close. Appends a line per order to ``out``."""
-        p = self._position(ticket)
+        p = self._settled(ticket, lambda q: q is not None)
         if p is None:
             self._queue_close(ticket)                # closed by `run` if it shows up
             out.append((False, f"buy filled (ticket {ticket}) but the position is not "
@@ -1014,20 +1038,23 @@ class Runner:
                     f"buy {p.volume:g} {sym} at {p.price_open:.2f} with a stop at "
                     f"{p.sl:.2f} (ticket {p.ticket})"))
         sent = self._part_close(p, half, "selftest part")
-        p2 = self._position(ticket)
+        p2 = (self._settled(ticket, lambda q: q is None or q.volume < p.volume)
+              if sent else self._position(ticket))
         left = "nothing" if p2 is None else f"{p2.volume:g}"
         out.append((sent and p2 is not None and abs(p2.volume - (vol - half)) < 1e-9,
                     f"part close of {half:g}: {left} left open"))
         if p2 is not None:
             sent = self._move_stop(p2, stop2)
-            p3 = self._position(ticket)
+            p3 = (self._settled(ticket, lambda q: q is None or q.sl != p2.sl)
+                  if sent else self._position(ticket))
             out.append((sent and p3 is not None and p3.sl > p2.sl,
                         f"stop move: {p2.sl:.2f} -> "
                         f"{'gone' if p3 is None else format(p3.sl, '.2f')}"))
         rest = self._position(ticket)
         if rest is not None:
             closed = self._close(rest, "selftest", now)   # a failure is queued for `run`
-            gone = self._position(ticket) is None
+            gone = (self._settled(ticket, lambda q: q is None)
+                    if closed else self._position(ticket)) is None
             out.append((closed and gone, "close of the rest: "
                         + ("flat" if closed and gone else
                            "FAILED; `run` will retry it, or close it in MT5")))
