@@ -693,6 +693,50 @@ def test_shadow_run_caps_at_data_and_resumes(tmp_path):
 
 
 
+class HistoryBehind(FakeBroker):
+    """FTMO's terminal, minutes after it opened: US500's bars still end on
+    the previous session for the first ``behind`` reads (2026-11-12)."""
+    behind = 2
+
+    def bars(self, symbol, minutes, count):
+        out = super().bars(symbol, minutes, count)
+        if symbol == "US500.cash" and self.behind > 0:
+            self.behind -= 1
+            last_day = out[-1][0].astimezone(NY).date()
+            return [x for x in out if x[0].astimezone(NY).date() < last_day]
+        return out
+
+
+def test_plan_is_retried_while_the_terminal_history_ends_early(tmp_path):
+    bars, ds = history()
+    b = HistoryBehind(bars)
+    b.clock = ny(ds[-1], 16, 47)
+    r = Runner(cfg(tmp_path), b)
+    r.tick()                                           # US500 ends on the day before
+    assert r.st.plan_checked is None and r.st.pending_entries == []
+    b.clock = ny(ds[-1], 16, 48)
+    r.tick()                                           # still behind
+    assert r.st.plan_checked is None
+    b.clock = ny(ds[-1], 16, 49)
+    r.tick()                                           # caught up: the plan is made
+    assert r.st.plan_checked == ds[-1].isoformat()
+    assert r.st.pending_entries == ["US100"] and r.st.plan_day == ds[-1].isoformat()
+
+
+def test_a_real_holiday_counts_after_the_plan_retries_run_out(tmp_path):
+    from ftmo_bot.runner import PLAN_RETRIES
+    r, b, bars, ds = planned(tmp_path, dry_run=False)
+    holiday = next_day(ds[-1])                         # no bars that day
+    for k in range(PLAN_RETRIES - 1):
+        b.clock = ny(holiday, 16, 5) + timedelta(minutes=k)
+        r.tick()
+        assert r.st.plan_checked == ds[-1].isoformat(), k
+    b.clock = ny(holiday, 16, 5) + timedelta(minutes=PLAN_RETRIES - 1)
+    r.tick()
+    assert r.st.plan_checked == holiday.isoformat()    # the day counts as checked
+    assert r.st.pending_entries == ["US100"] and b.sent == []   # the plan is kept
+
+
 def test_short_history_means_no_plan_not_a_crash(tmp_path):
     bars, ds = history(days=60)                # far fewer than 205 sessions
     b = FakeBroker(bars)

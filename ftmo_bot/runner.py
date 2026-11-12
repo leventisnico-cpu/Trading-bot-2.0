@@ -78,6 +78,7 @@ MANAGE_RETRY = timedelta(minutes=5)       # after a refused part close or stop m
 CLOSE_RETRY_MAX = timedelta(minutes=15)   # the slowest pace of a queued close's retries
 SELFTEST_STOPS = (0.05, 0.04)             # the self-test's stop, then where it moves: under the ask
 FILL_WAIT = (10, 0.3)                     # reads, and seconds between them, for a fill to show in the list
+PLAN_RETRIES = 30                         # ticks a plan is retried while the terminal's history ends before today
 FROZEN_ROOM = 0.0005                      # of the initial balance: under it a flat account is frozen
 BAR_MINUTES = 30
 # FTMO's index CFDs trade ~23 h a day: ~46 half-hour bars per session.
@@ -171,6 +172,8 @@ class Runner:
         moved, so a refused start leaves the files as they were."""
         self.cfg, self.b = cfg, broker
         self._sleep = _time.sleep            # between the reads of _settled (tests: a stub)
+        self._plan_tries = 0                 # planning ticks spent on a history that ends early
+        self._history_behind = False         # the last plan failed because bars end before today
         self.path = Path(cfg.state_path)
         self.st = State.load(self.path)
         acct = self.b.account()
@@ -497,12 +500,14 @@ class Runner:
     def _compute_once(self, now: datetime, day: Optional[date]
                       ) -> Optional[Tuple[date, fast4.Plan]]:
         ind, held_n, days, highs = {}, {}, set(), {}
+        self._history_behind = False
         keep = {s for s, h in self.st.held.items() if h.get("exit") == "scale_out"}
         free = (self._free_symbols(self.b.positions(self.cfg.magic))
                 if self.cfg.free_slots and self.st.held else set())
         for s in self.cfg.symbols:
             done = [x for x in self._sessions(s, now) if x.complete]
             if not done or (day is not None and done[-1].day != day):
+                self._history_behind = True      # a holiday, or MT5 still loading its history
                 log.info("no completed %s session for %s; no plan", s, day)
                 return None
             if len(done) < MIN_SESSIONS:
@@ -519,6 +524,7 @@ class Runner:
                 if s in keep and since:
                     highs[s] = max(since)
         if len(days) != 1:
+            self._history_behind = True
             log.warning("symbols end on different sessions %s; no plan", sorted(days))
             return None
         self.highs = highs
@@ -528,6 +534,18 @@ class Runner:
     def make_plan(self, now: datetime) -> None:
         today = now.astimezone(NY).date()
         res = self.compute_plan(now, today)          # a broker error retries next tick
+        if res is None and self._history_behind and self._plan_tries < PLAN_RETRIES - 1:
+            # A terminal opened minutes ago has not loaded today's bars yet
+            # (2026-11-12: a start at 16:47 found US100 ending on 11-11 and
+            # wrote the day off). Try again each tick before calling it a
+            # holiday; a real holiday costs PLAN_RETRIES quiet minutes.
+            self._plan_tries += 1
+            if self._plan_tries == 1:
+                log.info("the terminal's history ends before %s; the plan is tried "
+                         "again every tick, %d times, before the day counts as a "
+                         "holiday", today, PLAN_RETRIES)
+            return
+        self._plan_tries = 0
         self.st.plan_checked = today.isoformat()     # once per day, even on holidays
         if res is None:                              # holiday: keep any pending plan
             return
