@@ -24,3 +24,67 @@
 {"equity": 200.0, "halted": false, "traded": false, "ts": "2026-09-17T23:34:59.593304+00:00", "type": "cycle_done"}
 {"daily_return": 0.0, "decision": "OK", "drawdown": 0.0, "reason": "ok", "ts": "2026-09-18T23:23:46.105613+00:00", "type": "pre_trade"}
 {"equity": 200.0, "halted": false, "traded": false, "ts": "2026-09-18T23:23:46.107980+00:00", "type": "cycle_done"}
+{"daily_return": 0.0, "decision": "OK", "drawdown": 0.0, "reason": "ok", "ts": "2026-10-07T00:50:39.213997+00:00", "type": "pre_trade"}
+{"equity": 500.0, "halted": false, "traded": false, "ts": "2026-10-07T00:50:39.256189+00:00", "type": "cycle_done"}
+{"amount": 300.0, "since": "2026-09-18", "ts": "2026-10-07T00:50:39.257162+00:00", "type": "contribution"}
+{"daily_return": 0.0, "decision": "OK", "drawdown": 0.0, "reason": "ok", "ts": "2026-10-08T01:06:16.945522+00:00", "type": "pre_trade"}
+{"equity": 500.0, "halted": false, "traded": false, "ts": "2026-10-08T01:06:16.947084+00:00", "type": "cycle_done"}
+{"daily_return": 0.0, "decision": "OK", "drawdown": 0.0, "reason": "ok", "ts": "2026-10-09T01:17:42.086213+00:00", "type": "pre_trade"}
+{"equity": 500.0, "halted": false, "traded": false, "ts": "2026-10-09T01:17:42.087489+00:00", "type": "cycle_done"}
+{"reason": "refusing to trade \u2014 bad price data: ZAG.TO: last value is NaN", "ts": "2026-10-10T01:02:06.994648+00:00", "type": "refusal"}
+{"daily_return": 0.0, "decision": "OK", "drawdown": 0.0, "reason": "ok", "ts": "2026-10-13T02:38:00.657928+00:00", "type": "pre_trade"}
+{"equity": 600.0, "halted": false, "traded": false, "ts": "2026-10-13T02:38:00.659300+00:00", "type": "cycle_done"}
+{"amount": 100.0, "since": "2026-10-09", "ts": "2026-10-13T02:38:00.659553+00:00", "type": "contribution"}
+{"daily_return": 0.0, "decision": "OK", "drawdown": 0.0, "reason": "ok", "ts": "2026-10-14T00:24:20.293743+00:00", "type": "pre_trade"}
+{"equity": 600.0, "halted": false, "traded": false, "ts": "2026-10-14T00:24:20.295340+00:00", "type": "cycle_done"}
+{"daily_return": 0.0, "decision": "OK", "drawdown": 0.0, "reason": "ok", "ts": "2026-10-14T23:59:30.518811+00:00", "type": "pre_trade"}
+{"equity": 600.0, "halted": false, "traded": false, "ts": "2026-10-14T23:59:30.520632+00:00", "type": "cycle_done"}
+{"daily_return": 0.0, "decision": "OK", "drawdown": 0.0, "reason": "ok", "ts": "2026-10-15T23:43:23.185031+00:00", "type": "pre_trade"}
+{"equity": 600.0, "halted": false, "traded": false, "ts": "2026-10-15T23:43:23.187284+00:00", "type": "cycle_done"}
+{"daily_return": 0.0, "decision": "OK", "drawdown": 0.0, "reason": "ok", "ts": "2026-10-16T23:42:44.989665+00:00", "type": "pre_trade"}
+{"equity": 600.0, "halted": false, "traded": false, "ts": "2026-10-16T23:42:44.991942+00:00", "type": "cycle_done"}
+{"daily_return": 0.0, "decision": "OK", "drawdown": 0.0, "reason": "ok", "ts": "2026-10-20T00:27:50.000343+00:00", "type": "pre_trade"}
+{"equity": 700.0, "halted": false, "traded": false, "ts": "2026-10-20T00:27:50.001961+00:00", "type": "cycle_done"}
+{"amount": 100.0, "since": "2026-10-16", "ts": "2026-10-20T00:27:50.002277+00:00", "type": "contribution"}
+{"daily_return": 0.0, "decision": "OK", "drawdown": 0.0, "reason": "ok", "ts": "2026-10-20T23:58:56.492045+00:00", "type": "pre_trade"}
+{"equity": 700.0, "halted": false, "traded": false, "ts": "2026-10-20T23:58:56.493541+00:00", "type": "cycle_done"}
+{"daily_return": 0.0, "decision": "OK", "drawdown": 0.0, "reason": "ok", "ts": "2026-10-22T00:03:17.091014+00:00", "type": "pre_trade"}
+{"equity": 700.0, "halted": false, "traded": false, "ts": "2026-10-22T00:03:17.093420+00:00", "type": "cycle_done"}
+{"daily_return": 0.0, "decision": "OK", "drawdown": 0.0, "reason": "ok", "ts": "2026-10-23T00:01:53.209540+00:00", "type": "pre_trade"}
+{"equity": 700.0, "halted": false, "traded": false, "ts": "2026-10-23T00:01:53.211000+00:00", "type": "cycle_done"}
+{"daily_return": 0.0, "decision": "OK", "drawdown": 0.0, "reason": "ok", "ts": "2026-10-23T23:53:30.276913+00:00", "type": "pre_trade"}
+{"equity": 700.0, "halted": false, "traded": false, "ts": "2026-10-23T23:53:30.278417+00:00", "type": "cycle_done"}
+{"daily_return": 0.0, "decision": "OK", "drawdown": 0.0, "reason": "ok", "ts": "2026-10-27T00:37:01.966573+00:00", "type": "pre_trade"}
+{"equity": 800.0, "halted": false, "traded": false, "ts": "2026-10-27T00:37:01.968175+00:00", "type": "cycle_done"}
+{"amount": 100.0, "since": "2026-10-23", "ts": "2026-10-27T00:37:01.968519+00:00", "type": "contribution"}
+{"daily_return": 0.0, "decision": "OK", "drawdown": 0.0, "reason": "ok", "ts": "2026-10-28T00:35:25.165789+00:00", "type": "pre_trade"}
+{"equity": 800.0, "halted": false, "traded": false, "ts": "2026-10-28T00:35:25.182137+00:00", "type": "cycle_done"}
+{"daily_return": 0.0, "decision": "OK", "drawdown": 0.0, "reason": "ok", "ts": "2026-10-29T01:04:53.752423+00:00", "type": "pre_trade"}
+{"equity": 800.0, "halted": false, "traded": false, "ts": "2026-10-29T01:04:53.754146+00:00", "type": "cycle_done"}
+{"daily_return": 0.0, "decision": "OK", "drawdown": 0.0, "reason": "ok", "ts": "2026-10-30T01:10:57.936776+00:00", "type": "pre_trade"}
+{"filled": 19.0, "order_id": 1, "price": 41.63999938964844, "side": "BUY", "status": "FILLED", "symbol": "XEC.TO", "ts": "2026-10-30T01:10:57.938629+00:00", "type": "order_result"}
+{"equity": 798.4461880081177, "halted": false, "traded": true, "ts": "2026-10-30T01:10:57.940370+00:00", "type": "cycle_done"}
+{"daily_return": -0.028079545165430653, "decision": "OK", "drawdown": 0.02996727223777768, "reason": "ok", "ts": "2026-10-31T00:53:46.741019+00:00", "type": "pre_trade"}
+{"equity": 776.0261822097779, "halted": false, "traded": false, "ts": "2026-10-31T00:53:46.742822+00:00", "type": "cycle_done"}
+{"daily_return": 0.0015915009248810286, "decision": "OK", "drawdown": 0.025265301559448214, "reason": "ok", "ts": "2026-11-03T02:58:06.821517+00:00", "type": "pre_trade"}
+{"equity": 877.2612285964966, "halted": false, "traded": false, "ts": "2026-11-03T02:58:06.823416+00:00", "type": "cycle_done"}
+{"amount": 100.0, "since": "2026-10-31", "ts": "2026-11-03T02:58:06.823708+00:00", "type": "contribution"}
+{"daily_return": 0.0007580377191569454, "decision": "OK", "drawdown": 0.02452641589185924, "reason": "ok", "ts": "2026-11-04T01:29:57.364460+00:00", "type": "pre_trade"}
+{"equity": 877.9262256973267, "halted": false, "traded": false, "ts": "2026-11-04T01:29:57.366282+00:00", "type": "cycle_done"}
+{"daily_return": 0.00476116397000359, "decision": "OK", "drawdown": 0.019882026209513317, "reason": "ok", "ts": "2026-11-05T01:31:53.155784+00:00", "type": "pre_trade"}
+{"equity": 882.106176411438, "halted": false, "traded": false, "ts": "2026-11-05T01:31:53.158216+00:00", "type": "cycle_done"}
+{"daily_return": -0.04394022619074467, "decision": "OK", "drawdown": 0.06294863167148164, "reason": "ok", "ts": "2026-11-06T01:40:15.109457+00:00", "type": "pre_trade"}
+{"equity": 843.3462314956665, "halted": false, "traded": false, "ts": "2026-11-06T01:40:15.111466+00:00", "type": "cycle_done"}
+{"daily_return": 0.022529299699725502, "decision": "OK", "drawdown": 0.041837520560370524, "reason": "ok", "ts": "2026-11-07T00:59:26.274999+00:00", "type": "pre_trade"}
+{"equity": 862.3462314956665, "halted": false, "traded": false, "ts": "2026-11-07T00:59:26.276696+00:00", "type": "cycle_done"}
+{"daily_return": 0.02688009742201536, "decision": "OK", "drawdown": 0.014473817790222143, "reason": "ok", "ts": "2026-11-10T03:39:34.982689+00:00", "type": "pre_trade"}
+{"equity": 985.5261822097779, "halted": false, "traded": false, "ts": "2026-11-10T03:39:34.984986+00:00", "type": "cycle_done"}
+{"amount": 100.0, "since": "2026-11-07", "ts": "2026-11-10T03:39:34.985526+00:00", "type": "contribution"}
+{"daily_return": -0.004241339083187912, "decision": "OK", "drawdown": 0.018653768504333472, "reason": "ok", "ts": "2026-11-11T01:19:42.472951+00:00", "type": "pre_trade"}
+{"equity": 981.3462314956665, "halted": false, "traded": false, "ts": "2026-11-11T01:19:42.496320+00:00", "type": "cycle_done"}
+{"daily_return": 0.025750302492400845, "decision": "OK", "drawdown": 0.0, "reason": "ok", "ts": "2026-11-12T02:19:44.571325+00:00", "type": "pre_trade"}
+{"equity": 1006.6161938064575, "halted": false, "traded": false, "ts": "2026-11-12T02:19:44.573355+00:00", "type": "cycle_done"}
+{"daily_return": -0.012646294872153185, "decision": "OK", "drawdown": 0.012646294872153161, "reason": "ok", "ts": "2026-11-13T01:58:47.067826+00:00", "type": "pre_trade"}
+{"equity": 993.8862285964966, "halted": false, "traded": false, "ts": "2026-11-13T01:58:47.070574+00:00", "type": "cycle_done"}
+{"daily_return": -0.002867560601703678, "decision": "OK", "drawdown": 0.015477591456923975, "reason": "ok", "ts": "2026-11-14T01:30:23.091862+00:00", "type": "pre_trade"}
+{"equity": 991.0361996047974, "halted": false, "traded": false, "ts": "2026-11-14T01:30:23.093629+00:00", "type": "cycle_done"}
