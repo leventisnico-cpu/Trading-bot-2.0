@@ -1,5 +1,10 @@
 """Volatility-adaptive EMA crossover strategy.
 
+DEPLOYABLE: no
+    Loses to holding SPY in every walk-forward fold
+    (reports/minipropos_expectancy_spy.md; gate:
+    scripts/expectancy.py). Paper-only until that changes.
+
 Extends the plain crossover with three transparent adaptations to market
 conditions, each individually testable:
 

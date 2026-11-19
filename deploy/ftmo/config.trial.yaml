@@ -1,0 +1,65 @@
+# FTMO bot (FAST-4): config for FTMO's free 14-day trial on MT5.
+# deploy\ftmo\setup.ps1 installs it as state\ftmo_config.yaml (git-ignored).
+# NO credentials here, ever: log the MT5 terminal into the trial by hand.
+#
+# The trial is demo money, so the bot sends real orders on it: real fills,
+# stop-losses, symbol names, lot sizes and the server clock get tested,
+# which paper cannot do. Trial rules (2-Step at half target): 5% profit
+# target, 2 minimum trading days, the same 5% daily and 10% maximum loss
+# lines. The trial ends if nothing is traded in the first 7 days, so the bot
+# opens and closes the minimum lot in its first session (10:00-10:45 New
+# York) and again whenever 5 days pass without a trade. FAST-4 itself trades
+# only when it signals (about twice a month), so a quiet trial is normal.
+# Exits: the 5-step scale-out (operator's order, 2026-11-08): a trade is
+# held until its stop or its trail is hit, often for weeks.
+# Free slots (operator's order, 2026-11-10): a position whose stop is at or
+# over its entry takes no slot, so up to four positions can be open, at
+# most two of them with a stop under their entry.
+# If FTMO asks for payment for the trial, use any broker's free MT5 demo and
+# change `symbols` to that broker's index names, and `server_clock` to null.
+
+symbols:                 # strategy name -> FTMO MT5 symbol (check Market Watch)
+  US100: US100.cash
+  US500: US500.cash
+  US30: US30.cash
+  US2000: US2000.cash
+risk_per_trade: 0.03     # as on the challenge
+max_positions: 2         # positions that take a slot at once
+free_slots: true         # a position whose stop is at or over its entry takes no slot: S2 of
+                         # research/ftmo_slots_sizing.md, on by the operator's order (2026-11-10)
+notional_cap: 3.0
+atr_stop_mult: 3.0       # the first stop, entry - 3 x ATR(14); this distance is 1R
+exit_mode: scale_out     # the 5 steps: 1/2 at +1R, stop to entry; 1/4 at +1.5R, stop to +1R;
+                         # the last 1/4 trails 1R under the highest close. fast4 = close over
+                         # SMA5 or max_hold_sessions. An open position keeps the rule it was opened with.
+max_hold_sessions: 10    # fast4 exits only
+initial_balance: null    # taken from the trial account's balance when the bot first sees it
+profit_target: 0.05      # the trial's target
+min_trading_days: 2      # the trial's minimum
+max_loss: 0.10
+daily_loss: 0.05
+guard_buffer: 0.002
+cap_combined_risk: true
+cap_max_loss_buffer: 0.015   # all open stops stay 1.5% above the max-loss line: W2 of
+                             # research/ftmo_scale_out_v2.md, on by the operator's order (2026-11-09)
+target_margin: 0.003
+keepalive_days: 5        # a trade at least every 5 days (the trial needs one in its first 7)
+keepalive_symbol: US500
+magic: 404040
+dry_run: false           # demo money: orders go out with run.ps1 -Live (--execute), once login is set
+state_path: state/ftmo_state.json
+log_path: state/ftmo_bot.log
+mt5_path: null           # FTMO's terminal64.exe, e.g.
+                         # C:/Program Files/FTMO Global Markets MT5 Terminal/terminal64.exe
+                         # Set it when another MetaTrader 5 is installed too: left null, the
+                         # bot may attach to that one (`Authorization failed`)
+keep_awake: true         # while it runs, the bot keeps this PC from sleeping: plugged in, Windows
+                         # never sleeps on its own and closing the lid does nothing; a click in
+                         # the bot's window no longer pauses it. On battery Windows keeps its own
+                         # settings, so keep the PC plugged in. false: the bot changes nothing
+                         # (it does not undo what an earlier start set; Windows Settings does).
+                         # On by the operator's order (2026-11-12).
+server_clock: NY+7       # FTMO's server clock; null on another broker's demo
+login: null              # the trial's login number from FTMO's email (not the password),
+                         # e.g. login: 1234567. Orders go only to this account; until it
+                         # is set, run.ps1 -Live refuses and prints the login to set.

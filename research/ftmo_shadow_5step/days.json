@@ -1,0 +1,432 @@
+[
+  {
+    "day": "2026-10-05",
+    "balance": 14999.99922932,
+    "equity": 14999.99922932,
+    "min_equity": 14999.99922932,
+    "daily_floor": 14250.0,
+    "open": [],
+    "plan": "",
+    "deals": [
+      "buy SPY 0.01@770.7185",
+      "sell SPY 0.01@770.6415 -0.00 (FAST4 keepalive)"
+    ],
+    "trading_days": 1,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-06",
+    "balance": 14999.99922932,
+    "equity": 14999.99922932,
+    "min_equity": 14999.99922932,
+    "daily_floor": 14249.99922932,
+    "open": [],
+    "plan": "",
+    "deals": [],
+    "trading_days": 1,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-07",
+    "balance": 14999.99922932,
+    "equity": 14999.99922932,
+    "min_equity": 14999.99922932,
+    "daily_floor": 14249.99922932,
+    "open": [],
+    "plan": "",
+    "deals": [],
+    "trading_days": 1,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-08",
+    "balance": 14999.99922932,
+    "equity": 14999.99922932,
+    "min_equity": 14999.99922932,
+    "daily_floor": 14249.99922932,
+    "open": [],
+    "plan": "",
+    "deals": [],
+    "trading_days": 1,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-09",
+    "balance": 14999.99922932,
+    "equity": 14999.99922932,
+    "min_equity": 14999.99922932,
+    "daily_floor": 14249.99922932,
+    "open": [],
+    "plan": "",
+    "deals": [],
+    "trading_days": 1,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-12",
+    "balance": 14999.99922932,
+    "equity": 14999.99922932,
+    "min_equity": 14999.99922932,
+    "daily_floor": 14249.99922932,
+    "open": [],
+    "plan": "",
+    "deals": [],
+    "trading_days": 1,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-13",
+    "balance": 14999.99922932,
+    "equity": 14999.99922932,
+    "min_equity": 14999.99922932,
+    "daily_floor": 14249.99922932,
+    "open": [],
+    "plan": "",
+    "deals": [],
+    "trading_days": 1,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-14",
+    "balance": 14999.99922932,
+    "equity": 14999.99922932,
+    "min_equity": 14999.99922932,
+    "daily_floor": 14249.99922932,
+    "open": [],
+    "plan": "buy US100 buy US500",
+    "deals": [],
+    "trading_days": 1,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-15",
+    "balance": 14999.99922932,
+    "equity": 15262.392892744996,
+    "min_equity": 14995.500592744998,
+    "daily_floor": 14249.99922932,
+    "open": [
+      "QQQ 15.90@717.07 sl 688.78",
+      "SPY 14.01@765.49 sl 746.22"
+    ],
+    "plan": "",
+    "deals": [
+      "buy QQQ 15.90@717.0659",
+      "buy SPY 14.01@765.4883"
+    ],
+    "trading_days": 2,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-16",
+    "balance": 14999.99922932,
+    "equity": 14854.348192744998,
+    "min_equity": 14775.684892744997,
+    "daily_floor": 14249.99922932,
+    "open": [
+      "QQQ 15.90@717.07 sl 688.78",
+      "SPY 14.01@765.49 sl 746.22"
+    ],
+    "plan": "",
+    "deals": [],
+    "trading_days": 2,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-19",
+    "balance": 14999.99922932,
+    "equity": 15034.038892744997,
+    "min_equity": 14854.348192744998,
+    "daily_floor": 14249.99922932,
+    "open": [
+      "QQQ 15.90@717.07 sl 688.78",
+      "SPY 14.01@765.49 sl 746.22"
+    ],
+    "plan": "",
+    "deals": [],
+    "trading_days": 2,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-20",
+    "balance": 14999.99922932,
+    "equity": 15056.241592744998,
+    "min_equity": 14876.504992744998,
+    "daily_floor": 14249.99922932,
+    "open": [
+      "QQQ 15.90@717.07 sl 688.78",
+      "SPY 14.01@765.49 sl 746.22"
+    ],
+    "plan": "",
+    "deals": [],
+    "trading_days": 2,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-21",
+    "balance": 14999.99922932,
+    "equity": 15236.131492744998,
+    "min_equity": 15056.241592744997,
+    "daily_floor": 14249.99922932,
+    "open": [
+      "QQQ 15.90@717.07 sl 688.78",
+      "SPY 14.01@765.49 sl 746.22"
+    ],
+    "plan": "",
+    "deals": [],
+    "trading_days": 2,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-22",
+    "balance": 14999.99922932,
+    "equity": 14779.885192744998,
+    "min_equity": 14704.107292744999,
+    "daily_floor": 14249.99922932,
+    "open": [
+      "QQQ 15.90@717.07 sl 688.78",
+      "SPY 14.01@765.49 sl 746.22"
+    ],
+    "plan": "",
+    "deals": [],
+    "trading_days": 2,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-23",
+    "balance": 14999.99922932,
+    "equity": 14720.301592744998,
+    "min_equity": 14658.156892744997,
+    "daily_floor": 14249.99922932,
+    "open": [
+      "QQQ 15.90@717.07 sl 688.78",
+      "SPY 14.01@765.49 sl 746.22"
+    ],
+    "plan": "",
+    "deals": [],
+    "trading_days": 2,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-26",
+    "balance": 14999.99922932,
+    "equity": 14918.582392744996,
+    "min_equity": 14720.301592744998,
+    "daily_floor": 14249.99922932,
+    "open": [
+      "QQQ 15.90@717.07 sl 688.78",
+      "SPY 14.01@765.49 sl 746.22"
+    ],
+    "plan": "",
+    "deals": [],
+    "trading_days": 2,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-27",
+    "balance": 14999.99922932,
+    "equity": 15124.954192744997,
+    "min_equity": 14918.582392744996,
+    "daily_floor": 14249.99922932,
+    "open": [
+      "QQQ 15.90@717.07 sl 688.78",
+      "SPY 14.01@765.49 sl 746.22"
+    ],
+    "plan": "",
+    "deals": [],
+    "trading_days": 2,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-28",
+    "balance": 14999.99922932,
+    "equity": 15229.356592744998,
+    "min_equity": 15103.983892744998,
+    "daily_floor": 14249.99922932,
+    "open": [
+      "QQQ 15.90@717.07 sl 688.78",
+      "SPY 14.01@765.49 sl 746.22"
+    ],
+    "plan": "",
+    "deals": [],
+    "trading_days": 2,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-29",
+    "balance": 14999.99922932,
+    "equity": 15028.603492744998,
+    "min_equity": 14936.428492744999,
+    "daily_floor": 14249.99922932,
+    "open": [
+      "QQQ 15.90@717.07 sl 688.78",
+      "SPY 14.01@765.49 sl 746.22"
+    ],
+    "plan": "",
+    "deals": [],
+    "trading_days": 2,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-10-30",
+    "balance": 14550.203280720612,
+    "equity": 14412.929482995612,
+    "min_equity": 14338.25618299561,
+    "daily_floor": 14249.99922932,
+    "open": [
+      "SPY 14.01@765.49 sl 746.22"
+    ],
+    "plan": "buy US30",
+    "deals": [
+      "sell QQQ 15.90@688.7768 -449.80 (stop)"
+    ],
+    "trading_days": 2,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-11-02",
+    "balance": 14550.203280720612,
+    "equity": 14261.57178259656,
+    "min_equity": 14249.96808259656,
+    "daily_floor": 13800.203280720612,
+    "open": [
+      "SPY 14.01@765.49 sl 746.22",
+      "DIA 28.79@522.86 sl 507.70"
+    ],
+    "plan": "",
+    "deals": [
+      "buy DIA 28.79@522.86"
+    ],
+    "trading_days": 3,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-11-03",
+    "balance": 14550.203280720612,
+    "equity": 14227.297582596557,
+    "min_equity": 14145.87598259656,
+    "daily_floor": 13800.203280720612,
+    "open": [
+      "SPY 14.01@765.49 sl 746.22",
+      "DIA 28.79@522.86 sl 507.70"
+    ],
+    "plan": "",
+    "deals": [],
+    "trading_days": 3,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-11-04",
+    "balance": 14550.203280720612,
+    "equity": 14859.753844596558,
+    "min_equity": 14227.297582596557,
+    "daily_floor": 13800.203280720612,
+    "open": [
+      "SPY 14.01@765.49 sl 746.22",
+      "DIA 28.79@522.86 sl 507.70"
+    ],
+    "plan": "",
+    "deals": [],
+    "trading_days": 3,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-11-05",
+    "balance": 14280.188235460611,
+    "equity": 14036.04783506156,
+    "min_equity": 14028.85033506156,
+    "daily_floor": 13800.203280720612,
+    "open": [
+      "DIA 28.79@522.86 sl 507.70"
+    ],
+    "plan": "",
+    "deals": [
+      "sell SPY 14.01@746.2152 -270.02 (stop)"
+    ],
+    "trading_days": 3,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-11-06",
+    "balance": 14280.188235460611,
+    "equity": 13974.120545061562,
+    "min_equity": 13872.463055061558,
+    "daily_floor": 13530.188235460611,
+    "open": [
+      "DIA 28.79@522.86 sl 507.70"
+    ],
+    "plan": "",
+    "deals": [],
+    "trading_days": 3,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-11-09",
+    "balance": 14280.188235460611,
+    "equity": 14293.718335061561,
+    "min_equity": 13972.709835061558,
+    "daily_floor": 13530.188235460611,
+    "open": [
+      "DIA 28.79@522.86 sl 507.70"
+    ],
+    "plan": "",
+    "deals": [],
+    "trading_days": 3,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-11-10",
+    "balance": 14280.188235460611,
+    "equity": 14247.94223506156,
+    "min_equity": 14175.67933506156,
+    "daily_floor": 13530.188235460611,
+    "open": [
+      "DIA 28.79@522.86 sl 507.70"
+    ],
+    "plan": "",
+    "deals": [],
+    "trading_days": 3,
+    "flags": [],
+    "errors": 0
+  },
+  {
+    "day": "2026-11-11",
+    "balance": 14280.188235460611,
+    "equity": 14321.27036506156,
+    "min_equity": 14200.29478506156,
+    "daily_floor": 13530.188235460611,
+    "open": [
+      "DIA 28.79@522.86 sl 507.70"
+    ],
+    "plan": "",
+    "deals": [],
+    "trading_days": 3,
+    "flags": [],
+    "errors": 0
+  }
+]

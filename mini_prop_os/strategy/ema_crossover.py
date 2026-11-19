@@ -1,5 +1,10 @@
 """Intraday EMA-crossover strategy (long-only) on a liquid ticker (e.g. SPY).
 
+DEPLOYABLE: no
+    Loses to holding SPY in every walk-forward fold
+    (reports/minipropos_expectancy_spy.md; gate:
+    scripts/expectancy.py). Paper-only until that changes.
+
 Rules
 -----
 * Maintain fast and slow exponential moving averages of bar closes,

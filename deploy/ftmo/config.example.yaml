@@ -1,0 +1,90 @@
+# FTMO bot (FAST-4): config for the paid FTMO 2-Step challenge.
+# deploy\ftmo\setup.ps1 -Account challenge -Force installs it as
+# state\ftmo_config.yaml (git-ignored; -Force replaces the trial's copy);
+# edit that copy, not this file.
+# NO credentials here, ever: log the FTMO MT5 terminal in by hand; the bot
+# attaches to the running terminal.
+#
+# Research verdict for FAST-4 at 3% risk (research/ftmo_fast_pass.md):
+# NO-GO for a fast pass. With these risk controls and the FAST-4 exits
+# (exit_mode: fast4; research/ftmo_bot_policy.md): two years or more to
+# pass both phases; attempts breached 1% of the time in 2019-2026 and
+# 41-43% in 2011-2018. Run it knowing that.
+#
+# Exits: the 5-step scale-out, by the operator's order (2026-11-08)
+# (research/ftmo_scale_out.md, V1), with the cap kept 1.5% above the
+# max-loss line by the operator's order of 2026-11-09 (W2,
+# research/ftmo_scale_out_v2.md; it did not pass its pre-registered rule).
+# 61-62% of trades won (2012-2026), not 30 of 31. Of attempts started
+# 2011-18 / 2019-26: both phases passed 38-43% / 37-40% (within 18 months
+# 31-38% / 20-24%); breached 15-16% / 2%; frozen (flat, no risk room left,
+# cannot pass) 42-47% / 42%. Without the buffer (0.002): passed 46-47% /
+# 38-42%, breached 37% / 12-13%, frozen 17% / 30%. The buffer turns
+# breaches into frozen accounts and adds no passes
+# (research/ftmo_frozen_accounts.py).
+#
+# Free slots, by the operator's order of 2026-11-10 (S2,
+# research/ftmo_slots_sizing.md; it did not pass its pre-registered rule):
+# a position whose stop is at or over its entry takes no slot. With the
+# 5 steps and the 1.5% buffer (what this file runs), of attempts started
+# 2011-18 / 2019-26: both phases passed 35% / 42-52% (within 18 months
+# 34% / 30-39%); breached 19-21% / 7-8%; frozen 44-45% / 32-38%. 59% of
+# trades won, about 14 a year instead of 10, +0.08R a trade instead of
+# +0.13-0.15R; up to four positions open at once.
+
+symbols:                 # strategy name -> FTMO MT5 symbol (check Market Watch)
+  US100: US100.cash
+  US500: US500.cash
+  US30: US30.cash
+  US2000: US2000.cash
+risk_per_trade: 0.03     # operator's order (2026-10-04)
+max_positions: 2         # positions that take a slot at once
+free_slots: true         # a position whose stop is at or over its entry (step 3 done) takes no
+                         # slot: up to four open, at most two with a stop under their entry.
+                         # Operator's order (2026-11-10); false = every open position takes a slot
+notional_cap: 3.0        # x balance per position, at its entry. Two positions at 3x and two
+                         # half-sold ones at 1.5x need about 3/4 of the balance as margin at
+                         # entry prices on the Swing account (1:15, US2000 1:9); more as the
+                         # half-sold ones rise
+atr_stop_mult: 3.0       # the first stop, entry - 3 x ATR(14); this distance is 1R
+exit_mode: scale_out     # the 5 steps: 1/2 at +1R, stop to entry; 1/4 at +1.5R, stop to +1R;
+                         # the last 1/4 trails 1R under the highest close. fast4 = close over
+                         # SMA5 or max_hold_sessions. An open position keeps the rule it was opened with.
+max_hold_sessions: 10    # fast4 exits only
+initial_balance: null    # null: the account's balance when the bot first sees it (FTMO accounts
+                         # start at their size). Set the size only if the bot first meets an
+                         # account that has already traded; a size the balance cannot have is refused.
+profit_target: 0.10      # Phase 1: 0.10, Phase 2 (Verification): 0.05, funded account: null
+                         # (left blank it also means null: no target, so never blank it by mistake)
+min_trading_days: 4
+max_loss: 0.10
+daily_loss: 0.05
+guard_buffer: 0.002      # flatten 0.2% of initial before a loss line
+cap_combined_risk: true  # size each entry so all open stops together stay above both loss lines
+cap_max_loss_buffer: 0.015   # ... 1.5% above the max-loss line (the daily line: guard_buffer). W2 of
+                         # research/ftmo_scale_out_v2.md, on by the operator's order (2026-11-09) for the
+                         # challenge; decide again for the funded account (0.002 = without it)
+target_margin: 0.003     # lock the phase target once equity is this far (of initial) above it
+keepalive_days: 25       # minimum-lot round trip after this many days without an opened
+                         # position, in every phase (FTMO closes inactive accounts); 0 = off
+keepalive_symbol: US500
+magic: 404040
+dry_run: true            # set false (and login) AND start with run.ps1 -Live (--execute) to send orders
+state_path: state/ftmo_state.json
+log_path: state/ftmo_bot.log
+mt5_path: null           # FTMO's terminal64.exe, e.g.
+                         # C:/Program Files/FTMO Global Markets MT5 Terminal/terminal64.exe
+                         # Set it when another MetaTrader 5 is installed too: left null, the
+                         # bot may attach to that one (`Authorization failed`)
+keep_awake: true         # while it runs, the bot keeps this PC from sleeping: plugged in, Windows
+                         # never sleeps on its own and closing the lid does nothing; a click in
+                         # the bot's window no longer pauses it. On battery Windows keeps its own
+                         # settings, so keep the PC plugged in. false: the bot changes nothing
+                         # (it does not undo what an earlier start set; Windows Settings does).
+                         # On by the operator's order (2026-11-12).
+server_clock: NY+7       # FTMO's server: GMT+2, GMT+3 in summer, changing with the US clocks
+                         # (FTMO trading update 2026-10-29). Still checked against a live tick
+                         # before every bar read. On another broker's demo set null to fit it.
+login: null              # the account's login number from FTMO's email (not the password),
+                         # e.g. login: 1234567; a new one for each phase. Orders go only to
+                         # this account; until it is set, run.ps1 -Live refuses.

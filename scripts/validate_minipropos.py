@@ -31,12 +31,13 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
 from mini_prop_os.core.config import RiskConfig, load_config  # noqa: E402
-from mini_prop_os.core.types import Bar, Fill  # noqa: E402
+from mini_prop_os.core.types import Action, Bar, Fill  # noqa: E402
 from mini_prop_os.sim import (HistoricalSession, SimConfig, SimResult,
                               bars_from_closes, run_session)  # noqa: E402
 from mini_prop_os.strategy.adaptive_ema import (  # noqa: E402
     AdaptiveEmaCrossoverStrategy, VolRegime)
 from mini_prop_os.strategy.ema_crossover import EmaCrossoverStrategy  # noqa: E402
+from mini_prop_os.strategy.scheduled_dca import ScheduledDcaStrategy  # noqa: E402
 from mini_prop_os.risk.guardrails import RiskGuardrails  # noqa: E402
 
 PASS_THRESHOLD = 0.75
@@ -624,6 +625,84 @@ def historical_stress(quiet: bool) -> Tuple[List[Check], List[str]]:
     return checks, lines
 
 
+# ------------------------------------------------------------ scheduled DCA
+
+DCA_TOLERANCE = 50.0  # dollars, per the order sheet
+
+
+def scenario_scheduled_dca(quiet: bool) -> Tuple[List[Check], str]:
+    """Weekly DCA over the full SPY history through the real pipeline
+    must land within $50 of the analytic DCA figure (same fills, same
+    commissions, computed without the OMS/broker), never sell, and place
+    exactly one order per schedule slot."""
+    dates, closes = load_spy_index_closes()
+    closes = [c / 10.0 for c in closes]          # back to SPY share prices
+    symbol = "SPY"
+    lot = 10
+    commission = 0.10                            # $1 minimum / 10 shares
+    tick = 0.01
+    weeks = len(closes) / 5 + 1
+    cash = lot * max(closes) * weeks
+    sim_cfg = SimConfig(multiplier=1.0, tick_size=tick, slippage_ticks=1,
+                        commission_per_unit=commission, initial_cash=cash,
+                        split_fills=False)
+    risk = RiskGuardrails(RiskConfig(
+        max_position_shares=10_000_000, max_position_notional=1e12,
+        max_order_quantity=lot, max_gross_notional=1e12,
+        max_daily_loss=1e12, max_daily_loss_pct=0.999))
+    strategy = ScheduledDcaStrategy(symbol, quantity=lot, schedule="weekly",
+                                    weekday="Monday", time_of_day="00:00",
+                                    timezone="UTC", state_path=None)
+    bars = bars_from_closes(closes, symbol, timestamps=dates)
+    session = HistoricalSession(strategy, risk, sim_cfg)
+    res = run_session(session, bars)
+
+    # Analytic DCA: the first bar anchors; every later bar that is the
+    # first at/after a Monday 00:00 UTC slot buys `lot` at the NEXT bar's
+    # open (= that bar's close) plus one tick, paying commission per share.
+    slot_seen = strategy.due_slot(dates[0])
+    shares, spent = 0, 0.0
+    orders = 0
+    for i in range(len(dates) - 1):
+        slot = strategy.due_slot(dates[i])
+        if slot > slot_seen:
+            slot_seen = slot
+            fill = round((closes[i] + tick) / tick) * tick
+            spent += lot * fill + lot * commission
+            shares += lot
+            orders += 1
+    analytic = cash - spent + shares * closes[-1]
+    diff = abs(res.final_equity - analytic)
+    sells = sum(1 for it in session.broker.orders_received
+                if it.action is Action.SELL)
+    checks = [
+        Check("scheduled_dca: final equity within $50 of the analytic DCA "
+              "figure (commissions + slippage included)",
+              diff <= DCA_TOLERANCE,
+              f"sim ${res.final_equity:,.2f} vs analytic ${analytic:,.2f} "
+              f"(diff ${diff:,.2f})"),
+        Check("scheduled_dca: exactly one order per schedule slot",
+              res.final_position == shares and strategy.buys_emitted == orders,
+              f"{strategy.buys_emitted} buys, {res.final_position} shares "
+              f"vs analytic {orders} slots, {shares} shares"),
+        Check("scheduled_dca: never sells", sells == 0,
+              f"{sells} sell intents"),
+        Check("scheduled_dca: no risk rejections at measurement caps",
+              res.risk_rejections == 0, f"{res.risk_rejections} rejected"),
+        Check("scheduled_dca: accounting reconciles",
+              res.accounting_error < ACCOUNTING_TOLERANCE,
+              f"error ${res.accounting_error:.4f}"),
+    ]
+    line = (f"| scheduled_dca weekly, lot {lot} | {res.bars} | "
+            f"{strategy.buys_emitted} | {res.final_position} | "
+            f"{res.final_equity - cash:+,.0f} | {analytic - cash:+,.0f} | "
+            f"{diff:,.2f} |")
+    if not quiet:
+        print(f"  scheduled_dca: {strategy.buys_emitted} buys, "
+              f"sim vs analytic diff ${diff:,.2f}")
+    return checks, line
+
+
 # ------------------------------------------------------- historical replay
 
 def load_spy_index_closes() -> Tuple[List[datetime], List[float]]:
@@ -711,6 +790,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     checks += scenario_credibility_statistics()
     hist_checks, perf_lines = historical_replays(args.quiet)
     checks += hist_checks
+    dca_checks, dca_line = scenario_scheduled_dca(args.quiet)
+    checks += dca_checks
     stress_checks, stress_lines = historical_stress(args.quiet)
     checks += stress_checks
 
@@ -759,6 +840,15 @@ def main(argv: Optional[List[str]] = None) -> int:
         "max DD ($) | kill switch |",
         "|---|---|---|---|---|---|---|",
         *stress_lines,
+        "",
+        "Scheduled DCA (never sells) over the full SPY share-price history, "
+        "real pipeline vs the analytic figure (same fills, commissions, "
+        "1-tick slippage; gate: within $50):",
+        "",
+        "| strategy | bars | buys | final shares | sim PnL ($) | "
+        "analytic PnL ($) | diff ($) |",
+        "|---|---|---|---|---|---|---|",
+        dca_line,
         "",
         "Win rates for a trend-following crossover are typically well "
         "below 50% (few large winners pay for many small losers); the "

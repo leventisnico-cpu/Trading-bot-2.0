@@ -1,0 +1,60 @@
+# Mini-Prop OS — mechanical weekly DCA into SPY on the IBKR PAPER account
+# (TFSA permissions: stocks/ETFs only). Buys 10 shares every Monday at
+# 10:00 ET, never sells. PAPER ONLY: port 4002.
+#
+# Use:  .\deploy\windows\run.ps1 -Config deploy\config.tfsa-paper-dca.yaml
+
+connection:
+  host: 127.0.0.1
+  port: 4002            # IB Gateway PAPER
+  client_id: 17
+  account: ""
+  market_data_type: delayed
+
+contract:
+  symbol: SPY
+  sec_type: STK
+  exchange: SMART
+  currency: USD
+  multiplier: 1.0
+
+strategy:
+  name: scheduled_dca
+  bar_size: "1 min"
+  order_quantity: 10          # shares per period (dca_amount: 0)
+  dca_amount: 0.0             # >0 = currency per period -> shares at last price
+  dca_schedule: weekly
+  dca_weekday: Monday
+  dca_time: "10:00"           # in dca_timezone
+  dca_timezone: America/New_York
+  dca_state_path: state/dca_state.json
+  use_rth: true
+
+risk:
+  max_position_shares: 600          # ~a year of weekly 10-share buys
+  max_position_notional: 500000.0
+  max_order_quantity: 10            # exactly one lot per order
+  max_gross_notional: 500000.0
+  max_daily_loss: 500.0
+  max_daily_loss_pct: 0.02
+  allow_short: false
+  kill_switch_flattens: false       # a DCA book is not flattened by a
+                                    # daily-loss trip; it just stops buying
+
+execution:
+  execution_log_path: state/executions.jsonl
+  order_timeout_s: 60.0
+  cancel_on_shutdown: true
+  flatten_on_shutdown: false
+
+notifications:
+  enabled: true
+  provider: telegram
+  bot_token_env: TELEGRAM_BOT_TOKEN
+  chat_id_env: TELEGRAM_CHAT_ID
+  commands_enabled: true
+  poll_interval_s: 3.0
+
+logging:
+  level: INFO
+  file: state/mini_prop_os.log

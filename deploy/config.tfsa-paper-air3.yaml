@@ -1,0 +1,86 @@
+# Mini-Prop OS — AIR3 trend rule on SMH, IBKR PAPER account inheriting TFSA
+# permissions (stocks/ETFs only, no futures). Mirrors the Astral paper
+# deployment (saved strategy 6422, deployment 1924, $870) so the IBKR
+# pipeline rehearses the exact rule that would go live.
+#
+# PAPER ONLY. Port 4002 is IB Gateway's paper port. A live port (4001 / 4003 /
+# 7496) in this file is a bug until the live-readiness order is signed off,
+# and main.py refuses a live port anyway while the strategy is marked
+# DEPLOYABLE: no (see docs/LIVE_READINESS.md).
+#
+# Install for a session:   .\deploy\windows\run.ps1 -Config deploy\config.tfsa-paper-air3.yaml
+# Preflight (read-only):   .\deploy\windows\run.ps1 -Preflight -Config deploy\config.tfsa-paper-air3.yaml
+
+connection:
+  host: 127.0.0.1
+  port: 4002            # IB Gateway PAPER. 7497 = TWS paper.
+  client_id: 18         # distinct from the SPY config so both can be tried
+  account: ""           # empty = first managed account (the paper account)
+  connect_timeout_s: 15.0
+  heartbeat_interval_s: 10.0
+  heartbeat_timeout_s: 5.0
+  heartbeat_max_misses: 3
+  reconnect_backoff_base_s: 2.0
+  reconnect_backoff_max_s: 120.0
+  reconnect_max_attempts: 0     # 0 = retry forever
+  market_data_type: delayed     # daily bars: delayed data is fully adequate
+
+contract:
+  symbol: SMH
+  sec_type: STK
+  exchange: SMART
+  currency: USD
+  multiplier: 1.0
+
+strategy:
+  name: air3_trend      # buy 1 lot when close > 1.05 x SMA200 and SMA50 > SMA200;
+                        # sell when close < 0.95 x SMA200; nothing else
+  bar_size: "1 day"     # one decision per day, on the completed daily bar
+  history_duration: "2 Y"   # ~500 daily bars; the rule needs 200 to warm up
+  order_quantity: 1     # ONE share per entry: $870 of equity buys at most one
+                        # ~$630 SMH share (72% of equity, vs 95% on Astral
+                        # paper where fractional shares are allowed)
+  warmup_bars: 0        # 0 = derived by the strategy (200 bars)
+  use_rth: true         # stocks: regular trading hours only
+  trend_fast_period: 50
+  trend_slow_period: 200
+  trend_entry_band: 0.05
+  trend_exit_band: 0.05
+  # fields below belong to the other strategies and are ignored here
+  fast_period: 9
+  slow_period: 21
+
+risk:
+  max_position_shares: 1            # one share, one lot, never pyramided
+  max_position_notional: 1000.0     # 1 share x ~$630 SMH, with headroom
+  max_order_quantity: 1
+  max_gross_notional: 1000.0
+  # The rule has no stop by design: SMH moves 3-5% on a normal day and fell
+  # 10% in a day in April 2025. A tight daily-loss breaker would flatten the
+  # book on noise and turn a trend rule into a whipsaw machine. $130 / 15%
+  # of $870 lets a bad day pass and still halts on a genuine disaster.
+  max_daily_loss: 130.0
+  max_daily_loss_pct: 0.15
+  allow_short: false
+  kill_switch_flattens: true
+
+execution:
+  execution_log_path: state/executions.jsonl
+  order_timeout_s: 60.0
+  cancel_on_shutdown: true
+  flatten_on_shutdown: false
+
+notifications:
+  enabled: true
+  provider: telegram
+  # Credentials are NEVER written here. The bot token and chat id are read
+  # from these environment variables (set them in the shell / .env that
+  # launches the bot; .env is git-ignored).
+  bot_token_env: TELEGRAM_BOT_TOKEN
+  chat_id_env: TELEGRAM_CHAT_ID
+  commands_enabled: true            # answer /status, /positions, /orders
+  poll_interval_s: 3.0
+
+logging:
+  level: INFO
+  file: state/mini_prop_os.log
