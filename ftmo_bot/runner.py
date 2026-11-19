@@ -79,6 +79,8 @@ CLOSE_RETRY_MAX = timedelta(minutes=15)   # the slowest pace of a queued close's
 SELFTEST_STOPS = (0.05, 0.04)             # the self-test's stop, then where it moves: under the ask
 FILL_WAIT = (10, 0.3)                     # reads, and seconds between them, for a fill to show in the list
 PLAN_RETRIES = 30                         # ticks a plan is retried while the terminal's history ends before today
+RECONNECT_AFTER = 2                       # failed ticks in a row before the broker link is reopened
+GIVE_UP_AFTER = 10                        # failed ticks in a row before the bot exits for the watchdog to restart it
 FROZEN_ROOM = 0.0005                      # of the initial balance: under it a flat account is frozen
 BAR_MINUTES = 30
 # FTMO's index CFDs trade ~23 h a day: ~46 half-hour bars per session.
@@ -1172,6 +1174,21 @@ class Runner:
             return True
         return bool(self.b.positions(self.cfg.magic))
 
+    def _reconnect(self, failed: int) -> None:
+        """Reopen the broker link after ``failed`` ticks in a row (MT5:
+        the terminal was closed and reopened). Never raises."""
+        reconnect = getattr(self.b, "reconnect", None)
+        if reconnect is None:
+            return
+        try:
+            if reconnect():
+                log.info("reconnected to the terminal after %d failed ticks", failed)
+            else:
+                log.warning("reconnect to the terminal failed (tick %d); trying again "
+                            "next tick", failed)
+        except Exception:
+            log.exception("reconnect failed")
+
     def run(self, every: int = 60) -> None:
         log.info("FTMO bot running (%s), risk %.1f%% per trade, symbols %s",
                  "DRY-RUN" if self.cfg.dry_run else "LIVE ORDERS",
@@ -1186,6 +1203,7 @@ class Runner:
                 console = keepawake.no_quick_edit()
                 for fine, line in keepawake.guard_lines(held, console is not None):
                     log.log(logging.INFO if fine else logging.WARNING, line)
+            failed = 0
             while True:
                 try:                             # the stall check never ends the loop
                     now = _utcnow()
@@ -1197,11 +1215,23 @@ class Runner:
                     log.exception("stall check failed")
                 try:
                     self.tick()
+                    failed = 0
                     if self.st.halted and (self.cfg.dry_run or not self.holding()):
                         log.warning("halted: %s", self.st.halted)
                         return
                 except Exception:                # keep running; state untouched
-                    log.exception("tick failed")
+                    failed += 1
+                    log.exception("tick failed (%d in a row)", failed)
+                    # 2026-11-18: the terminal was closed and reopened; the
+                    # bot's IPC link stayed dead ("IPC send failed") for 17
+                    # hours, the watchdog saw a live process and did nothing.
+                    if failed >= GIVE_UP_AFTER:
+                        log.error("giving up after %d failed ticks in a row; exiting so "
+                                  "the watchdog starts a fresh bot (an open position "
+                                  "keeps its stop at the broker)", failed)
+                        return
+                    if failed >= RECONNECT_AFTER:
+                        self._reconnect(failed)
                 _time.sleep(every)
         finally:
             keepawake.restore_console(console)

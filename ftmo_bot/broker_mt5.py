@@ -39,6 +39,7 @@ class MT5Broker:
         before every send (the terminal can be switched at any time)."""
         import MetaTrader5 as mt5   # imported here so CI never needs it
         self.mt5 = mt5
+        self.path = path
         self.login = login
         self.probe = probe
         self.strict = strict
@@ -60,6 +61,23 @@ class MT5Broker:
                                "Open the FTMO MT5 terminal and log in first.")
         if probe:
             self.verify(probe)                   # a weekend start just warns
+
+    def reconnect(self) -> bool:
+        """Drop the IPC link and open it again. Once the terminal has been
+        closed and reopened, every call on the old link answers
+        ``(-10001, 'IPC send failed')`` until this is done."""
+        try:
+            self.mt5.shutdown()
+        except Exception:                        # the old link is dead anyway
+            pass
+        ok = self.mt5.initialize(self.path) if self.path else self.mt5.initialize()
+        if not ok:
+            log.warning("MT5 reconnect failed: %s", self.mt5.last_error())
+            return False
+        self._looks.clear()                      # the clock's freshness looks restart
+        a = self.mt5.account_info()
+        log.info("reconnected to the terminal (account %s)", a.login if a else "none")
+        return True
 
     # ------------------------------------------------------------ clock
     def _measure(self, symbol: str) -> Optional[timedelta]:
