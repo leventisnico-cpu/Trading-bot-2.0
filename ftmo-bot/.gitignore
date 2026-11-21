@@ -1,0 +1,19 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.json
+# Market data is large and re-downloadable; never commit it.
+data/raw/*
+data/bars/*
+data/integrity/*
+data/calendar/*
+!data/raw/.gitkeep
+!data/bars/.gitkeep
+# Live runtime state (baseline, heartbeat, HALT, idempotency keys, logs).
+state/
+reports/*/*.parquet
+reports/report.html
